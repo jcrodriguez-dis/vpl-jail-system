@@ -1,0 +1,8 @@
+#configuración en configure.ac (version etc)
+aclocal
+autoheader
+autoconf
+automake
+./configure
+make distcheck
+

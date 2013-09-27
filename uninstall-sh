@@ -1,0 +1,75 @@
+#!/bin/bash
+# version:		$Id: uninstall-sh,v 1.1 2011-04-04 14:54:30 juanca Exp $
+# package:		Part of vpl-xmlrpc-jail
+# copyright:	Copyright (C) 2011 Juan Carlos Rodríguez-del-Pino. All rights reserved.
+# license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-2.0.html
+# Description:	Script to uninstall vpl-xmlrpc-jail (Centos 5.5 and Ubuntu)
+
+remove_dir() {
+	if [ -d $1 ] ; then
+		rmdir $1
+	fi
+}
+if [ "$USER" != "root" ] ; then
+	echo "This script need to be run as root and is run as $USER"
+	exit 1;
+fi
+VPLJAIL_INSTALL_DIR=/etc/vpl
+if [ -d $VPLJAIL_INSTALL_DIR ] ; then
+	echo "VPL jail installation dir '$VPLJAIL_INSTALL_DIR' not found"
+	exit 1
+fi
+LSYSTEM="Unknow"
+if [ -f /sbin/chkconfig ] ; then
+	LSYSTEM="1"
+fi
+if [ -f /usr/sbin/update-rc.d ] ; then
+	LSYSTEM="2"
+fi
+echo "Select distribution:"
+echo "1) RedHat/Centos 5.X"
+echo "2) Ubuntu/Debian"
+read LSYSTEM
+if [ "$LSYSTEM" != "1" ] && [ "$LSYSTEM" != "2" ] ;
+then
+	echo "Sorry, unknow system"
+	exit 1
+fi
+
+#Stop services
+service vpl-jail-system stop
+rm /etc/xinetd.d/vpl-xmlrpc-jail
+service xinetd reload
+CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-xmlrpc-jail.conf"
+#Load config file
+if [ -f "$CONFIG_FILE" ]; then
+	. "$CONFIG_FILE"
+	#Check $JAILPATH not been "/"
+	if [ -f "$JAILPATH$CONFIG_FILE" ] ; then
+		echo -n $"vpl-jail-system jail path error '$JAILPATH'"
+	else
+		#Remove safe dir
+		remove_dir $JAILPATH/bin	
+		remove_dir $JAILPATH/usr	
+		remove_dir $JAILPATH/lib	
+		remove_dir $JAILPATH/lib64	
+		remove_dir $JAILPATH/tmp	
+		remove_dir $JAILPATH/home	
+		remove_dir $JAILPATH/var/lib	
+		remove_dir $JAILPATH/var
+		#Ask user to remove unsafe dir
+		echo "please, remove manualy '$JAILPATH' directory"
+	fi
+else
+	echo -n $"vpl-jail-system config file not found: $CONFIG_FILE"
+fi
+rm $VPLJAIL_INSTALL_DIR/vpl-xmlrpc-jail
+rm $VPLJAIL_INSTALL_DIR/vpl-xmlrpc-jail.conf
+rmdir $VPLJAIL_INSTALL_DIR
+if [ "$LSYSTEM" = "1" ] ;
+then
+	chkconfig --del vpl-jail-system
+else
+	update-rc.d -f vpl-jail-system remove
+fi
+rm /etc/init.d/vpl-jail-system

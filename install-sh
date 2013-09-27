@@ -1,0 +1,71 @@
+#!/bin/bash
+# version:		$Id: install-sh,v 1.19 2011-08-05 16:30:48 juanca Exp $
+# package:		Part of vpl-xmlrpc-jail
+# copyright:	Copyright (C) 2011 Juan Carlos Rodríguez-del-Pino. All rights reserved.
+# license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-2.0.html
+# Description:	Script to install vpl-xmlrpc-jail (Centos 5.5 and Ubuntu)
+
+if [ "$USER" != "root" ] ; then
+	echo "This script need to be run as root and is run as $USER"
+	exit 1;
+fi
+VPLJAIL_INSTALL_DIR=/etc/vpl
+if [ -d $VPLJAIL_INSTALL_DIR ] ; then
+	echo "Updating installation"
+else
+	mkdir $VPLJAIL_INSTALL_DIR
+fi
+LSYSTEM="Unknow"
+if [ -f /sbin/chkconfig ] ; then
+	LSYSTEM="1"
+fi
+if [ -f /usr/sbin/update-rc.d ] ; then
+	LSYSTEM="2"
+fi
+echo "Select distribution:"
+echo "1) RedHat/Centos 5.X"
+echo "2) Ubuntu/Debian"
+read LSYSTEM
+if [ "$LSYSTEM" != "1" ] && [ "$LSYSTEM" != "2" ] ;
+then
+	echo "Sorry, unknow system"
+	exit 1
+fi
+cp src/vpl-xmlrpc-jail $VPLJAIL_INSTALL_DIR
+cp -i vpl-xmlrpc-jail.conf $VPLJAIL_INSTALL_DIR
+chmod 600 $VPLJAIL_INSTALL_DIR/vpl-xmlrpc-jail.conf
+if [ "$LSYSTEM" = "1" ] ;
+then
+	echo "Selected RedHat/Centos 5.x"
+	cp vpl-jail-system.centos /etc/init.d/vpl-jail-system
+	cp -i vpl-xmlrpc-jail.xinetd /etc/xinetd.d/vpl-xmlrpc-jail
+	chmod +x /etc/init.d/vpl-jail-system
+	chkconfig --level 2345 nfs on
+	chkconfig --add vpl-jail-system
+	service xinetd restart
+	service nfs start
+else
+	echo "Selected Ubuntu/Debian"
+	apt-get -y install xinetd
+	cp vpl-jail-system.ubuntu /etc/init.d/vpl-jail-system
+	cp -i vpl-xmlrpc-jail.xinetd /etc/xinetd.d/vpl-xmlrpc-jail
+	chmod +x /etc/init.d/vpl-jail-system
+	update-rc.d -f vpl-jail-system remove
+	update-rc.d vpl-jail-system start 50 2 3 4 5 . stop 50 0 1 6 .
+	echo "Install development software? (C, C++, Java, etc.) (y/n)"
+	read A
+	if [ "$A" != "n" ] ; then
+		apt-get -y install expect fpc gcc gdb gfortran ghdl gnat gprolog g++ hugs
+		apt-get -y install junit junit4 mit-scheme mono-complete mono-debugger octave3.2
+		apt-get -y install openjdk-6-jdk perl php5 plt-scheme python ruby sqlite3 swi-prolog
+		apt-get -y install valgrind
+		echo "Remove apache2 ? (y/n)"
+		read A
+		if [ "$A" != "n" ] ; then
+			#remove apache2
+			rm /etc/init.d/apache2 >/dev/null 2>&1
+			update-rc.d apache2 remove
+		fi
+	fi
+fi
+service vpl-jail-system start

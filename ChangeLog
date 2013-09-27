@@ -1,0 +1,488 @@
+2011-04-07  juanca
+
+	* src/jail.cpp: Changed parm uri to urlpath, uri not deprecated
+	  Removed the 5 seg wait after execution.
+
+2011-04-07  juanca
+
+	* src/vpl-xmlrpc-jail.cpp: Changed the debug levels to an int from
+	  0 to 8
+
+2011-04-07  juanca
+
+	* src/util.h: Added version() function
+
+2011-04-07  juanca
+
+	* src/redirector.cpp: Removed shutdown(socket) function.  Changed
+	  code to more reliable communications Added logs.
+
+2011-04-07  juanca
+
+	* src/redirector.h: Added isOutputBufferFull() function
+
+2011-04-07  juanca
+
+	* src/httpServer.h: Refactoring creating a new send function
+	  Changed URI to the correct name.
+
+2011-04-07  juanca
+
+	* src/httpServer.cpp: Fixed race communication error by removing
+	  “shutdown(socket)” function calls.  Refactoring creating a
+	  new send function Changed URI to the correct name.
+
+2011-04-05  juanca
+
+	* src/Makefile.am: Added redirector.h and redirector.cpp
+
+2011-04-05  juanca
+
+	* src/redirector.cpp: fix error
+
+2011-04-04  juanca
+
+	* ChangeLog: 1.2 Changelog
+
+2011-04-04  juanca
+
+	* vpl-jail-system.ubuntu: Fixed error in name of device file
+	  "random" and "urandom" Added new clone dirs "/etc/mono",
+	  "/etc/alternatives" and "/var/lib"
+
+2011-04-04  juanca
+
+	* vpl-jail-system.centos: Fixed error in name of device file
+	  "random" and "urandom"
+
+2011-04-04  juanca
+
+	* uninstall-sh: New script to uninstall vpl_xmlrpc_jail
+
+2011-04-04  juanca
+
+	* install-sh: Added copyright comment Added development software
+	  installation for Ubuntu
+
+2011-04-04  juanca
+
+	* src/: redirector.h, redirector.cpp: Redirector class moved from
+	  jail.h. Added addMessage method
+
+2011-04-04  juanca
+
+	* src/jail.cpp: Moved Redirector class to redirector.h Changed
+	  addOutput to addMessage for jail system messages
+
+2011-04-04  juanca
+
+	* src/jail.h: Moved Redirector class to redirector.h
+
+2011-01-04  juanca
+
+	* src/rpc.h: getStructMembers now accept struct and array of 0 size
+
+2010-12-27  juanca
+
+	* install-sh: Fexed errors in distribution selection
+
+2010-12-15  juanca
+
+	* src/jail.cpp: Change network connect state to blocking
+
+2010-12-15  juanca
+
+	* src/util.h: Changed include macro flag name
+
+2010-12-07  juanca
+
+	* install-sh: Add update-rc.d to remove last vpl instalation
+
+2010-12-07  juanca
+
+	* vpl-jail-system.ubuntu: changes Ubuntu runlevels
+
+2010-12-07  juanca
+
+	* install-sh: changes Ubuntu runlevels
+
+2010-12-06  juanca
+
+	* vpl-xmlrpc-jail.xinetd: Line delimiter to unix
+
+2010-12-06  juanca
+
+	* HOWTO.txt: fix typo
+
+2010-12-06  juanca
+
+	* vpl-xmlrpc-jail.xinetd: Fix default port number
+
+2010-12-06  juanca
+
+	* install-sh: change script to execution file install xinetd for
+	  Ubuntu
+
+2010-12-05  juanca
+
+	* .cvsignore, HOWTO.txt, config.h, config.h.in, configure,
+	  configure.ac, install-sh, vpl-jail-system.ubuntu,
+	  src/.deps/httpServer.Po, src/.deps/jail.Po,
+	  src/.deps/vpl-xmlrpc-jail.Po: Last update
+
+2010-12-03  juanca
+
+	* Makefile.am, Makefile.in, config.h.in: needed for configure
+
+2010-12-03  juanca
+
+	* vpl-xmlrpc-jail.xinetd: fix error and new default port
+
+2010-12-03  juanca
+
+	* install-sh, vpl-jail-system.centos, vpl-jail-system.ubuntu: new
+	  init script for Ubuntu
+
+2010-12-03  juanca
+
+	* src/Makefile.in: needed for configure
+
+2010-12-03  juanca
+
+	* src/jail.cpp: need climits and fix a regresion error
+
+2010-09-21  juanca
+
+	* src/: httpServer.cpp, jail.cpp, util.h, xml.h: Added include
+	  needed and cast to remove warnings
+
+2009-11-20  juanca
+
+	* install-sh: Check for update and ask for user confirmation to
+	  overwrite configuration files
+
+2009-11-20  juanca
+
+	* src/: jail.cpp, jail.h: Fix program terminate information error
+	  and added code to output information when program output nothing.
+
+2009-11-19  juanca
+
+	* vpl-xmlrpc-jail.xinetd: Change default parm value
+
+2009-11-19  juanca
+
+	* src/jail.cpp: Fix format string
+
+2009-11-19  juanca
+
+	* vpl-xmlrpc-jail.xinetd: Set DoS params to override default limits
+
+2009-11-19  juanca
+
+	* src/: jail.cpp, jail.h: Added new redirector class to handle
+	  program I/O and Net I/O without a new process.  Information about
+	  process termination is appened to program output.
+
+2009-11-18  juanca
+
+	* src/jail.cpp: Added terminate child exit code or signal to output
+
+2009-10-16  juanca
+
+	* src/jail.cpp: Add info about execution error to output
+
+2009-10-16  juanca
+
+	* src/jail.cpp: Add info about execution error to output
+
+2009-08-18  juanca
+
+	* src/: jail.cpp, rpc.h: Change maxprocess to maxprocesses
+
+2009-08-16  juanca
+
+	* src/: jail.cpp, jail.h: Change maxproccess to maxproccesses
+
+2009-07-29  juanca
+
+	* .cproject: [no log message]
+
+2009-07-29  juanca
+
+	* src/: httpServer.cpp, httpServer.h, jail.cpp, jail.h, rpc.h,
+	  util.h, vpl-xmlrpc-jail.cpp, xml.h: License GNU/GPL v2
+
+2009-07-29  juanca
+
+	* .cdtbuild_initial, .cproject, .project, .project_initial: [no log
+	  message]
+
+2009-07-29  juanca
+
+	* src/xml.h: Added \t tab to encodeXML
+
+2009-07-29  juanca
+
+	* src/jail.cpp: Improve stability
+
+2009-07-28  juanca
+
+	* COPYING: License GNU/GPL v2
+
+2009-07-21  juanca
+
+	* COPYING: GPLv3
+
+2009-05-05  juanca
+
+	* src/xml.h: Cleaning ASCII control codes from UTF-8
+
+2009-04-06  juanca
+
+	* vpl.spec, src/jail.cpp, src/xml.h: Fix problem xml convertion
+	  with utf-8 using iconv Fix program buffer to net problem
+
+2009-03-27  juanca
+
+	* src/jail.cpp: FIx problem with compilation output not read
+
+2009-03-23  juanca
+
+	* install-sh: Fixed
+
+2009-03-11  juanca
+
+	* src/jail.cpp: Resolve send program output after end
+
+2009-03-11  juanca
+
+	* src/jail.cpp: Adding log info
+
+2009-03-10  juanca
+
+	* src/jail.cpp: send to net buffered program output after program
+	  end
+
+2009-03-06  juanca
+
+	* src/: httpServer.cpp, jail.cpp, xml.h, .deps/httpServer.Po,
+	  .deps/jail.Po, .deps/vpl-xmlrpc-jail.Po: Fixing UTF-8  problem
+
+2009-01-07  juanca
+
+	* src/jail.cpp: Added seed to select prisoner number
+
+2009-01-07  juanca
+
+	* install-sh, vpl-jail-system: Fixing scripts
+
+2009-01-05  juanca
+
+	* install-sh, vpl-jail-system: fixing scripts
+
+2009-01-03  juanca
+
+	* install-sh, vpl-jail-system: fixing scripts
+
+2008-12-31  juanca
+
+	* src/vpl_xmlrpc_jail: Remove
+
+2008-12-31  juanca
+
+	* Makefile.am, install-sh, vpl-jail-system, vpl-xmlrpc-jail-fs.sh,
+	  src/Makefile.am: Implemented vpl-jail-system service (start stop
+	  jail file system)
+
+2008-12-31  juanca
+
+	* vpl-jail-system: Implementing a rc script to create and destroy
+	  the jail file system
+
+2008-12-30  juanca
+
+	* vpl-xmlrpc-jail-fs.sh: jail creation first version
+
+2008-12-30  juanca
+
+	* install-sh, vpl-xmlrpc-jail-fs.sh, vpl-xmlrpc-jail.conf:
+	  installation and jail creation script improve
+
+2008-12-29  juanca
+
+	* .cdtproject, .cvsignore, AUTHORS, COPYING, ChangeLog, INSTALL,
+	  Makefile.am, NEWS, README, config.h, configure, configure.ac,
+	  depcomp, httpServer.cpp, httpServer.h, install-sh, jail.cpp,
+	  jail.h, missing, rpc.h, util.h, vpl-xmlrpc-jail-fs.sh,
+	  vpl-xmlrpc-jail.cpp, vpl-xmlrpc-jail.xinetd, xml.h,
+	  src/.cvsignore, src/Makefile.am, src/httpServer.cpp,
+	  src/httpServer.h, src/jail.cpp, src/jail.h, src/rpc.h,
+	  src/util.h, src/vpl-xmlrpc-jail.cpp, src/vpl_xmlrpc_jail,
+	  src/xml.h: Change to automake
+
+2008-12-22  juanca
+
+	* jail.cpp: Fix delete files
+
+2008-12-21  juanca
+
+	* httpServer.cpp, jail.cpp, jail.h, rpc.h, util.h,
+	  vpl-xmlrpc-jail.cpp: add support to keep only selected files in
+	  execution
+
+2008-12-21  juanca
+
+	* jail.cpp: cleanup
+
+2008-12-21  juanca
+
+	* httpServer.cpp, httpServer.h, jail.cpp, jail.h, rpc.h, util.h,
+	  xml.h: Comments
+
+2008-12-21  juanca
+
+	* httpServer.cpp, jail.cpp, rpc.h, util.h, vpl-xmlrpc-jail.cpp:
+	  fixes
+
+2008-12-21  juanca
+
+	* jail.cpp, jail.h, rpc.h, xml.h: Refactoring
+
+2008-12-21  juanca
+
+	* httpServer.cpp, httpServer.h, jail.cpp, jail.h, rpc.h, util.h,
+	  vpl-xmlrpc-jail.cpp, xml.h: Commenting and refactoring
+
+2008-12-20  juanca
+
+	* httpServer.cpp, httpServer.h, jail.cpp, jail.h, util.h,
+	  vpl-xmlrpc-jail.cpp: Commenting and refactoring
+
+2008-12-18  juanca
+
+	* httpServer.cpp, httpServer.h, jail.cpp, jail.h, util.h,
+	  vpl-xmlrpc-jail.cpp: doing TODO
+
+2008-12-18  juanca
+
+	* httpServer.cpp, jail.cpp, vpl-xmlrpc-jail.cpp: fix security error
+	  and add TODO info
+
+2008-12-17  juanca
+
+	* jail.cpp, jail.h, rpc.h: fixes
+
+2008-12-14  juanca
+
+	* jail.cpp: Fix deleteDir error
+
+2008-12-14  juanca
+
+	* jail.cpp, rpc.h, vpl-xmlrpc-jail.cpp: Added executed bool to
+	  response
+
+2008-12-14  juanca
+
+	* .cdtbuild, httpServer.cpp, jail.cpp, jail.h, util.h,
+	  vpl-xmlrpc-jail.cpp: Implementing resource limits
+
+2008-12-13  juanca
+
+	* httpServer.cpp, httpServer.h, jail.cpp, jail.h, rpc.h, util.h,
+	  vpl-xmlrpc-jail.cpp, xml.h, xmlrpc.cpp, xmlrpc.h: Clean up and
+	  refactor code
+
+2008-12-11  juanca
+
+	* vpl-xmlrpc-jail.cpp, xmlrpc.h: Implementing resource limits
+
+2008-12-10  juanca
+
+	* vpl-xmlrpc-jail.cpp: Jail fixing
+
+2008-12-10  juanca
+
+	* xmlrpc.h, .cdtbuild, vpl-xmlrpc-jail.cpp: Jail fixing
+
+2008-12-09  juanca
+
+	* vpl-xmlrpc-jail.cpp, xmlrpc.cpp, xmlrpc.h: Implementing XML
+	  parser and RPC processor
+
+2008-12-09  juanca
+
+	* xmlrpc.h: Implementing XML parser
+
+2008-12-08  juanca
+
+	* vpl-xmlrpc-jail.cpp, xmlrpc.cpp, xmlrpc.h: http server
+	  implementation
+
+2008-12-08  juanca
+
+	* vpl-xmlrpc-jail.cpp, xmlrpc.cpp, xmlrpc.h: http server
+	  implementation
+
+2008-12-05  juanca
+
+	* .cdtbuild, vpl-xmlrpc-jail.cpp: Advances
+
+2008-12-04  juanca
+
+	* vpl-xmlrpc-jail.cpp: Implementing program executer
+
+2008-12-03  juanca
+
+	* vpl-xmlrpc-jail.cpp: Implementing redirector net<=>program
+
+2008-12-03  juanca
+
+	* .cdtbuild: advances
+
+2008-12-03  juanca
+
+	* vpl-xmlrpc-jail.cpp: advances
+
+2008-12-02  juanca
+
+	* vpl-xmlrpc-jail-fs.sh, vpl-xmlrpc-jail.conf: advances
+
+2008-12-02  juanca
+
+	* vpl-xmlrpc-jail.cpp: clean up
+
+2008-12-02  juanca
+
+	* vpl-xmlrpc-jail.cpp: Writing code
+
+2008-12-02  juanca
+
+	* vpl-xmlrpc-jail.cpp: More advances
+
+2008-12-01  juanca
+
+	* vpl-xmlrpc-jail.cpp: More advances
+
+2008-12-01  juanca
+
+	* vpl-xmlrpc-jail.cpp: More advances
+
+2008-12-01  juanca
+
+	* vpl-xmlrpc-jail.cpp: advances
+
+2008-11-30  juanca
+
+	* vpl-xmlrpc-jail.cpp: advances
+
+2008-11-29  juanca
+
+	* vpl-xmlrpc-jail.cpp: Adding previous code
+
+2008-11-28  juanca
+
+	* .cdtbuild, .cdtproject, .project, vpl-xmlrpc-jail.cpp,
+	  .settings/org.eclipse.cdt.core.prefs,
+	  .settings/org.eclipse.cdt.managedbuilder.core.prefs: Start
+

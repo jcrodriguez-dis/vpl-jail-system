@@ -1,0 +1,192 @@
+#!/bin/bash
+#
+# Startup script for vpl-jail-system
+#
+# author:     Juan Carlos Rodriguez-del-Pino
+# chkconfig:  345 99 36
+# description: Virtual Programming Lab jail is a sandbox to compile \
+#              and execute programs. vpl-xmlrpc-jail, a xinetd deamon, \
+#              receive the code and execution restrictions and return \
+#              the results to  the client. \
+#              This script build jail filesystem and start \
+#              or stop the vpl-xmlrpc-jail deamon.
+# processname: vpl-jail-system
+#
+### BEGIN INIT INFO
+# Provides: $vpl-jail-system
+# Required-Start: $network $nfs
+# Required-Stop: $network $nfs
+# Default-Start: 3 4 5
+# Default-Stop: 0 1 2 6
+# Description: build jail filesystem and start or stop the vpl-xmlrpc-jail deamon
+### END INIT INFO
+
+# Jail filesystem structure
+# $JAILPATH____ dev   #fake with minimum files
+#          |___ etc   #fake with own passwd and group
+#          |___ home  #dir to create apropiate prisoner home dir
+#          |___ tmp   #dir
+#          |___ proc  #Real dir by mount --bind
+#          |___ usr   #Replicate readonly dir by nfs
+#          |___ bin   #Replicate readonly dir by nfs
+#          |___ lib   #Replicate readonly dir by nfs
+#          |___ lib64 #Replicate readonly dir by nfs
+
+# load init.d common functions
+. /etc/rc.d/init.d/functions
+
+create_check_dir() {
+	if [ ! -d "$1" ] ; then
+		mkdir "$1" >/dev/null 2>&1
+	fi
+	if [ -d "$1" ] ; then
+		chmod $2 "$1" >/dev/null 2>&1
+	else
+		echo -n $"Can't mkdir $1"
+		failure
+		exit 1
+	fi
+}
+
+set_etc() {
+	create_check_dir "$JAILPATH/etc" 755
+	#passwd file
+	PASSWORDFILE="$JAILPATH/etc/passwd"
+	echo "root:*:0:0:root:/root:/bin/bash" > "$PASSWORDFILE"
+	for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
+		echo "p$I:*:$I:$I:prisoner $I:/home/p$I:/sbin/nologin" >> "$PASSWORDFILE"
+	done
+	chmod 644 "$PASSWORDFILE"
+	#group file
+	GROUPFILE="$JAILPATH/etc/group"
+	echo "root:*:0:root" > "$GROUPFILE"
+	for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
+		echo "p$I:*:$I:p$I" >> "$GROUPFILE"
+	done
+	chmod 644 "$GROUPFILE"
+}
+
+create_device() {
+	if [ -f "$1" ] ; then
+		rm "$1" >/dev/null 2>&1
+	fi
+	mknod "$1" c $2 $3 >/dev/null 2>&1
+	chmod 666 "$1" >/dev/null 2>&1
+}
+
+set_dev() {
+	DEVPATH="$JAILPATH/dev"
+	create_check_dir "$DEVPATH" 755
+	create_device "$DEVPATH/null" 1 3
+	create_device "$DEVPATH/zero" 1 5
+	create_device "$DEVPATH/full" 1 7
+	create_device "$DEVPATH/random" 1 8
+	create_device "$DEVPATH/urandom" 1 9
+	create_device "$DEVPATH/tty" 5 0
+	create_device "$DEVPATH/ptmx" 5 2
+}
+
+set_tmp() {
+	create_check_dir "$JAILPATH/tmp" 1777
+	rm -Rf $JAILPATH/tmp/* >/dev/null 2>&1
+}
+
+set_home() {
+	create_check_dir "$JAILPATH/home" 0711
+	rm -Rf $JAILPATH/home/* >/dev/null 2>&1
+}
+
+
+set_other() {
+	/usr/sbin/exportfs -o async,ro,wdelay 127.0.0.1:$1
+	create_check_dir "$JAILPATH$1" 0755
+	mount -t nfs -o ro,nosuid 127.0.0.1:/$1 "$JAILPATH$1"
+}
+
+unset_other() {
+	umount "$JAILPATH$1" >/dev/null 2>&1
+	/usr/sbin/exportfs -u 127.0.0.1:$1
+}
+
+set_others() {
+	set_other /bin
+	set_other /usr
+	set_other /lib
+	if [ -d /lib64 ] ; then
+		set_other /lib64
+	fi
+	create_check_dir "$JAILPATH/proc" 0755
+	mount --bind /proc "$JAILPATH/proc"
+}
+
+unset_others() {
+	unset_other /bin
+	unset_other /usr
+	unset_other /lib
+	if [ -d /lib64 ] ; then
+		unset_other /lib64
+	fi
+	umount "$JAILPATH/proc" >/dev/null 2>&1
+}
+
+start(){
+	if [ -f "$JAILPATH/bin/bash" ] ; then
+		stop
+	fi
+	echo -n $"Starting vpl-jail-system service:"
+	create_check_dir "$JAILPATH" 0755
+	set_etc
+	set_dev
+	set_tmp
+	set_home
+	set_others
+	#Red-Hat
+	success
+	echo
+	action "Starting vpl-xmlrpc-jail service:" chkconfig vpl-xmlrpc-jail on
+}
+
+stop(){
+	#Red-Hat
+	action "Stopping vpl-xmlrpc-jail service:" chkconfig vpl-xmlrpc-jail off
+	echo -n $"Stopping vpl-jail-system service:"
+	unset_others
+	success
+	echo
+}
+
+VPLJAIL_INSTALL_DIR=/etc/vpl
+CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-xmlrpc-jail.conf"
+#Load config file
+if [ -f "$CONFIG_FILE" ]; then
+	. "$CONFIG_FILE"
+else
+	echo -n $"vpl-jail-system config file not found: $CONFIG_FILE"
+	failure
+	exit 1
+fi
+
+#Check $JAILPATH not been "/"
+if [ -f "$JAILPATH$CONFIG_FILE" ] ; then
+	echo -n $"vpl-jail-system jail path error '$JAILPATH'"
+	failure
+	exit 1
+fi
+
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  restart)
+        stop
+        start
+        ;;
+  *)
+        echo $"Usage: vpl-jail-system {start|stop|restart}"
+        exit 1
+esac
+exit 0
+

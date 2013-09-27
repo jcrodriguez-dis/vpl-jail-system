@@ -1,0 +1,24 @@
+service vpl-xmlrpc-jail
+{
+	disable = no
+	log_on_failure += USERID
+	log_on_success = HOST PID
+	log_type = FILE /var/log/vpl-xmlrpc-jail.log
+	socket_type = stream
+	protocol = tcp
+	type = UNLISTED
+	user = root
+	wait = no
+	server = /etc/vpl/vpl-xmlrpc-jail
+
+#Common options
+#Uncomment and chage ip number, valid if no NAT
+#	only_from = 10.0.0.0
+#Add -d number to server_args to output debug info to syslog
+	server_args = -urlpath /
+	port = 52000
+#control of DoS
+	cps = 200 3
+	instances = 200
+	per_source = 200
+}
