@@ -1,8 +1,8 @@
 /**
- * version:		$Id: redirector.cpp,v 1.3 2011-04-07 14:26:47 juanca Exp $
- * package:		Part of vpl-xmlrpc-jail
- * copyright:	Copyright (C) 2009 Juan Carlos Rodríguez-del-Pino. All rights reserved.
- * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-2.0.html
+ * @version:   $Id: redirector.cpp,v 1.17 2014-02-26 18:05:22 juanca Exp $
+ * @package:   Part of vpl-jail-system
+ * @copyright: Copyright (C) 2013 Juan Carlos Rodríguez-del-Pino
+ * @license:   GNU/GPL3, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 
 #if HAVE_CONFIG_H
@@ -11,6 +11,8 @@
 
 #include <syslog.h>
 #include <string.h>
+#include <arpa/inet.h>
+#include "jail_limits.h"
 #include "redirector.h"
 
 /**
@@ -27,38 +29,39 @@ void Redirector::fdblock(int fd, bool set){
 		syslog(LOG_ERR,"fcntl F_SETFL: %m");
 	}
 }
-
-/**
- * Start redirector (online connection)
- * fdps int: pseudo terminal file descriptor
- * host int: host IP
- * port int: port IP
- * password string: password to start host communication
- */
-void Redirector::start(const int fdps, const int host, const int port, const string &password){
-	this->state=begin;
-	this->fdps=fdps;
-	this->host=host;
-	this->port=port;
-	this->password=password;
-	this->online=true;
-	this->timeout=time(NULL)+5; //timeout in 5 seg
-	this->netbuf="";
-	this->programbuf="";
-	this->noOutput = true;
+Redirector::Redirector():bufferSizeLimit(50*1024){
+	state=error;
+	fdps=-1;  //Pseudo terminal file descriptor
+	sock=-1;    //Socket for vncserver conexion
+	timeout=0; //Timeout when connecting
+	port=-1; //Port of vncserver
+	ws=NULL; //webSocket for online
+	online=false;
+	indirect=false;
+	noOutput=false; //true if program output nothing
 }
 
-/**
- * Start redirector (batch)
- * fdps int: pseudo terminal file descriptor
- */
+void Redirector::start(webSocket *ws, const int port){
+	this->state=begin;
+	this->ws=ws;
+	this->port=port;
+	this->online=true;
+	this->indirect=true;
+	this->timeout=time(NULL)+10; //timeout in 5 seg
+}
+
+void Redirector::start(const int fdps, webSocket *ws){
+	this->state=begin;
+	this->fdps=fdps;
+	this->ws=ws;
+	this->online=true;
+	this->timeout=time(NULL)+30; //timeout in 5 seg
+}
+
 void Redirector::start(const int fdps){
 	this->state=begin;
 	this->fdps=fdps;
-	this->online=false;
-	this->netbuf="";
-	this->programbuf="";
-	this->noOutput = true;
+	this->timeout=time(NULL)+5; //timeout in 5 seg
 }
 
 /**
@@ -66,7 +69,10 @@ void Redirector::start(const int fdps){
  */
 void Redirector::advance(){
 	if(online){
-		advanceOnline();
+		if(indirect)
+			advanceIndirect();
+		else
+			advanceOnline();
 	}else{
 		advanceBatch();
 	}
@@ -76,227 +82,277 @@ void Redirector::advance(){
  * Advance for batch execution
  */
 void Redirector::advanceBatch(){
-	const int MAX=1024*10; //Buffer size to read
+	int oldstate=state;
+	const int MAX=JAIL_NET_BUFFER_SIZE; //Buffer size to read
 	const int POLLBAD=POLLERR|POLLHUP|POLLNVAL;
 	const int POLLREAD=POLLIN|POLLPRI;
+	const int polltimeout= 100; //  0.1 sec 
 	switch(state){
-		case begin:
-			if(fdps<0) {
-				state=error; //fd pseudo terminal error
-				break;
-			}
-			fdblock(fdps,false);
-		case connecting:
-			state=connected;
-		case connected:{
-			//Poll to read from program
-			struct pollfd devices[1];
-			devices[0].fd=fdps;
-			char buf[MAX];
-			devices[0].events=POLLREAD|POLLOUT;
-			int res=poll(devices,1,0);
-			if(res==-1) { //Error
-				state = error;
-				break;
-			}
-			if(res==0) break; //Nothing to do
-			syslog(LOG_INFO,"poll: program %d %s.",
-						devices[0].revents,eventsToString(devices[0].revents).c_str());
-			if(devices[0].revents & POLLREAD){ //Read program output
-				int readsize=read(fdps,buf,MAX);
-				if(readsize <= 0){
-					syslog(LOG_INFO,"program output read error: %m");
-					state=error;
-					break; //program output read error
-				}
-				if(readsize >0) {
-					netbuf += string(buf,readsize);
-					break;
-				}
-			}
-			if(devices[0].revents & POLLBAD){
-				syslog(LOG_INFO,"Program end or I/O error: %m %d %s.",
-						devices[0].revents,eventsToString(devices[0].revents).c_str());
-				state=error;
-				break;
-			}
+	case begin:
+		if(fdps<0) {
+			state=error; //fd pseudo terminal error
 			break;
 		}
-		case ending:
-			state=end;
-		case end:
-		case error:
+		fdblock(fdps,false);
+	case connecting:
+		state=connected;
+		/* no break */
+	case connected:{
+		//Poll to read from program
+		struct pollfd devices[1];
+		devices[0].fd=fdps;
+		char buf[MAX];
+		devices[0].events=POLLREAD; //removed |POLLOUT
+		int res=poll(devices,1,polltimeout);
+		if(res==-1) { //Error
+			state = error;
 			break;
+		}
+		if(res==0) break; //Nothing to do
+		//syslog(LOG_INFO,"poll: program %d %s.",
+		//			devices[0].revents,eventsToString(devices[0].revents).c_str());
+		if(devices[0].revents & POLLREAD){ //Read program output
+			int readsize=read(fdps,buf,MAX);
+			if(readsize == 0){
+				syslog(LOG_INFO,"program output end: %m");
+				state=end;
+				break; //program output read error
+			}
+			if(readsize < 0){
+				syslog(LOG_INFO,"program output read error: %m");
+				state=error;
+				break; //program output read error
+			}
+			if(readsize >0) {
+				netbuf += string(buf,readsize);
+				break;
+			}
+		}
+		if(devices[0].revents & POLLBAD){
+			syslog(LOG_INFO,"Program end or I/O error: %m %d %s.",
+					devices[0].revents,eventsToString(devices[0].revents).c_str());
+			state=error;
+			break;
+		}
+		break;
 	}
+	case ending:
+		state=end;
+		/* no break */
+	case end:
+	case error:
+		usleep(50000);
+		break;
+	}
+	if(oldstate != state)
+		syslog(LOG_INFO,"New redirector state %d => %d",oldstate,state);
+
 }
 
 /**
  * Advance for online execution
  */
 void Redirector::advanceOnline(){
-	const int MAX=1024*10; //Buffer size to read
+	const int MAX=JAIL_NET_BUFFER_SIZE; //Buffer size to read
 	const int POLLBAD=POLLERR|POLLHUP|POLLNVAL;
 	const int POLLREAD=POLLIN|POLLPRI;
+	const int polltimeout= 100; //  0.1 sec 
+	States oldstate=state;
 	switch(state){
-		case begin:{
-			if(fdps<0) {
-				state=error; //fd pseudo terminal error
-				break;
-			}
-			sock=socket(AF_INET,SOCK_STREAM,0);//0= IP protocol
-			if(sock<0){
-				state=error; //No socket available
-				break;
-			}
-			int on=1;
-			setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-			fdblock(sock,true);
-			fdblock(fdps,false);
-			state=connecting;
-		}
-		case connecting:{
-			struct sockaddr_in sdir;
-			memset(&sdir, 0, sizeof(sdir));
-			sdir.sin_family = AF_INET;
-			sdir.sin_addr.s_addr = host;
-			sdir.sin_port = htons( port );
-			if(connect(sock, (const sockaddr*)&sdir, sizeof(sdir))==0){
-				fdblock(sock,false);
-				netbuf=password;
-				state=connected;
-				break;
-			}else{
-				syslog(LOG_INFO, "socket connect to (%x:%d) error: %m", (int)host, (int)port);
-			}
-			if(timeout<time(NULL)){
-				syslog(LOG_ERR, "socket connect timeout: %m");
-				state=error;
-			}
+	case begin:{
+		if(fdps<0) {
+			state=error; //fd pseudo terminal error
 			break;
 		}
-		case connected:{
-			//Poll to write and read from program and net
-			struct pollfd devices[2];
-			devices[0].fd=fdps;
-			devices[1].fd=sock;
-			char buf[MAX];
-			if(programbuf.size()) devices[0].events=POLLREAD|POLLOUT;
-			else devices[0].events=POLLREAD;
-			if(netbuf.size()) devices[1].events=POLLREAD|POLLOUT;
-			else devices[1].events=POLLREAD;
-			int res=poll(devices,2,0);
-			if(res==-1) { //Error
-				syslog(LOG_INFO,"pool error %m");
-				state = error;
-				break;
+		fdblock(fdps,false);
+		state=connected;
+	case connected:{
+		//Poll to write and read from program and net
+		if(ws->isReadBuffered())
+			programbuf += ws->receive();
+		struct pollfd devices[2];
+		devices[0].fd=fdps;
+		devices[1].fd=ws->getSocket();
+		char buf[MAX];
+		if(programbuf.size()) devices[0].events=POLLREAD|POLLOUT;
+		else devices[0].events=POLLREAD;
+		devices[1].events=POLLREAD;
+		int res=poll(devices,2,polltimeout);
+		if(res==-1) { //Error
+			syslog(LOG_INFO,"pool error %m");
+			state = error;
+			break;
+		}
+		if(res==0) break; //Nothing to do
+		syslog(LOG_INFO,"poll: program %d %s",
+				devices[0].revents,eventsToString(devices[0].revents).c_str());
+		if(devices[1].revents & POLLREAD)
+			programbuf += ws->receive();
+		if((devices[0].revents & POLLREAD) && !isOutputBufferFull()){ //Read program output
+			int readsize=read(fdps,buf,MAX);
+			if(readsize <= 0){
+				syslog(LOG_INFO,"program output read error: %m");
+				state=ending;
+				break; //program output read error
 			}
-			if(res==0) break; //Nothing to do
-			syslog(LOG_INFO,"poll: program %d %s. net %d %s",
-						devices[0].revents,eventsToString(devices[0].revents).c_str(),
-						devices[1].revents,eventsToString(devices[1].revents).c_str());
-
-			if(devices[0].revents & POLLREAD && !isOutputBufferFull()){ //Read program output
-				int readsize=read(fdps,buf,MAX);
-				if(readsize <= 0){
-					syslog(LOG_INFO,"program output read error: %m");
-					state=ending;
-					break; //program output read error
-				}
-				if(readsize >0) {
-					addOutput(string(buf,readsize));
-				}
+			if(readsize >0) {
+				ws->send(string(buf,readsize));
 			}
-			if(devices[1].revents & POLLREAD){ //Read from net
-				int readsize=read(sock,buf,MAX);
-				if(readsize <= 0){
-					syslog(LOG_INFO,"Socket closed at server end or error: %m");
-					state=ending;
-					break; //Socket closed at server end or error
-				}
-				if(readsize >0){
-					programbuf += string(buf,readsize);
-				}
-			}
-			if(programbuf.size()>0 && devices[0].revents & POLLOUT){ //Write to program
-				int written=write(fdps,programbuf.c_str(),programbuf.size());
-				if(written <=0) {
-					syslog(LOG_INFO,"Write to program error: %m");
-					state=ending;
-					break;
-				}
-				programbuf.erase(0,written);
-			}
-			if(netbuf.size()>0 && devices[1].revents & POLLOUT){ //Write to net
-				int written=write(sock,netbuf.c_str(),netbuf.size());
-				if(written <=0){
-					syslog(LOG_INFO,"Write to net error: %m");
-					state=ending;
-					break;
-				}
-				netbuf.erase(0,written);
-			}
-			if((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)){
-				syslog(LOG_INFO,"Program end or I/O error: %m %d %s",devices[0].revents,eventsToString(devices[0].revents).c_str());
+		}
+		if(programbuf.size()>0 && (devices[0].revents & POLLOUT)){ //Write to program
+			int written=write(fdps,programbuf.data(),programbuf.size());
+			if(written <=0) {
+				syslog(LOG_INFO,"Write to program error: %m");
 				state=ending;
 				break;
 			}
-			if(devices[1].revents & POLLBAD){
-				syslog(LOG_INFO,"Net sock closed or I/O error: %m %d %s",devices[1].revents,eventsToString(devices[1].revents).c_str());
-				state=error;
-				break;
-			}
+			programbuf.erase(0,written);
+		}
+		if((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)){
+			syslog(LOG_INFO,"Program end or I/O error: %m %d %s",devices[0].revents,eventsToString(devices[0].revents).c_str());
+			state=ending;
 			break;
 		}
-		case ending:{
-			//Send buffered program output to net
-			if(isSilent()){
-				syslog(LOG_INFO,"Program terminated with no output");
-				addOutput("\nProgram terminated with no output\n");
-			}
-			if(messageBuf.size()>0){
-				syslog(LOG_INFO,"Add jail message to output");
-				addOutput(messageBuf);
-				messageBuf="";
-			}
-			if(netbuf.size()==0){ //Nothing to send
-				syslog(LOG_INFO,"No more data to send");
-				fdblock(sock,true);
-				close(sock);
-				state=end;
-				break;
-			}
-			struct pollfd devices[1];
-			devices[0].fd=sock;
-			devices[0].events=POLLOUT;
-			int res=poll(devices,1,0);
-			if(res==-1) { //Error
-				state = error;
-				syslog(LOG_INFO,"pool error %m");
-				break;
-			}
-			if(res==0){ //Nothing to do
-				break;
-			}
-			if(devices[0].revents & POLLOUT){ //Write to net
-				int written=write(sock,netbuf.c_str(),netbuf.size());
-				if(written <=0) {
-					syslog(LOG_INFO,"Write to net error: %m");
-					state=error;
-					break;
-				}
-				netbuf.erase(0,written);
-				break;
-			}
-			if(devices[0].revents & POLLBAD && netbuf.size()==0){
-				state=(devices[0].revents & POLLHUP)?end:error;
-				break;
-			}
-		}
-		case end:
-		case error:
-			break;
+		break;
 	}
+	case ending:{
+		if(isSilent()){
+			syslog(LOG_INFO,"Program terminated with no output");
+			ws->send("\nProgram terminated with no output\n");
+		}
+		if(messageBuf.size()>0){
+			syslog(LOG_INFO,"Add jail message to output");
+			ws->send(messageBuf);
+			messageBuf="";
+		}
+	}
+	/* no break */
+	case end:
+	case error:
+		if(ws->isClosed())
+			usleep(50000);
+		else ws->close();
+		break;
+	}
+	}
+	if(oldstate != state)
+		syslog(LOG_INFO,"New redirector state %d => %d",oldstate,state);
 }
+
+/**
+ * Advance for online Indirect execution
+ */
+void Redirector::advanceIndirect(){
+	const int MAX=JAIL_NET_BUFFER_SIZE; //Buffer size to read
+	const int POLLBAD=POLLERR|POLLHUP|POLLNVAL;
+	const int POLLREAD=POLLIN|POLLPRI;
+	const int polltimeout= 100; //  0.1 sec 
+	States oldstate=state;
+	switch(state){
+	case begin:{
+		sock=socket(AF_INET,SOCK_STREAM,0);//0= IP protocol
+		if(sock<0){
+			state=error; //No socket available
+			break;
+		}
+		int on=1;
+		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+		//fdblock(sock,false);
+		state=connecting;
+	}
+	/* no break */
+	case connecting:{
+		struct sockaddr_in sdir;
+		memset(&sdir, 0, sizeof(sdir));
+		sdir.sin_family = AF_INET;
+		inet_pton(AF_INET,"127.0.0.1",&sdir.sin_addr);
+		sdir.sin_port = htons( port );
+		if(connect(sock, (const sockaddr*)&sdir, sizeof(sdir))==0){
+			//fdblock(sock,true);
+			state=connected;
+			break;
+		}else{
+			syslog(LOG_INFO, "socket connect to (127.0.0.1:%d) error: %m",(int)port);
+		}
+		if(timeout<time(NULL)){
+			syslog(LOG_ERR, "socket connect timeout: %m");
+			state=error;
+		}
+		break;
+	}
+	case connected:{
+		//Poll to write and read from program and net
+		if(ws->isClosed()){
+			syslog(LOG_INFO,"Websocket closed by client");
+			state = end;
+			break;
+		}
+		if(ws->isReadBuffered())
+			netbuf += ws->receive(); //Read client data
+		struct pollfd devices[2];
+		devices[0].fd=sock;
+		devices[1].fd=ws->getSocket();
+		char buf[MAX];
+		if(netbuf.size()) devices[0].events=POLLREAD|POLLOUT;
+		else devices[0].events=POLLREAD;
+		devices[1].events=POLLREAD;
+		int res=poll(devices,2,polltimeout);
+		if(res==-1) { //Error
+			syslog(LOG_INFO,"pool error %m");
+			state = error;
+			break;
+		}
+		if(res==0) break; //Nothing to do
+		syslog(LOG_INFO,"poll: server socket %d %s",
+				devices[0].revents,eventsToString(devices[0].revents).c_str());
+	    syslog(LOG_INFO,"poll: client socket %d %s",
+				devices[1].revents,eventsToString(devices[1].revents).c_str());
+		if(devices[1].revents & POLLREAD){ //Read vnc client data
+			netbuf += ws->receive();
+		}
+		if(devices[0].revents & POLLREAD){ //Read vncserver data
+			int readsize=read(sock,buf,MAX);
+			if(readsize <= 0){ //Socket closed or error
+				if(readsize < 0)
+					syslog(LOG_INFO,"Receive from vncserver error: %m");
+				else
+					syslog(LOG_INFO,"Receive from vncserver size==0: %m");
+				state=ending;
+				break;
+			}
+			ws->send(string(buf,readsize),BINARY_FRAME);
+		}
+		if(netbuf.size()>0 && (devices[0].revents & POLLOUT)){ //Write to vncserver
+			int written=write(sock,netbuf.data(),netbuf.size());
+			if(written <=0) { //close or error
+				if(written<0)
+					syslog(LOG_INFO,"Send to vncserver error: %m");
+				state=ending;
+				break;
+			}
+			netbuf.erase(0,written);
+		}
+		if((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)){
+			syslog(LOG_INFO,"Vncserver end or I/O error: %m %d %s",devices[0].revents,eventsToString(devices[0].revents).c_str());
+			state=ending;
+			break;
+		}
+		break;
+	}
+	case ending:
+		state=end;
+		/* no break */
+	case end:
+	case error:
+		if(ws->isClosed())
+			usleep(50000);
+		else ws->close();
+		break;
+	}
+	if(oldstate != state)
+		syslog(LOG_INFO,"New redirector state %d => %d",oldstate,state);
+}
+
 
 /**
  * return if output buffer is full
@@ -320,8 +376,8 @@ void Redirector::addOutput(const string &toAdd){
 		string overflow=netbuf+toAdd;
 		size_t ofsize=overflow.size();
 		netbuf=overflow.substr(0,bufferSizeLimit/2)
-				+text
-				+overflow.substr(ofsize-bufferSizeLimit/2,bufferSizeLimit/2);
+						+text
+						+overflow.substr(ofsize-bufferSizeLimit/2,bufferSizeLimit/2);
 		syslog(LOG_INFO,"Program output has been cut to 50Kb");
 		static bool noLimited=true;
 		if(noLimited){
@@ -372,7 +428,7 @@ string Redirector::eventsToString(int events){
 	if(events & POLLRDBAND) ret += "POLLRDBAND ";
 	if(events & POLLWRNORM) ret += "POLLWRNORM ";
 	if(events & POLLWRBAND) ret += "POLLWRBAND ";
-	if(events & POLLMSG) ret += "POLLMSG ";
+	//if(events & POLLMSG) ret += "POLLMSG ";
 	ret += ")";
 	return ret;
 }

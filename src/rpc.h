@@ -1,12 +1,13 @@
 /**
- * version:		$Id: rpc.h,v 1.4 2011-01-04 12:00:00 juanca Exp $
- * package:		Part of vpl-xmlrpc-jail
- * copyright:	Copyright (C) 2009 Juan Carlos Rodríguez-del-Pino. All rights reserved.
- * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-2.0.html
+ * version:		$Id: rpc.h,v 1.12 2014-02-21 18:13:30 juanca Exp $
+ * package:		Part of vpl-jail-system
+ * copyright:	Copyright (C) 2014 Juan Carlos Rodríguez-del-Pino. All rights reserved.
+ * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
- 
+
 #ifndef RPC_INC_H
 #define PPC_INC_H
+
 #include "xml.h"
 #include "util.h"
 
@@ -15,76 +16,77 @@
  */
 class RPC{
 public:
+	static string responseWraper(string response){
+		return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+				"<methodResponse>\n"
+				"<params>\n"
+				"<param>\n"
+				"<struct>\n"
+				+response+
+				"</struct>\n"
+				"</param>\n"
+				"</params>\n"
+				"</methodResponse>\n";
+	}
+	static string responseMember(const string name, const string & value){
+		return "<member><name>"
+				+XML::encodeXML(name)+"</name>\n"
+				"<value><string>"
+				+ XML::encodeXML(value) +
+				"</string></value>\n"
+				"</member>\n";
+	}
+	static string responseMember(string name, int value){
+		return "<member><name>"
+				+name+"</name>\n"
+				"<value><int>"
+				+ Util::itos(value) +
+				"</int></value>\n"
+				"</member>\n";
+	}
 	/**
 	 * return a ready response
 	 */
-	static string readyResponse(string status, int load, int maxtime, int maxfilesize,
-								int maxmemory, int maxprocesses, string softinstalled){
+	static string availableResponse(string status, int load, int maxtime, int maxfilesize,
+			int maxmemory, int maxprocesses, int secureport){
 		string response;
-		response += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-		response += "<methodResponse>\n";
-		response += "<params>\n";
-		response += "<param>\n";
-		response += "<struct>\n";
-		response += "<member><name>status</name>\n";
-		response += "<value><string>" + XML::encodeXML(status) +"</string></value>\n";
-		response += "</member>\n";
-		response += "<member><name>load</name>\n";
-		response += "<value><int>" + Util::itos(load) + "</int></value>\n";
-		response += "</member>\n";
-		response += "<member><name>maxtime</name>\n";
-		response += "<value><int>" + Util::itos(maxtime) + "</int></value>\n";
-		response += "</member>\n";
-		response += "<member><name>maxfilesize</name>\n";
-		response += "<value><int>" + Util::itos(maxfilesize) + "</int></value>\n";
-		response += "</member>\n";
-		response += "<member><name>maxmemory</name>\n";
-		response += "<value><int>" + Util::itos(maxmemory) + "</int></value>\n";
-		response += "</member>\n";
-		response += "<member><name>maxprocesses</name>\n";
-		response += "<value><int>" + Util::itos(maxprocesses) + "</int></value>\n";
-		response += "</member>\n";
-		response += "<member><name>softinstalled</name>\n";
-		response += "<value><string>" + XML::encodeXML(softinstalled) + "</string></value>\n";
-		response += "</member>\n";
-		response += "</struct>\n";
-		response += "</param>\n";
-		response += "</params>\n";
-		response += "</methodResponse>\n";
-		return response;
+		response += responseMember("status",status);
+		response += responseMember("load",load);
+		response += responseMember("maxtime",maxtime);
+		response += responseMember("maxfilesize",maxfilesize);
+		response += responseMember("maxmemory",maxmemory);
+		response += responseMember("maxprocesses",maxprocesses);
+		response += responseMember("secureport",secureport);
+		return responseWraper(response);
 	}
 
-	/**
-	 * return a execute response
-	 */
-	static string executeResponse(string compilation,string execution, bool executed){
+	static string requestResponse(const string adminticket,const string monitorticket,
+			const string executionticket, int sport){
 		string response;
-		response+="<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-		response+="<methodResponse>\n";
-		response+="<params>\n";
-		response+="<param>\n";
-		response+="<struct>\n";
-		response+="<member>\n";
-		response+="<name>compilation</name>\n";
-		response+="<value><string>"+XML::encodeXML(compilation)+"</string></value>\n";
-		response+="</member>\n";
-		response+="<member>\n";
-		response+="<name>execution</name>\n";
-		response+="<value><string>"+XML::encodeXML(execution)+"</string></value>\n";
-		response+="</member>\n";
-		response+="<member>\n";
-		response+="<name>executed</name>\n";
-		if(executed){
-			response+="<value><int>1</int></value>\n";
-		}else{
-			response+="<value><int>0</int></value>\n";
-		}
-		response+="</member>\n";
-		response+="</struct>\n";
-		response+="</param>\n";
-		response+="</params>\n";
-		response+="</methodResponse>\n";
-		return response;
+		response += responseMember("adminticket",adminticket);
+		response += responseMember("monitorticket",monitorticket);
+		response += responseMember("executionticket",executionticket);
+		response += responseMember("secureport",sport);
+		return responseWraper(response);
+	}
+
+	static string getResultResponse(const string &compilation,const string & execution, bool executed,bool interactive){
+		string response;
+		response += responseMember("compilation",compilation);
+		response += responseMember("execution",execution);
+		response += responseMember("executed",(executed?1:0));
+		response += responseMember("interactive",(interactive?1:0));
+		return responseWraper(response);
+	}
+	static string runningResponse(bool running){
+		string response;
+		response += responseMember("running",(running?1:0));
+		return responseWraper(response);
+	}
+	static string stopResponse(){
+		string response;
+		response += responseMember("stop",1);
+		return responseWraper(response);
 	}
 	/**
 	 * return method call name
@@ -94,7 +96,8 @@ public:
 			const XML::TreeNode *method=root->child("methodName");
 			return method->getContent();
 		}
-		throw "RPC/XML methodName parse error";
+		throw HttpException(badRequestCode
+				,"RPC/XML methodName parse error");
 	}
 	/**
 	 * return struct value as a mapstruct
@@ -103,7 +106,7 @@ public:
 		if(st->getName() == "struct"){
 			mapstruct ret;
 			for(size_t i=0; i< st->nchild(); i++){
-				ret[st->child(i)->child("name")->getContent()]=st->child(i)->child("value")->child(0);
+				ret[st->child(i)->child("name")->getString()]=st->child(i)->child("value")->child(0);
 			}
 			return ret;
 		}else if(st->getName() == "array" && st->nchild() == 0){
@@ -112,7 +115,8 @@ public:
 			return ret;
 		}
 		syslog(LOG_ERR,"Expected struct/array(0) found %s",st->getName().c_str());
-		throw "RPC/XML getStructMembers parse error";
+		throw HttpException(badRequestCode
+				,"RPC/XML getStructMembers parse error");
 	}
 	/**
 	 * return struct of method call data as mapstruct
@@ -122,7 +126,8 @@ public:
 			const XML::TreeNode *st=root->child("params")->child("param")->child("value")->child("struct");
 			return getStructMembers(st);
 		}
-		throw "RPC/XML getData parse error";
+		throw HttpException(badRequestCode
+				,"RPC/XML getData parse error");
 	}
 	/**
 	 * return list of files as mapstruct

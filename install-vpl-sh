@@ -1,0 +1,210 @@
+#!/bin/bash
+# version:		$Id: install-vpl-sh,v 1.4 2014-02-26 18:06:10 juanca Exp $
+# package:		Part of vpl-jail-system
+# copyright:    Copyright (C) 2014 Juan Carlos Rodriguez-del-Pino
+# license:      GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl.txt
+# Description:  Script to install vpl-jail-system (Ubuntu 12 and CentOS)
+echo "INSTALLING VPL-JAIL-SYSTEM"
+echo "=========================="
+LOGFILE=installation.log
+if [ "$USER" != "root" ] ; then
+    echo "This script need to be run as root and is run as $USER"
+    exit 1;
+fi
+#Detect system
+if [ -f /sbin/chkconfig  ] && [ "$(command -v yum)" != "" ] ; then
+	echo "Detected RedHat or similar distribution (using chkconfig)"
+    function vpl_install_base {
+        yum -y install $1 >>$LOGFILE
+    }
+    LSYSTEM="1"
+else
+	if [ -f /usr/sbin/update-rc.d ] && [ "$(command -v apt-get)" != "" ] ; then
+		echo "Detected Ubuntu or similar distribution (using update-rc.d)"
+		echo "Updating distribution software DB"
+		apt-get update >>$LOGFILE
+	    function vpl_install_base {
+            apt-get -q -y --allow-unauthenticated install $1 >>$LOGFILE
+	    }
+    	LSYSTEM="2"
+    else
+    	echo "Sorry can't detect system type"
+    	exit 1
+	fi
+fi
+function vpl_install {
+   echo "Installing $1:"
+   shift
+   while [ "$#" != "0" ] ; do
+   	   echo "     $1"
+       vpl_install_base $1
+       shift
+   done
+}
+
+function vpl_installq {
+   echo -n "Do you want to install $1 (y/n) "
+   A="y"
+   read A
+   if [ "$A" == "y" ] ; then
+        vpl_install $@
+   fi
+}
+
+function vpl_generate_selfsigned_certificate {
+	echo "Generating self-signed SSL certificate"
+	#Get host name to generate the certificate
+	echo -n "Do you want a certificate with wildcar? (y/n)"
+	read A
+	if [ "$A" == "y" ] ; then
+		INAME=$(hostname --long| sed 's/^[^\.]*/\*/g')
+	else
+		INAME=$(hostname --long)
+	fi
+	#Generate key
+	openssl genrsa -passout pass:12345678 -des3 -out key.pem 1024
+	#Generate certificate for this server
+	openssl req -new -subj "/C=ES/ST=Canarias/L=Las Palmas de Gran Canaria/O=VPL/OU=Execution server/CN=$INAME" -key key.pem -out certini.pem -passin pass:12345678
+	#Remove key password
+	cp key.pem keyini.pem
+	openssl rsa -in keyini.pem -out key.pem -passin pass:12345678
+	#Generate self signed certificate for 5 years
+	openssl x509 -in certini.pem -out cert.pem -req -signkey key.pem -days 1826 
+}
+
+echo "Preparing the installation"
+if [ "$LSYSTEM" == "1" ] ; then
+	vpl_install "LSB core" redhat-lsb-core
+	vpl_install "C++ compiler" make gcc gcc-c++
+	vpl_install "SSL library" openssl openssl-devel
+	vpl_install "Window manager" metacity xterm
+	vpl_install "VNC server" tigervnc-server
+	vpl_install "Web browser" firefox
+else
+	vpl_install "C++ compiler" make g++
+	vpl_install "SSL library" openssl libssl-dev
+	vpl_install "X system" xorg
+	vpl_install "VNC server" tightvncserver
+	vpl_install "Window manager" xfonts-75dpi xfonts-100dpi metacity metacity-themes
+	vpl_install "Configuration DB system" gconf2
+	gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
+	vpl_install "Web browser" firefox
+fi
+echo "Checking installed software"
+./configure >>$LOGFILE
+echo "Compiling vpl-jail-server"
+make >>$LOGFILE
+VPLJAIL_INSTALL_DIR=/etc/vpl
+if [ -d $VPLJAIL_INSTALL_DIR ] ; then
+    echo "Updating installation => $VPLJAIL_INSTALL_DIR"
+	#Stop service
+	service vpl-jail-system stop >>$LOGFILE
+else
+	echo "Installing => $VPLJAIL_INSTALL_DIR"
+    mkdir $VPLJAIL_INSTALL_DIR
+fi
+#Copy daemon 
+cp src/vpl-jail-server $VPLJAIL_INSTALL_DIR
+#Copy configuration file
+cp -i vpl-jail-system.conf $VPLJAIL_INSTALL_DIR
+chmod 600 $VPLJAIL_INSTALL_DIR/vpl-jail-system.conf
+#Copy launch scripts
+cp vpl_*.sh /etc/vpl
+chmod +x /etc/vpl/*.sh
+#Copy service script
+cp vpl-jail-system.initd /etc/init.d/vpl-jail-system
+chmod +x /etc/init.d/vpl-jail-system
+#create default control dir
+if [ ! -d /var/vpl-jail-system ] ; then
+	mkdir /var/vpl-jail-system
+fi
+chmod 0600 /var/vpl-jail-system
+if [ ! -f $VPLJAIL_INSTALL_DIR/cert.pem ] ; then
+	vpl_generate_selfsigned_certificate
+	cp key.pem $VPLJAIL_INSTALL_DIR
+	cp cert.pem $VPLJAIL_INSTALL_DIR
+	chmod 600 $VPLJAIL_INSTALL_DIR/*.pem
+	rm key.pem keyini.pem certini.pem cert.pem
+else
+	echo "Found SSL certificate => Don't create new one"
+fi
+if [ "$LSYSTEM" = "1" ] ;
+then
+	#Add service
+    chkconfig --add vpl-jail-system
+    echo "Do you want to install development software? (C, C++, Java, etc.) (y/n)"
+    read A
+    if [ "$A" != "n" ] ; then
+        vpl_install "Ada compiler (GNU)" gcc-gnat
+        vpl_install "Assembler" nasm
+        vpl_install "C compiler (GNU)" gcc
+        #vpl_install "C# development framework (mono)" mono-complete monodevelop monodevelop-debugger-gdb
+        #vpl_install "DDD graphical front end debugger (GNU)" ddd
+        vpl_install "Fortran compiler (GNU)" gcc-gfortran
+        vpl_install "General purpose debugger (GNU)" gdb
+        #vpl_install "Haskell 98 interpreter" hugs
+        vpl_install "Java (OpenJDK7)" java-1.7.0-openjdk-devel
+        vpl_install "Junit framework" junit junit4
+        #vpl_install "Octave (GNU)" octave
+        #vpl_install "Pascal compiler" fp-compiler
+        vpl_install "Perl interpreter" perl
+        vpl_install "PHP interpreter" php-cli
+        vpl_install "Prolog" pl
+        vpl_install "Python interpreter" python
+        vpl_install "Ruby interpreter" ruby
+        #vpl_install "Scala programming language" scala
+        #vpl_install "Scheme interpreter" plt-scheme
+        vpl_install "SQL interpreter" sqlite
+        vpl_install "TCL interpreter" tcl
+        vpl_install "Valgrind tool" valgrind
+    fi
+else
+    update-rc.d -f vpl-jail-system remove >>$LOGFILE
+    update-rc.d vpl-jail-system start 50 2 3 4 5 . stop 50 0 1 6 . >>$LOGFILE
+    echo "Do you want to install development software? (C, C++, Java, etc.) (y/n)"
+    read A
+    if [ "$A" != "n" ] ; then
+        vpl_install "Ada compiler (GNU)" gnat
+        vpl_install "Assembler" nasm
+        vpl_install "C compiler (GNU)" gcc
+        vpl_install "C# development framework (mono)" mono-complete monodevelop monodevelop-debugger-gdb
+        vpl_install "DDD graphical front end debugger (GNU)" ddd
+        vpl_install "Fortran compiler (GNU)" gfortran
+        vpl_install "General purpose debugger (GNU)" gdb
+        vpl_install "Haskell 98 interpreter" hugs
+        vpl_install "Java (OpenJDK7)" openjdk-7-jdk checkstyle
+        vpl_install "Junit framework" junit junit4
+        vpl_install "Octave (GNU)" octave
+        vpl_install "Pascal compiler" fp-compiler
+        vpl_install "Perl interpreter" perl
+        vpl_install "PHP interpreter" php5-cli
+        vpl_install "Prolog" swi-prolog
+        vpl_install "Python interpreter" python pydb
+        vpl_install "Ruby interpreter" ruby
+        vpl_install "Scala programming language" scala
+        vpl_install "Scheme interpreter" plt-scheme
+        vpl_install "SQL interpreter" sqlite3
+        vpl_install "TCL interpreter" tcl
+        vpl_install "Valgrind tool" valgrind
+        #vpl_install "clojure" clojure
+        #vpl_install "Cobol" open-cobol
+        #vpl_install "CoffeScript" coffescript
+        #vpl_install "D compiler (GNU)" gdc
+        #vpl_install "Erlang" erlang
+        #vpl_install "Expect tool" expect
+        #vpl_install "VHDL compiler" ghdl
+        #vpl_install "Go programming language compiler" golang
+        #vpl_install "Groovy programming language" groovy
+        #vpl_install "Haxe programming language" haxe
+        #vpl_install "R statistical computation and graphics system (GNU)" r-base
+        #vpl_install "XQuery interpreter" galax
+        echo -n "Remove apache2 ? (y/n) "
+        read A
+        if [ "$A" != "n" ] ; then
+            #remove apache2
+            rm /etc/init.d/apache2 >/dev/null 2>&1
+            update-rc.d apache2 remove
+        fi
+    fi
+fi
+service vpl-jail-system start

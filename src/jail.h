@@ -1,8 +1,8 @@
 /**
- * version:		$Id: jail.h,v 1.6 2011-04-04 14:04:25 juanca Exp $
- * package:		Part of vpl-xmlrpc-jail
- * copyright:	Copyright (C) 2009 Juan Carlos Rodríguez-del-Pino. All rights reserved.
- * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-2.0.html
+ * @version:   $Id: jail.h,v 1.18 2014-02-21 18:13:30 juanca Exp $
+ * @package:   Part of vpl-jail-system
+ * @copyright: Copyright (C) 2013 Juan Carlos Rodríguez-del-Pino
+ * @license:   GNU/GPL3, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 
 #ifndef JAIL_INC_H
@@ -24,64 +24,39 @@ using namespace std;
 #include <sys/wait.h>
 #include <sys/resource.h>
 
+#include "processMonitor.h"
+#include "websocket.h"
+
 /**
  * class Jail
  **/
 class Jail{
-	string jailPath;   //Path to jail file system
-	string configPath; //Path to configuration file
-	uid_t  minPrisoner, maxPrisoner; //uid prisoner selection limits
-	uid_t  prisoner;   //User prisoner selected
-	bool   needClean;	//true if need to clean prisoner
-	struct Interactive{
-		bool   requested; 	//true if run interactive is requested
-		string sname;		//program to run
-		int    host;		//host to connect
-		int    port;		//port number
-		string  password;	//password for connection
-		Interactive(){
-			requested=false;
-		}
-	} interactive;
-	struct {
-		int maxtime;
-		int maxfilesize;
-		int maxmemory;
-		int maxprocesses;
-	} executionLimits, jailLimits;
-	string softwareInstalled;
-	const int argc;
-	const char ** const argv;
-	char * const * const environment;
-	pid_t  newpid;			//pid of program executed
-	pid_t  redirectorpid;	//pid of redirector process
-	void checkConfig();
-	void checkJail();
-	void checkPath(const string c,const int minSize=2);
-	string prisonerHomePath();
-	bool parseConfigLine(const string &line, string &param, string &svalue, int &value);
-	void readConfigFile();
-	void selectPrisoner();
-	int  load();
-	void stopPrisonerProcess();
-	void removePrisonerHome();
-	void processRequest(); //process request and return answer
-	int removeDir(string dir, bool force);
-	void clean(); //Clean prisoner process and home dir
+	pid_t  newpid;            //pid of program executed
+	pid_t  redirectorpid;    //pid of redirector process
+	string IP; //Client IP
+	Configuration *configuration;
 	static void catchSIGTERM(int n);
 	void goJail();
-	void changeUser();
-	void transferExecution(string fileName);
-	void setLimits();
-
+	void changeUser(processMonitor &pm);
+	void setLimits(processMonitor &pm);
+	void transferExecution(processMonitor &pm,string fileName);
+	bool isValidIPforRequest();
+	//Action commands
+	string commandAvailable(int memRequested);
+	void commandRequest(mapstruct &parsedata, string &adminticket,string &monitorticket,string &executionticket);
+	void commandGetResult(string adminticket,string &compilation,string &execution,bool &executed,bool &interactive);
+	bool commandRunning(string adminticket);
+	void commandStop(string adminticket);
+	void commandMonitor(string userticket,Socket *s);
+	void commandExecute(string userticket,Socket *s);
 public:
-	Jail(int const argcp, const char ** const argvp,char * const * const envp);
-	~Jail();
-	void   process();
-	void   writeFile(string name, string data);
-	string readFile(string name);
-	void deleteFile(string name);
-	string run(string name, int host=0, int port=0, string password="");
-	void runInteractive(string name, int hostip, int port, string password);
+	Jail(string);
+	void process(Socket *);//process request and return answer
+	void writeFile(processMonitor &pm,string name, const string &data);
+	string readFile(processMonitor &pm,string name);
+	void deleteFile(processMonitor &pm,string name);
+	string run(processMonitor &pm,string name, int othermaxtime=0);
+	void runTerminal(processMonitor &pm, webSocket &s, string name);
+	void runVNC(processMonitor &pm, webSocket &s, string name);
 };
 #endif

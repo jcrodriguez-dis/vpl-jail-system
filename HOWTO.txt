@@ -1,8 +1,4 @@
-#configuración en configure.ac (version etc)
-aclocal
-autoheader
-autoconf
-automake
-./configure
-make distcheck
-
+VPL-JAIL-SYSTEM INSTALLATION/UPDATE
+-----------------------------------
+* Don't use "./configure+make install"
+* To install or update the vpl-jail-system RUN the script "install-vpl.sh" as root 

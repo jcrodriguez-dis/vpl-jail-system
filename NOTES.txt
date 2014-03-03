@@ -1,0 +1,10 @@
+#autoscan generate configure.scan
+#Configuration in configure.ac and Makefile.am
+#Don't use autoreconf --force --install
+aclocal
+autoheader
+autoconf
+automake
+./configure
+make distcheck
+

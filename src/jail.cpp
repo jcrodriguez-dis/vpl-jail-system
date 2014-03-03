@@ -1,18 +1,14 @@
 /**
- * version:		$Id: jail.cpp,v 1.24 2011-06-07 08:58:16 juanca Exp $
- * package:		Part of vpl-xmlrpc-jail
- * copyright:	Copyright (C) 2011 Juan Carlos Rodríguez-del-Pino. All rights reserved.
- * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-2.0.html
+ * @version:   $Id: jail.cpp,v 1.42 2014-02-26 16:49:49 juanca Exp $
+ * @package:   Part of vpl-jail-system
+ * @copyright: Copyright (C) 2014 Juan Carlos Rodríguez-del-Pino
+ * @license:   GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 
 #if HAVE_CONFIG_H
 #include <config.h>
 #endif
 
-#include "jail.h"
-#include "redirector.h"
-#include "httpServer.h"
-#include "util.h"
 #include <climits>
 #include <limits>
 #include <cstring>
@@ -22,681 +18,736 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
-/**
- * Constructor, parameters => main parameters
+#include "jail.h"
+#include "redirector.h"
+#include "httpServer.h"
+#include "util.h"
+#include "processMonitor.h"
+#include "websocket.h"
+/*
+ * @return string "ready", "busy", "offline"
  */
-Jail::Jail(const int argcp, const char ** const argvp,char * const * const envp):argc(argcp),argv(argvp),environment(envp){
-	needClean=false;
+string Jail::commandAvailable(int memRequested){
+	syslog(LOG_INFO,"Memory requested %d",memRequested);
+	if(Util::fileExists("/etc/nologin")){ //System going shutdown
+		return "offline";
+	}else {
+		char *mem=(char*)malloc(memRequested);
+		if(mem==NULL) return "busy";
+		else free(mem);
+	}
+	return "ready";
 }
 
-Jail::~Jail(){
-	clean();
-}
-
-/**
- * Process request
- * 	1) Read configuration file "/etc/vpl-xmlrpc-jail.conf"
- * 	2) Check jail
- *  3) Select prisoner
- *  4) Read request
- *  5) Execute request
- */
-void Jail::processRequest(){
-	readConfigFile(); // Check and load configuration file
-	checkJail();      // Check jail security
-    selectPrisoner();
-	syslog(LOG_INFO,"Create server version %s",Util::version());
-	//Set URLPath from main arg if set "-urlpath PATH" or "/RPC"
-	string URLPath=Util::getCommand(argc,argv,"-urlpath");
-	if(URLPath==""){
-		//For compatibility with ver <= 1.1
-		URLPath = Util::getCommand(argc,argv,"-uri");
-		if(URLPath == "")
-			URLPath="/RPC";
-	}
-	HttpJailServer server(URLPath);
-	syslog(LOG_INFO,"Read from net");
-	//Receive request with http limits taken fron config file
-	string data=server.receive(STDIN_FILENO, jailLimits.maxtime, jailLimits.maxmemory);
-	XML xml(data);
-	string request=RPC::methodName(xml.getRoot());
-	syslog(LOG_INFO,"Write response");
-	if(request=="status"){
-		string status="ready";//TODO Test ready condition
-        mapstruct parsedata=RPC::getData(xml.getRoot());
-        int memRequested=parsedata["maxmemory"]->getInt();
-		if(Util::fileExists("/etc/nologin")){ //System going shutdown
-			status="offline";
-		}else {
-			char *mem=(char*)malloc(memRequested);
-			if(mem==NULL){
-				status="busy";
-			}
-			else{
-				free(mem);
-			}
-		}
-		server.send200(RPC::readyResponse(status,load(),
-				jailLimits.maxtime,
-				jailLimits.maxfilesize,
-				jailLimits.maxmemory,
-				jailLimits.maxprocesses,
-				softwareInstalled));
-		close(STDIN_FILENO);
-	}
-	else if(request=="execute"){
-        syslog(LOG_INFO,"execute request");
-        mapstruct parsedata=RPC::getData(xml.getRoot());
-        syslog(LOG_INFO,"parse files %lu",(long unsigned int)parsedata.size());
-        mapstruct files=RPC::getFiles(parsedata["files"]);
-        mapstruct filestodelete=RPC::getFiles(parsedata["filestodelete"]);
-        string script=parsedata["execute"]->getString();
-        //Retrieve files to execution dir and options
-        for(mapstruct::iterator i=files.begin(); i!=files.end(); i++){
-			string name=i->first,data=i->second->getString();
-			syslog(LOG_INFO,"Write file %s data size %lu",name.c_str(),(long unsigned int)data.size());
-        	writeFile(name,data);
-        }
-		executionLimits=jailLimits;
-		syslog(LOG_INFO,"Reading parms");
-		executionLimits.maxtime=min(parsedata["maxtime"]->getInt(),executionLimits.maxtime);
-		executionLimits.maxfilesize=min(parsedata["maxfilesize"]->getInt(),executionLimits.maxfilesize);
-		executionLimits.maxmemory=min(parsedata["maxmemory"]->getInt(),executionLimits.maxmemory);
-		executionLimits.maxprocesses=min(parsedata["maxprocesses"]->getInt(),executionLimits.maxprocesses);
-		syslog(LOG_INFO,"maxtime %d",parsedata["maxtime"]->getInt());
-		syslog(LOG_INFO,"maxfilesize %d",parsedata["maxfilesize"]->getInt());
-		syslog(LOG_INFO,"maxmemory %d",parsedata["maxmemory"]->getInt());
-		syslog(LOG_INFO,"maxprocesses %d",parsedata["maxprocesses"]->getInt());
-
-		int interactive=parsedata["interactive"]->getInt();
-
-		syslog(LOG_INFO,"Compilation");
-        string outputCompilation=run(script);
-
-        string outputExecution;
-        bool compiled=Util::fileExists(prisonerHomePath()+"/vpl_execution");
-        if(compiled){
-        	//Delete files
-	        for(mapstruct::iterator i=filestodelete.begin(); i!=filestodelete.end(); i++){
-				string name=i->first;
-				syslog(LOG_INFO,"Delete file %s",name.c_str());
-	        	deleteFile(name);
-	        }
-	        if(interactive){
-				syslog(LOG_INFO,"Interactive execution");
-				int port=parsedata["port"]->getInt();
-				string password=parsedata["password"]->getString();
-				in_addr addr;
-				int host;
-				if(parsedata.find("ip") == parsedata.end() ||
-					inet_aton(parsedata["ip"]->getString().c_str(),&addr) == 0){
-					host = server.getClientIP();
-				}else{
-					host = addr.s_addr;
-				}
-				runInteractive("vpl_execution",host,port,password);
-	        }else{
-				syslog(LOG_INFO,"Non interactive execution");
-	        	outputExecution=run("vpl_execution");
-	        }
-        }else{
-       		syslog(LOG_INFO,"Compilation fail");
-        }
-		server.send200(RPC::executeResponse(outputCompilation,outputExecution,compiled));
-		close(STDIN_FILENO);
-	}
-	else{
-		server.sendCode(HttpJailServer::internalServerErrorCode,"Unknown request");
-	}
-}
-
-/**
- * Prepare to run the execution interactive
- */
-void Jail::runInteractive(string name, int hostip, int port, string password){
-	interactive.requested=true;
-	interactive.sname=name;
-	interactive.host=hostip;
-	interactive.port=port;
-	interactive.password=password;
-}
-
-/**
- * Stop prisoner process if some one exists
- */
-void Jail::stopPrisonerProcess(){
-	syslog(LOG_INFO,"Sttoping prisoner process");
-    pid_t pid=fork();
+void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &monitorticket,string &executionticket){
+	syslog(LOG_INFO,"Request for process");
+	processMonitor pm(adminticket,monitorticket,executionticket);
+	pid_t pid=fork();
 	if(pid==0){ //new process
-	    changeUser();
-	    //To not stop at first signal
-	    signal(SIGTERM,Jail::catchSIGTERM);
-		kill(-1,SIGTERM);
-		usleep(100000);
-		kill(-1,SIGKILL);
-		abort();
-	}
-	else{
-	   waitpid(pid,NULL,0); //Wait for pid end
-	}
-}
-
-/**
- * return prisoner home page
- * if user root absolute path if prisoner relative to jail path
- */
-string Jail::prisonerHomePath(){
-	char buf[40];
-	sprintf(buf,"/home/p%d",prisoner);
-	uid_t uid=getuid();
-	if(uid!=0){
-		syslog(LOG_ERR,"prisonerHomePath %d",uid);
-		return buf;
-	}
-	return jailPath+buf;
-}
-
-/**
- * remove a directory and its content
- * if force=true remove always
- * else remove files owned by prisoner
- * and complete directories owned by prisoner (all files and directories owns by prisoner or not)
- */
-int Jail::removeDir(string dir, bool force){
-	const string parent(".."),me(".");
-	int nunlink=0;
-	struct stat filestat;
-	dirent *ent;
-	DIR *dirfd=opendir(dir.c_str());
-	if(dirfd==NULL){
-		syslog(LOG_ERR,"Can't open dir \"%s\": %m",dir.c_str());
-		return 0;
-	}
-	while((ent=readdir(dirfd))!=NULL){
-		const string name(ent->d_name);
-		const string fullname=dir+"/"+name;
-		lstat(fullname.c_str(),&filestat);
-		bool owned=filestat.st_uid == prisoner || filestat.st_gid == prisoner;
-		if(ent->d_type & DT_DIR){
-			if(name != parent && name != me){
-				nunlink+=removeDir(fullname,force||owned);
+		try{
+			syslog(LOG_INFO,"parse files %lu",(long unsigned int)parsedata.size());
+			mapstruct files=RPC::getFiles(parsedata["files"]);
+			mapstruct filestodelete=RPC::getFiles(parsedata["filestodelete"]);
+			string script=parsedata["execute"]->getString();
+			//Retrieve files to execution dir and options
+			for(mapstruct::iterator i=files.begin(); i!=files.end(); i++){
+				string name=i->first,data=i->second->getString();
+				syslog(LOG_INFO,"Write file %s data size %lu",name.c_str(),(long unsigned int)data.size());
+				pm.writeFile(name,data);
 			}
-		}
-		else{
-			if(force || owned){
-				if(unlink(fullname.c_str())){
-					syslog(LOG_ERR,"Can't unlink \"%s\": %m",fullname.c_str());
+			ExecutionLimits executionLimits=Configuration::getConfiguration()->getLimits();
+			syslog(LOG_INFO,"Reading parms");
+			executionLimits.syslog("Config");
+			executionLimits.maxtime=min(parsedata["maxtime"]->getInt(),executionLimits.maxtime);
+			executionLimits.maxfilesize=min(parsedata["maxfilesize"]->getInt(),executionLimits.maxfilesize);
+			executionLimits.maxmemory=min(parsedata["maxmemory"]->getInt(),executionLimits.maxmemory);
+			executionLimits.maxprocesses=min(parsedata["maxprocesses"]->getInt(),executionLimits.maxprocesses);
+			executionLimits.syslog("Request");
+			string vpl_lang=parsedata["lang"]->getString();
+			syslog(LOG_DEBUG,"VPL_LANG %s",vpl_lang.c_str());
+			bool interactive=parsedata["interactive"]->getInt()>0;
+			syslog(LOG_DEBUG,"interactive %d",parsedata["interactive"]->getInt());
+			pm.setExtraInfo(executionLimits,interactive,vpl_lang);
+			pm.setCompiler();
+			syslog(LOG_INFO,"Compilation");
+			string compilationOutput=run(pm,script);
+			pm.setCompilationOutput(compilationOutput);
+			bool compiled=pm.FileExists(VPL_EXECUTION)||pm.FileExists(VPL_WEXECUTION);
+			if(compiled){
+				//Delete files
+				for(mapstruct::iterator i=filestodelete.begin(); i!=filestodelete.end(); i++){
+					string name=i->first;
+					syslog(LOG_INFO,"Delete file %s",name.c_str());
+					pm.deleteFile(name);
 				}
-				else nunlink++;
+				if(!interactive && pm.FileExists(VPL_EXECUTION)){
+					pm.setRunner();
+					syslog(LOG_INFO,"Non interactive execution");
+					string executionOutput=run(pm,VPL_EXECUTION);
+					syslog(LOG_INFO,"Write execution result");
+					pm.setExecutionOutput(executionOutput,true);
+				}
+			}else{
+				syslog(LOG_INFO,"Compilation fail");
+			}
+			exit(0);
+		}
+		catch(...){
+			syslog(LOG_INFO,"Internal error");
+		}
+	}
+}
+void Jail::commandGetResult(string adminticket,string &compilation,string &execution, bool &executed, bool &interactive){
+	processMonitor pm(adminticket);
+	pm.getResult(compilation,execution,executed);
+	interactive=pm.isInteractive();
+}
+bool Jail::commandRunning(string adminticket){
+	processMonitor pm(adminticket);
+	return pm.isRunnig();
+}
+void Jail::commandStop(string adminticket){
+	pid_t pid=fork();
+	if(pid==0){ //new process
+		try{
+			processMonitor pm(adminticket);
+			pm.clean();
+			pm.cleanMonitor();
+		}catch(...){
+		}
+		exit(0);
+	}
+}
+void Jail::commandMonitor(string monitorticket,Socket *s){
+	processMonitor pm(monitorticket);
+	webSocket ws(s);
+	processState state=prestarting;
+	time_t timeout=pm.getStartTime()+pm.getMaxTime();
+	time_t startTime,lastMessageTime;
+	time_t lastTime=pm.getStartTime();
+	string lastMessage;
+	while(state != stopped){
+		time_t now = time(NULL);
+		if(lastMessage.size()>0 && now != lastMessageTime){
+			ws.send(lastMessage+": "+Util::itos(now-startTime)+" seg");
+			lastMessageTime = now;
+		}
+		processState newstate=pm.getState();
+		if(newstate!=state){
+			state=newstate;
+			switch(state){
+			case starting:
+				syslog(LOG_DEBUG,"Monitor starting");
+				startTime = now;
+				lastMessageTime = now;
+				lastMessage = "message:starting";
+				ws.send(lastMessage);
+				break;
+			case compiling:
+				syslog(LOG_DEBUG,"Monitor compiling");
+				timeout=now+pm.getMaxTime();
+				startTime = now;
+				lastMessageTime = now;
+				lastMessage = "message:compilation";
+				ws.send(lastMessage);
+				break;
+			case beforeRunning:
+				syslog(LOG_DEBUG,"Monitor beforeRunning");
+				ws.send("compilation:"+pm.getCompilation());
+				timeout=now+JAIL_SOCKET_TIMEOUT;
+				if(pm.FileExists(VPL_EXECUTION)){
+					syslog(LOG_DEBUG,"run:terminal");
+					ws.send("run:terminal");
+				}else if(pm.FileExists(VPL_WEXECUTION))
+					ws.send("run:vnc:"+pm.getVNCPassword());
+				else{
+					ws.send("close:");
+					ws.close();
+					pm.clean();
+					pm.cleanMonitor();
+					return;
+				}
+				break;
+			case running:
+				syslog(LOG_DEBUG,"Monitor running");
+				startTime = now;
+				timeout=now+pm.getMaxTime()+6 /* execution cleanup */;
+				lastMessageTime = now;
+				lastMessage = "message:running";
+				ws.send(lastMessage);
+				break;
+			case retrieve:
+				syslog(LOG_DEBUG,"Monitor retrieve");
+				startTime = now;
+				timeout=now+JAIL_HARVEST_TIMEOUT;
+				ws.send("retrieve:");
+				break;
+			case stopped:
+				syslog(LOG_DEBUG,"Monitor stopped");
+				ws.send("close:");
 			}
 		}
+		ws.wait(100); // 10 time a second
+		
+		string rec=ws.receive();
+		if(ws.isClosed())
+			break;
+		if(rec.size()>0){ //Receive client close ws
+			ws.close();
+			break;
+		}
+		//Check running timeout
+		if(timeout< time(NULL)){
+			ws.send("message:timeout");
+			pm.clean();
+			pm.cleanMonitor();
+			usleep(3000000);
+			ws.send("close:");
+			ws.close();
+			return;
+		}
+		if(lastTime != now && pm.isOutOfMemory()){ //Every second check memory usage
+			string ml= pm.getMemoryLimit();
+			syslog(LOG_DEBUG,"Out of memory (%s)",ml.c_str());
+			ws.send("message:outofmemory:"+ml);
+			usleep(1500000);
+			pm.clean();
+			pm.cleanMonitor();
+			usleep(1500000);
+			ws.send("close:");
+			ws.close();
+			return;
+		}
+		lastTime = now;
 	}
-	closedir(dirfd);
-	if(force){
-		if(rmdir(dir.c_str())){
-			syslog(LOG_ERR,"Can't rmdir \"%s\": %m",dir.c_str());
+	pm.clean();
+	pm.cleanMonitor();
+}
+
+void Jail::commandExecute(string executeticket,Socket *s){
+	processMonitor pm(executeticket);
+	webSocket ws(s);
+	if(pm.getSecurityLevel() != execute){
+		syslog(LOG_ERR,"Security: execute request with no monitor ticket");
+		throw "Internal server error";
+	}
+	syslog(LOG_INFO,"Start executing");
+	if(pm.getState() == beforeRunning){
+		pm.setRunner();
+		if(pm.FileExists(VPL_EXECUTION)){
+			string program;
+			if(pm.installScript(".vpl_launcher.sh","vpl_terminal_launcher.sh"))
+				program=".vpl_launcher.sh";
+			else
+				program=VPL_EXECUTION;
+			runTerminal(pm, ws, program);
+		}
+		else if(pm.FileExists(VPL_WEXECUTION)){
+			if(pm.installScript(".vpl_launcher.sh","vpl_vnc_launcher.sh"))
+				runVNC(pm, ws, ".vpl_launcher.sh");
+			else
+				syslog(LOG_ERR,"Error: vpl_vnc_launcher.sh not installed");
+		}else{
+			syslog(LOG_ERR,"Error: no thing to run");
 		}
 	}
-	return nunlink;
 }
 
-/**
- * remove prisoner home directory and /tmp prisoner files
- */
-void Jail::removePrisonerHome(){
-	syslog(LOG_INFO,"Remove prisoner home (%d)",prisoner);
-	removeDir(prisonerHomePath(),true); //All files and dir
-	removeDir(jailPath+"/tmp",false); //Only prisoner files and dirs
-}
-
-/**
- * Remove prisoner files and stop prisoner process
- */
-void Jail::clean(){
-	if(needClean){
-		syslog(LOG_INFO,"Cleaning");
-		stopPrisonerProcess();
-		removePrisonerHome();
-		needClean=false;
-	}
-}
-
-/**
- * process request and run interactive if requested
- */
-void Jail::process(){
-	processRequest();
-	if(interactive.requested){
-		run(interactive.sname,interactive.host,
-			interactive.port,interactive.password);
-		interactive.requested=false;
-	}
-}
-
-/**
- * Check configuration file security
- */
-void Jail::checkConfig(){
-	configPath="/etc/vpl/vpl-xmlrpc-jail.conf";
-	struct stat info;
-	if(lstat(configPath.c_str(),&info)) throw "Jail error: Config file not found";
-	if(info.st_uid !=0 || info.st_gid !=0) throw "Jail error: config file not owned by root";
-	if(info.st_mode & 077) throw "Jail error: config file with insecure permissions (must be 0600)";
-}
-
-/**
- * Check jail security (/etc, paswords files, /home, etc)
- */
-void Jail::checkJail(){
-	string detc=jailPath+"/etc";
-	struct stat info;
-	if(lstat(detc.c_str(),&info)) throw "Jail error: jail /etc not checkable";
-	if(info.st_uid !=0 || info.st_gid !=0) throw "Jail error: jail /etc not owned by root";
-	if(info.st_mode & 022) throw "Jail error: jail /etc with insecure permissions (must be 0xx44)";
-
-	string fpasswd=jailPath+"/etc/passwd";
-	if(lstat(fpasswd.c_str(),&info)) throw "Jail error: jail /etc/passwd not checkable";
-	if(info.st_uid !=0 || info.st_gid !=0) throw "Jail error: jail /etc/passwd not owned by root";
-	if(info.st_mode & 033) throw "Jail error: jail /etc/passwd with insecure permissions (must be 0xx44)";
-
-	string fshadow=jailPath+"/etc/shadow";
-	if(!lstat(fshadow.c_str(),&info)) {
-		if(info.st_uid !=0 || info.st_gid !=0) throw "Jail error: jail /etc/shadow not owned by root";
-		if(info.st_mode & 077) throw "Jail error: jail /etc/passwd with insecure permissions (must be 0x00)";
-	}
-}
-
-/**
- * Check password for dangerous chars
- */
-void Jail::checkPath(const string c,const int minSize){
-	if((int)c.size() < minSize) throw "Jail error: Path too short";
-	if(c.find("..") != string::npos) throw "Jail error: path with forbidden chars";
-}
-
-/**
- * Parse configuration file line
- * @param line line to parse
- * @param param string found before "="
- * @param svalue string after "="
- * @param value int value after "="
- * @return true if well constructed
- */
-bool Jail::parseConfigLine(const string &line, string &param, string &svalue, int &value){
-	string aux=line;
-	param="";
-	svalue="";
-	value=0;
-	int l=aux.size();
-	for(int i=0; i< l; i++){ //remove comment
-		if(aux[i]=='#'){
-	  		aux.erase(i,l-i);
-	  		break;
-		}
-	}
-	Util::trim(aux);  //Clean string
-	l=aux.size();
-	for(int i=0; i< l; i++){
-		if(aux[i]=='='){ //Locate '='
-			param=aux.substr(0,i);
-			Util::trim(param);
-			svalue=aux.substr(i+1,l-(i+1));
-			Util::trim(svalue);
-	  		value=atoi(svalue.c_str());
-	  		return true;
-		}
+bool Jail::isValidIPforRequest(){
+	const vector<string> &dirs=configuration->getTaskOnlyFrom();
+	if(dirs.size()==0) return true;
+	for(int i = 0; i< dirs.size(); i++){
+		if(IP.find(dirs[i]) == 0)
+			return true;
 	}
 	return false;
 }
 
+
 /**
- * Read and parse configuration file
+ * Constructor, parameters => main parameters
  */
-void Jail::readConfigFile(){
-	jailLimits.maxtime=INT_MAX;
-	jailLimits.maxfilesize=INT_MAX;
-	jailLimits.maxmemory=INT_MAX;
-	jailLimits.maxprocesses=INT_MAX;
-	checkConfig();
-	ifstream file;
-	file.open(configPath.c_str(),ifstream::in);
-	if(file.fail())
-   		throw "Jail error: config file can't be opened";
-	int nl=0;
-	while(!file.fail()){
-		string line, param, svalue;
-		int value;
-		getline(file,line);
-		if(file.fail()) break;
-		nl++;
-		if(parseConfigLine(line, param, svalue, value)){
-			if(param=="MIN_PRISONER_UGID"){
-				syslog(LOG_INFO,"MIN_PRISONER_UGID %d",value);
-				if(value>1000) minPrisoner=value;
-				else throw "Jail error: incorrect MIN_PRISONER_UGID value";
+Jail::Jail(string IP){
+	this->IP = IP;
+	configuration = Configuration::getConfiguration();
+}
+
+/**
+ * Process request
+ *  3) read http request and header
+ *  4) select http xmlrpc or websocket
+ *  5) http: available, request, getresult, running, stop
+ *  6) websocket: monitor, execute
+ */
+void Jail::process(Socket *socket){
+	syslog(LOG_INFO,"Start server version %s",Util::version());
+	string httpURLPath=configuration->getURLPath();
+	syslog(LOG_INFO,"urlpath for requests %s",httpURLPath.c_str());
+	HttpJailServer server(socket);
+	socket->readHeaders();
+	if(Util::toUppercase(socket->getHeader("Upgrade"))
+	!="WEBSOCKET"){
+		try{
+			syslog(LOG_INFO,"http request");
+			if(!isValidIPforRequest())
+				throw HttpException(badRequestCode,"Client not allowed");
+			if(socket->getURLPath() == "/OK"){
+				string page="<!DOCTYPE html><html><body>OK</body></html>";
+				page += "<script>setTimeout(function(){window.close();},2000);</script>";
+				server.send200(page);
+				return;
 			}
-			else if(param=="MAX_PRISONER_UGID"){
-				syslog(LOG_INFO,"MAX_PRISONER_UGID %d",value);
-				if(value<=65534) maxPrisoner=value;
-				else throw "Jail error: incorrect MAX_PRISONER_UGID value";
-			}
-			else if(param=="JAILPATH" ){
-				syslog(LOG_INFO,"JAILPATH %s",svalue.c_str());
-				while(svalue.size()>0 && svalue[svalue.size()-1] == '/')
-					svalue.erase(svalue.size()-1,1);
-				checkPath(svalue);
-				jailPath=svalue;
-			}
-			else if(param=="MAXTIME" ){
-				syslog(LOG_INFO,"MAXTIME %d",value);
-				jailLimits.maxtime=value;
-			}
-			else if(param=="MAXFILESIZE" ){
-				syslog(LOG_INFO,"MAXFILESIZE %d",value);
-				jailLimits.maxfilesize=value;
-			}
-			else if(param=="MAXMEMORY" ){
-				syslog(LOG_INFO,"MAXMEMORY %d",value);
-				jailLimits.maxmemory=value;
-			}
-			else if(param=="MAXPROCESSES" ){
-				syslog(LOG_INFO,"MAXPROCESSES %d",value);
-				jailLimits.maxprocesses=value;
-			}
-			else if(param=="SOFTINSTALLED" ){
-				syslog(LOG_INFO,"SOFTINSTALLED \"%s\"",svalue.c_str());
-				softwareInstalled+=";"+svalue;
-			}
-			else if(param != ""){ //Error
-           		static char buf[100];
-           		sprintf(buf,"Jail error: incorrect config file (line %d)",nl);
-           		throw buf;
+			server.validateRequest(httpURLPath);
+			string data=server.receive();
+			XML xml(data);
+			string request=RPC::methodName(xml.getRoot());
+			mapstruct parsedata=RPC::getData(xml.getRoot());
+			syslog(LOG_INFO,"Execute request '%s'",request.c_str());
+			if(request=="available"){
+				ExecutionLimits jailLimits=configuration->getLimits();
+				int memRequested=parsedata["maxmemory"]->getInt();
+				string status=commandAvailable(memRequested);
+				syslog(LOG_INFO,"Status: '%s'",status.c_str());
+				server.send200(RPC::availableResponse(status,processMonitor::requestsInProgress(),
+						jailLimits.maxtime,
+						jailLimits.maxfilesize,
+						jailLimits.maxmemory,
+						jailLimits.maxprocesses,
+						configuration->getSecurePort()));
+			}else if(request=="request"){
+				string adminticket,monitorticket,executionticket;
+				commandRequest(parsedata, adminticket,monitorticket,executionticket);
+				server.send200(RPC::requestResponse(adminticket,monitorticket,executionticket
+						,configuration->getSecurePort()));
+			}else if(request=="getresult"){
+				string adminticket,compilation,execution;
+				bool executed,interactive;
+				adminticket=parsedata["adminticket"]->getString();
+				commandGetResult(adminticket, compilation, execution,executed,interactive);
+				server.send200(RPC::getResultResponse(compilation,execution,executed,interactive));
+			}else if(request=="running"){
+				string adminticket;
+				adminticket=parsedata["adminticket"]->getString();
+				commandRunning(adminticket);
+				server.send200(RPC::runningResponse(commandRunning(adminticket)));
+			}else if(request=="stop"){
+				string adminticket;
+				adminticket=parsedata["adminticket"]->getString();
+				commandStop(adminticket);
+				server.send200(RPC::stopResponse());
+			}else{ //Error
+				throw HttpException(badRequestCode,"Unknown request:"+request);
 			}
 		}
-	}
-	if(jailPath.size()==0) throw "Jail error: incorrect config file, JAILPATH no set";
-	if(minPrisoner>maxPrisoner || minPrisoner<1000 || maxPrisoner>65534)
-  		throw "Jail error: incorrect config file, prisoner uid bad defined";
-}
-
-/**
- * Return number of prisoner in jail
- */
-int Jail::load(){
-	const string homeDir=jailPath+"/home";
-	const string pre="p";
-	int nprisoner;
-	dirent *ent;
-	DIR *dirfd=opendir(homeDir.c_str());
-	if(dirfd==NULL){
-		syslog(LOG_ERR,"Can't open dir \"%s\": %m",homeDir.c_str());
-		return 0;
-	}
-	while((ent=readdir(dirfd))!=NULL){
-		const string name(ent->d_name);
-		if(name.find(pre,0)==0) nprisoner++;
-	}
-	closedir(dirfd);
-	return nprisoner-1; //Remove own prisoner
-}
-
-/**
- * Select for a prisoner id form minPrisoner to maxPrisoner
- */
-void Jail::selectPrisoner(){
-	int const range=(maxPrisoner-minPrisoner)+1;
-	int const ntry=range*2;
-	int const umask=0700;
-	srand(time(NULL)%RAND_MAX);
-	for(int i=0; i<ntry; i++){
-		prisoner = minPrisoner+rand()%range;
-		string homePath=prisonerHomePath();
-		if(mkdir(homePath.c_str(),umask)==0){
-			needClean=true;
-			if(chown(homePath.c_str(),prisoner,prisoner)){
-				syslog(LOG_ERR,"can't change prisoner home dir owner: %m");
-				throw "Jail error: can't change prisoner home dir owner";
+		catch(HttpException &exception){
+			syslog(LOG_ERR,"%s",exception.getLog().c_str());
+			server.sendCode(exception.getCode(),exception.getMessage());
+		}
+		catch(const char *s){
+			syslog(LOG_ERR,"%s",s);
+			server.sendCode(internalServerErrorCode,s);
+		}
+		catch(...){
+			syslog(LOG_ERR, "Unexpected exception %s:%d",__FILE__,__LINE__);
+			server.sendCode(internalServerErrorCode,"Unknown error");
+		}
+	}else{ //Websocket
+		try{
+			if(socket->getMethod() != "GET"){
+				throw "Unsupported METHOD "+socket->getMethod();
 			}
-			return;
+			string URLPath=socket->getURLPath();
+			regex_t reg;
+			regmatch_t match[3];
+			regcomp(&reg, "^\\/([^\\/]+)\\/(.+)$", REG_EXTENDED);
+			int nomatch=regexec(&reg, URLPath.c_str(),3, match, 0);
+			if(nomatch)
+				throw string("Bad URL");
+			string ticket=URLPath.substr(match[1].rm_so,match[1].rm_eo-match[1].rm_so);
+			string command=URLPath.substr(match[2].rm_so,match[2].rm_eo-match[2].rm_so);
+			if(command == "monitor"){
+				commandMonitor(ticket,socket);
+			}else if(command == "execute"){
+				commandExecute(ticket,socket);
+			}else
+				throw string("Bad command");
+		}
+		catch(HttpException &exception){
+			syslog(LOG_ERR, "%s",exception.getLog().c_str());
+			sleep(3);
+			socket->send(exception.getMessage());
+		}
+		catch(string &exception){
+			syslog(LOG_ERR, "%s", exception.c_str());
+			sleep(3);
+			socket->send(exception);
+		}
+		catch(const char *s){
+			syslog(LOG_ERR, "%s", s);
+			sleep(3);
+		}
+		catch(...){
+			syslog(LOG_ERR, "Unexpected exception %s:%d",__FILE__,__LINE__);
+			socket->send("Unexpected exception");
 		}
 	}
-	throw "Jail error: can't create prisoner home dir";
-}
-
-/**
- * Write a file to prisoner home
- */
-void Jail::writeFile(string name, string data){
-	checkPath(name,1);
-	string fullName=prisonerHomePath()+"/"+name;
-	FILE *fd=fopen(fullName.c_str(),"wb");
-	if(fd==NULL) throw "Jail error: can't write file";
-	bool isScript=name.size()>4 && name.substr(name.size()-3,3) == ".sh";
-	if(isScript){ //Endline converted to UNIX
-		string newdata;
-		for(size_t i=0; i<data.size(); i++){
-			if(data[i] != '\r') newdata+=data[i];
-			else{
-				char p=' ',n=' ';
-				if(i>0) p=data[i-1];
-				if(i+1<data.size()) n=data[i+1];
-				if(p != '\n' && n != '\n') newdata += '\n';
-			}
-		}
-		data=newdata;
-	}
-	if(data.size()>0 && fwrite(data.c_str(),data.size(),1,fd)!=1) throw "Jail error: can't write to file";
-	fclose(fd);
-	if(chown(fullName.c_str(),prisoner,prisoner)) syslog(LOG_ERR,"Can't change file owner %m");
-	if(chmod(fullName.c_str(),isScript?0700:0600)) syslog(LOG_ERR,"Can't change file perm %m");
-}
-
-/**
- * Read a file from prisoner home directory
- */
-string Jail::readFile(string name){
-	checkPath(name,1);
-	string fullName=prisonerHomePath()+"/"+name;
-	FILE *fd=fopen(fullName.c_str(),"rb");
-	if(fd==NULL) throw "Jail error: can't read file";
-	string res;
-	const int sbuffer=1024;
-	char buffer[sbuffer];
-	size_t read;
-	while((read=fread(buffer,1,sbuffer,fd))>0){
-        res+=string(buffer,read);
-    }
-    fclose(fd);
-	return res;
-}
-
-/**
- * Read a file from prisoner home directory
- */
-void Jail::deleteFile(string name){
-	checkPath(name,1);
-	string fullName=prisonerHomePath()+"/"+name;
-	if(Util::fileExists(fullName)){
-		if(unlink(fullName.c_str())){
-			syslog(LOG_ERR,"Can't delete file %s: %m",name.c_str());
-			throw "Jail error: can't delete file";
-		}
-	}
-}
-
-void Jail::catchSIGTERM(int n){
-		//Do nothing
 }
 
 /**
  * chdir and chroot to jail
  */
 void Jail::goJail(){
-	if(chdir(jailPath.c_str()) != 0) throw "Can't chdir to jail";
-	if(chroot(jailPath.c_str()) != 0) throw "Can't chroot to jail";
+	string jailPath=configuration->getJailPath();
+	if(chdir(jailPath.c_str()) != 0)
+		throw HttpException(internalServerErrorCode,"I can't chdir to jail",jailPath);
+	if(chroot(jailPath.c_str()) != 0)
+		throw HttpException(internalServerErrorCode,"I can't chroot to jail",jailPath);
 	syslog(LOG_INFO,"chrooted \"%s\"",jailPath.c_str());
-}
-
-/**
- * Root mutate to be prisoner
- */
-void Jail::changeUser(){
-	if(setresgid(prisoner,prisoner,prisoner)!= 0) {
-		syslog(LOG_ERR,"Can't change to prisoner group %d: %m",prisoner);
-		throw "Can't change to prisoner group";
-	}
-	if(setresuid(prisoner,prisoner,prisoner)!= 0){
-		syslog(LOG_ERR,"Can't change to prisoner user %d: %m",prisoner);
-		throw "Can't change to prisoner user";
-	}
-	//Recheck not needed
-	if(getuid()==0 || geteuid()==0) throw "Can't change to prisoner user 2";
-	syslog(LOG_INFO,"change user to %d",prisoner);
 }
 
 /**
  * Execute program at prisoner home directory
  */
-void Jail::transferExecution(string fileName){
-	 string dir=prisonerHomePath();
-	 string fullname=dir+"/"+fileName;
-     if(chdir(dir.c_str())){
-     	syslog(LOG_ERR,"Can't chdir to home dir. \"%s\" %m",dir.c_str());
-     	throw "Can't chdir to exec dir";
-     }
-     char *argv[6];
-     char *command= new char[fullname.size()+1];
-     strcpy(command,fullname.c_str());
-     setpgrp();
-     int i=0;
-     argv[i++] = command;
-     argv[i++] = NULL;
-     syslog(LOG_ERR,"Running \"%s\"",command);
-     execve(command,argv,environment);
-     syslog(LOG_ERR,"execve \"%s\" fail: %m",command);
-     throw "Can't execve";
+void Jail::transferExecution(processMonitor &pm, string fileName){
+	string dir=pm.getRelativeHomePath();
+	syslog(LOG_DEBUG,"Jail::transferExecution to %s+%s",dir.c_str(),fileName.c_str());
+	string fullname=dir+"/"+fileName;
+	if(chdir(dir.c_str())){
+		throw "I can't chdir to exec dir :"+dir;
+	}
+	if(!Util::fileExists(fullname)){
+		throw string("transferExecution: execution file not found: ")+fullname;
+	}
+	char *arg[6];
+	char *command= new char[fullname.size()+1];
+	strcpy(command,fullname.c_str());
+	setpgrp();
+	int narg=0;
+	arg[narg++] = command;
+	arg[narg++] = NULL;
+	int nenv=0;
+	char *env[10];
+	string uid=Util::itos(pm.getPrisonerID());
+	string HOME="HOME=/home/p"+uid;
+	env[nenv++]=(char *)HOME.c_str();
+	string PATH="PATH="+Util::getEnv("PATH");
+	env[nenv++]=(char *)PATH.c_str();
+	env[nenv++]=(char *)"TERM=xterm";
+	string UID="UID="+uid;
+	env[nenv++]=(char *)UID.c_str();
+	string USER="USER=p"+uid;
+	env[nenv++]=(char *)USER.c_str();
+	string USERNAME="USERNAME=Prisoner "+uid;
+	env[nenv++]=(char *)USERNAME.c_str();
+	string VPL_LANG="VPL_LANG="+pm.getLang();
+	env[nenv++]=(char *)VPL_LANG.c_str();
+	string VPL_VNCPASSWD="VPL_VNCPASSWD="+pm.getVNCPassword();
+	if(pm.isInteractive()){
+		env[nenv++]=(char *)VPL_VNCPASSWD.c_str();
+	}
+	env[nenv++]=NULL;
+	syslog(LOG_DEBUG,"Running \"%s\"",command);
+	execve(command,arg,env);
+	throw string("I can't execve: ")+command+" ("+strerror(errno)+")";
 }
 
 /**
  * set user limits
  */
-void Jail::setLimits(){
-	//
+void Jail::setLimits(processMonitor &pm){
+	ExecutionLimits executionLimits=pm.getLimits();
+	executionLimits.syslog("setLimits");
 	struct rlimit limit;
-	limit.rlim_cur=executionLimits.maxmemory;
-	limit.rlim_max=executionLimits.maxmemory;
-	setrlimit(RLIMIT_AS,&limit);
-	setrlimit(RLIMIT_DATA,&limit);
-	setrlimit(RLIMIT_STACK,&limit);
 	limit.rlim_cur=0;
 	limit.rlim_max=0;
 	setrlimit(RLIMIT_CORE,&limit);
 	limit.rlim_cur=executionLimits.maxtime;
 	limit.rlim_max=executionLimits.maxtime;
 	setrlimit(RLIMIT_CPU,&limit);
-	limit.rlim_cur=executionLimits.maxfilesize;
-	limit.rlim_max=executionLimits.maxfilesize;
-	setrlimit(RLIMIT_FSIZE,&limit);
-	limit.rlim_cur=executionLimits.maxprocesses;
-	limit.rlim_max=executionLimits.maxprocesses;
-	setrlimit(RLIMIT_NPROC,&limit);
+	if(executionLimits.maxfilesize>0){ //0 equals no limit
+		limit.rlim_cur=executionLimits.maxfilesize;
+		limit.rlim_max=executionLimits.maxfilesize;
+		setrlimit(RLIMIT_FSIZE,&limit);
+	}
+	if(executionLimits.maxprocesses>0){ //0 equals no change
+		limit.rlim_cur=executionLimits.maxprocesses;
+		limit.rlim_max=executionLimits.maxprocesses;
+		setrlimit(RLIMIT_NPROC,&limit);
+	}
 	//RLIMIT_MEMLOCK
 	//RLIMIT_MSGQUEUE
 	//RLIMIT_NICERLIMIT_NOFILE
 	//RLIMIT_RTPRIO
 	//RLIMIT_SIGPENDING
-
 }
 
 /**
  * run program controlling timeout and redirection
  */
-string Jail::run(string name, int host, int port, string password){
+string Jail::run(processMonitor &pm,string name, int othermaxtime){
+	int maxtime;
+	pm.getLimits().syslog("run");
+	if(othermaxtime){
+		maxtime=othermaxtime;
+		syslog(LOG_INFO,"Other maxtime set: %d",othermaxtime);
+	}
+	else
+		maxtime=pm.getMaxTime();
 	int fdmaster=-1;
-	signal(SIGTERM,Jail::catchSIGTERM);
-	signal(SIGKILL,Jail::catchSIGTERM);
+	signal(SIGTERM,SIG_IGN);
+	signal(SIGKILL,SIG_IGN);
 	newpid=forkpty(&fdmaster,NULL,NULL,NULL);
 	if (newpid == -1) //fork error
 		return "Jail: fork error";
 	if(newpid == 0){ //new process
 		try{
 			goJail();
-			setLimits();
-			changeUser();
-			transferExecution(name);
+			setLimits(pm);
+			pm.becomePrisoner();
+			transferExecution(pm,name);
 		}catch(const char *s){
 			syslog(LOG_INFO,"Error running: %s",s);
 			printf("\nJail error: %s\n",s);
+		}
+		catch(const string &s){
+			syslog(LOG_INFO,"Error running: %s",s.c_str());
+			printf("\nJail error: %s\n",s.c_str());
 		}
 		catch(...){
 			syslog(LOG_INFO,"Error running");
 			printf("\nJail error: at execution stage\n");
 		}
 		exit(EXIT_SUCCESS);
-  	}
-  	syslog(LOG_INFO, "child pid %d",newpid);
-  	Redirector redirector;
-  	if(host){
-  	    redirector.start(fdmaster,host,port,password);
-  	}else{
-  		redirector.start(fdmaster);
-  	}
-     const long int waittime= 10000;
-     volatile time_t startTime=time(NULL);
-     //struct rusage resources;
-     int status;
-     while(redirector.isActive()){
-    	 redirector.advance();
- 	    pid_t wret=waitpid(newpid, &status, WNOHANG);
-        if(wret == newpid){
+	}
+	syslog(LOG_INFO, "child pid %d",newpid);
+	Redirector redirector;
+	redirector.start(fdmaster);
+	const long int waittime= 10000;
+	time_t startTime=time(NULL);
+	time_t lastTime=startTime;
+	int stopSignal=SIGTERM;
+	bool noMonitor=false;
+	int status;
+	while(redirector.isActive()){
+		redirector.advance();
+		pid_t wret=waitpid(newpid, &status, WNOHANG);
+		if(wret == newpid){
 			if(WIFSIGNALED(status)){
 				int signal = WTERMSIG(status);
 				char buf[1000];
-				sprintf(buf,"\nJail: program terminated due to \"%s\" (%d)\n",
+				sprintf(buf,"\r\nJail: program terminated due to \"%s\" (%d)",
 						strsignal(signal),signal);
 				redirector.addMessage(buf);
 			}else if(WIFEXITED(status)){
 				int exitcode = WEXITSTATUS(status);
 				if(exitcode != EXIT_SUCCESS){
 					char buf[100];
-					sprintf(buf,"\nJail: program terminated normally with exit code %d.\n",exitcode);
+					sprintf(buf,"\r\nJail: program terminated normally with exit code %d.\n",exitcode);
 					redirector.addMessage(buf);
 				}
 			}else{
-				redirector.addMessage("Jail: program terminated but unknown reason.");
+				redirector.addMessage("\r\nJail: program terminated but unknown reason.");
 			}
-        	newpid=-1;
-        	break;
-        } else if(wret > 0){//waitpid error wret != newpid
-        	redirector.addMessage("\nJail waitpid error: ret>0.\n");
-        	newpid=-1;
-        	break;
-        } else if(wret == -1) { //waitpid error
-        	newpid=-1;
-        	redirector.addMessage("\nJail waitpid error: ret==-1.\n");
-  			syslog(LOG_INFO,"Jail waitpid error: %m");
- 			break;
-        }
-        if (wret == 0){ //Process running
-           time_t now=time(NULL);
-           if(now-startTime > executionLimits.maxtime){
-        	   redirector.addMessage("\nJail: execution time limit reached.\n");
-           		syslog(LOG_INFO,"Execution time limit (%d) reached",executionLimits.maxtime);
-				break;
-           }
-        }
-     	usleep(waittime);
-     }
-     if(newpid>0){
-     	stopPrisonerProcess();
-     }
+			newpid=-1;
+			break;
+		} else if(wret > 0){//waitpid error wret != newpid
+			redirector.addMessage("\r\nJail waitpid error: ret>0.\n");
+			break;
+		} else if(wret == -1) { //waitpid error
+			redirector.addMessage("\r\nJail waitpid error: ret==-1.\n");
+			syslog(LOG_INFO,"Jail waitpid error: %m");
+			break;
+		}
+		if (wret == 0){ //Process running
+			time_t now=time(NULL);
+			if(lastTime != now){
+				int elapsedTime=now-startTime;
+				lastTime = now;
+				if(elapsedTime>JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()){
+					if(stopSignal!=SIGKILL)
+						redirector.addMessage("\r\nJail: browser connection error.\n");
+					syslog(LOG_INFO,"Not monitored");
+					kill(newpid,stopSignal);
+					stopSignal=SIGKILL; //Second try
+					noMonitor=true;
+				}else if(elapsedTime > maxtime){
+					redirector.addMessage("\r\nJail: execution time limit reached.\n");
+					syslog(LOG_INFO,"Execution time limit (%d) reached"
+							,maxtime);
+					kill(newpid,stopSignal);
+					stopSignal=SIGKILL; //Second try
+				}
+				else if(pm.isOutOfMemory()){
+					string ml= pm.getMemoryLimit();
+					if(stopSignal!=SIGKILL)
+						redirector.addMessage("\r\nJail: out of memory ("+ml+")\n");
+					syslog(LOG_INFO,"Out of memory (%s)",ml.c_str());
+					kill(newpid,stopSignal);
+					stopSignal=SIGKILL; //Second try
+				}
+			}
+		}
+	}
 	//wait until 5sg for redirector to read and send program output
 	for(int i=0;redirector.isActive() && i<50; i++){
 		redirector.advance();
 		usleep(100000); // 1/10 seg
 	}
 	string output=redirector.getOutput();
-	syslog(LOG_INFO,"Complete program output: %s", output.c_str());
-    return output;
+	syslog(LOG_DEBUG,"Complete program output: %s", output.c_str());
+	if(noMonitor){
+		pm.clean();
+		pm.cleanMonitor();
+	}
+	return output;
+}
+
+/**
+ * run program in terminal controlling timeout and redirection
+ */
+void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
+	int fdmaster=-1;
+	ExecutionLimits executionLimits=pm.getLimits();
+	signal(SIGTERM,SIG_IGN);
+	signal(SIGKILL,SIG_IGN);
+	newpid=forkpty(&fdmaster,NULL,NULL,NULL);
+	if (newpid == -1){ //fork error
+		syslog(LOG_INFO,"Jail: fork error %m");
+		return;
+	}
+	if(newpid == 0){ //new process
+		try{
+			goJail();
+			setLimits(pm);
+			pm.becomePrisoner();
+			setsid();
+			transferExecution(pm,name);
+		}catch(const char *s){
+			syslog(LOG_INFO,"Error running: %s",s);
+		}
+		catch(...){
+			syslog(LOG_INFO,"Error running");
+		}
+		exit(EXIT_SUCCESS);
+	}
+	syslog(LOG_INFO, "child pid %d",newpid);
+	Redirector redirector;
+	syslog(LOG_INFO, "Redirector start terminal control");
+	redirector.start(fdmaster,&ws);
+	const long int waittime= 10000;
+	time_t startTime=time(NULL);
+	time_t lastTime=startTime;
+	bool noMonitor=false;
+	int stopSignal=SIGTERM;
+	int status;
+	syslog(LOG_INFO,"run: start redirector loop");
+	while(redirector.isActive() && !ws.isClosed()){
+		redirector.advance();
+		pid_t wret=waitpid(newpid, &status, WNOHANG);
+		if(wret == 0){
+			time_t now=time(NULL);
+			if(lastTime != now){
+				int elapsedTime=now-startTime;
+				lastTime = now;
+				if(elapsedTime>JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()){
+					syslog(LOG_INFO,"Not monitored");
+					noMonitor=true;
+					if(stopSignal!=SIGKILL)
+						redirector.addMessage("\r\nJail: process stopped\n");
+					redirector.stop();
+					kill(newpid,stopSignal);
+					stopSignal=SIGKILL;
+				}else if(elapsedTime > executionLimits.maxtime){
+					if(stopSignal!=SIGKILL)
+						redirector.addMessage("\r\nJail: execution time limit reached.\n");
+					redirector.stop();
+					syslog(LOG_INFO,"Execution time limit (%d) reached"
+							,executionLimits.maxtime);
+					kill(newpid,stopSignal);
+					stopSignal=SIGKILL;
+				}
+				else if(pm.isOutOfMemory()){
+					string ml= pm.getMemoryLimit();
+					if(stopSignal!=SIGKILL)
+						redirector.addMessage("\r\nJail: out of memory ("+ml+")\n");
+					syslog(LOG_INFO,"Out of memory (%s)",ml.c_str());
+					kill(newpid,stopSignal);
+					stopSignal=SIGKILL; //Second try
+				}
+			}
+		}else{ //Not running or error
+			break;
+		}
+	}
+	syslog(LOG_DEBUG,"End redirector loop");
+	//wait until 5sg for redirector to read and send program output
+	for(int i=0;redirector.isActive() && i<50; i++){
+		redirector.advance();
+		usleep(100000); // 1/10 seg
+	}
+	if(noMonitor){
+		syslog(LOG_DEBUG,"Not monitored");
+		pm.clean();
+		pm.cleanMonitor();
+	}
+}
+
+/**
+ * run program in VNCserver controlling timeout and redirection
+ */
+void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
+	ExecutionLimits executionLimits=pm.getLimits();
+	signal(SIGTERM,SIG_IGN);
+	signal(SIGKILL,SIG_IGN);
+	string output=run(pm,name,10); //FIXME use constant
+	syslog(LOG_DEBUG,"%s",output.c_str());
+	Redirector redirector;
+	syslog(LOG_INFO, "Redirector start vncserver control");
+	redirector.start(&ws,(int)(pm.getPrisonerID()));
+	const long int waittime= 10000;
+	time_t startTime=time(NULL);
+	time_t lastTime=startTime;
+	bool noMonitor=false;
+	syslog(LOG_INFO,"run: start redirector loop");
+	while(redirector.isActive() && !ws.isClosed()){
+		redirector.advance();
+		time_t now=time(NULL);
+		if(lastTime != now){
+			int elapsedTime=now-startTime;
+			lastTime = now;
+			//TODO report to user the out of resources
+			if(elapsedTime > executionLimits.maxtime){
+				syslog(LOG_INFO,"Execution time limit (%d) reached"
+						,executionLimits.maxtime);
+				redirector.stop();
+				break;
+			}
+			if(pm.isOutOfMemory()){
+				string ml= pm.getMemoryLimit();
+				syslog(LOG_INFO,"Out of memory (%s)",ml.c_str());
+				redirector.stop();
+				break;
+			}
+			if(elapsedTime>JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()){
+				syslog(LOG_INFO,"Not monitored");
+				redirector.stop();
+				noMonitor=true;
+				break;
+			}
+		}
+	}
+	syslog(LOG_DEBUG,"End redirector loop");
+	//wait until 5sg for redirector to read and send program output
+	for(int i=0;redirector.isActive() && i<50; i++){
+		redirector.advance();
+		usleep(100000); // 1/10 seg
+	}
+	if(pm.installScript(".vpl_vnc_stopper.sh","vpl_vnc_stopper.sh")){
+		output=run(pm,".vpl_vnc_stopper.sh",5); //FIXME use constant
+		syslog(LOG_DEBUG,"%s",output.c_str());
+	}
+	if(noMonitor){
+		pm.clean();
+		pm.cleanMonitor();
+	}
 }

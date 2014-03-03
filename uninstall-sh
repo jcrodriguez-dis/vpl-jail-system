@@ -1,8 +1,8 @@
 #!/bin/bash
-# version:		$Id: uninstall-sh,v 1.1 2011-04-04 14:54:30 juanca Exp $
+# version:		$Id: uninstall-sh,v 1.3 2014-02-11 18:04:02 juanca Exp $
 # package:		Part of vpl-xmlrpc-jail
 # copyright:	Copyright (C) 2011 Juan Carlos Rodríguez-del-Pino. All rights reserved.
-# license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-2.0.html
+# license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
 # Description:	Script to uninstall vpl-xmlrpc-jail (Centos 5.5 and Ubuntu)
 
 remove_dir() {
@@ -26,27 +26,16 @@ fi
 if [ -f /usr/sbin/update-rc.d ] ; then
 	LSYSTEM="2"
 fi
-echo "Select distribution:"
-echo "1) RedHat/Centos 5.X"
-echo "2) Ubuntu/Debian"
-read LSYSTEM
-if [ "$LSYSTEM" != "1" ] && [ "$LSYSTEM" != "2" ] ;
-then
-	echo "Sorry, unknow system"
-	exit 1
-fi
 
 #Stop services
 service vpl-jail-system stop
-rm /etc/xinetd.d/vpl-xmlrpc-jail
-service xinetd reload
-CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-xmlrpc-jail.conf"
+CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf"
 #Load config file
 if [ -f "$CONFIG_FILE" ]; then
 	. "$CONFIG_FILE"
 	#Check $JAILPATH not been "/"
 	if [ -f "$JAILPATH$CONFIG_FILE" ] ; then
-		echo -n $"vpl-jail-system jail path error '$JAILPATH'"
+		echo "vpl-jail-system jail path error '$JAILPATH'"
 	else
 		#Remove safe dir
 		remove_dir $JAILPATH/bin	
@@ -61,7 +50,7 @@ if [ -f "$CONFIG_FILE" ]; then
 		echo "please, remove manualy '$JAILPATH' directory"
 	fi
 else
-	echo -n $"vpl-jail-system config file not found: $CONFIG_FILE"
+	echo "vpl-jail-system config file not found: $CONFIG_FILE"
 fi
 rm $VPLJAIL_INSTALL_DIR/vpl-xmlrpc-jail
 rm $VPLJAIL_INSTALL_DIR/vpl-xmlrpc-jail.conf

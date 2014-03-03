@@ -1,8 +1,8 @@
 /**
- * version:		$Id: redirector.h,v 1.2 2011-04-07 14:18:15 juanca Exp $
- * package:		Part of vpl-xmlrpc-jail
- * copyright:	Copyright (C) 2011 Juan Carlos Rodríguez-del-Pino. All rights reserved.
- * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-2.0.html
+ * @version:   $Id: redirector.h,v 1.8 2014-02-21 18:13:30 juanca Exp $
+ * @package:   Part of vpl-jail-system
+ * @copyright: Copyright (C) 2013 Juan Carlos Rodríguez-del-Pino
+ * @license:   GNU/GPL3, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 
 #ifndef REDIRECTOR_INC_H
@@ -22,30 +22,33 @@ using namespace std;
 #include <pty.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
+#include "websocket.h"
 
 class Redirector{
 	int fdps;  //Pseudo terminal file descriptor
-	int host;  //Host IP number
-	int port;  //Port number at host
-	string password; //Password to start connection
 	int sock;    //Socket
 	time_t timeout; //Timeout when connecting
 	string messageBuf; //Buffer of messages from Jail system
 	string programbuf; //Buffer from net to program
 	string netbuf;  //Buffer from program to net
 	const int bufferSizeLimit; //Size limit 50Kb
-
+	int port; //Port of vncserver
+	webSocket *ws; //webSocket for online
 	enum States {begin, connecting, connected, ending, end, error} state;
 	bool online;
+	bool indirect;
 	bool noOutput; //true if program output nothing
 	void advanceOnline();
+	void advanceIndirect();
 	void advanceBatch();
 	static string eventsToString(int);
 public:
 	static void fdblock(int fd, bool set=true);
-	Redirector():bufferSizeLimit(50*1024){state=error;}
-	void start(const int fdps, const int host, const int port, const string &password);
+	Redirector();
+	void start(webSocket *s, const int port);
+	void start(const int fdps, webSocket *s);
 	void start(const int fdps);
+	void stop() {state=ending;}
 	void advance();
 	bool isError(){return state == error;}
 	bool isActive(){return state != error && state != end;}

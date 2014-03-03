@@ -1,18 +1,21 @@
 /**
- * version:		$Id: xml.h,v 1.7 2010-09-21 11:23:07 juanca Exp $
- * package:		Part of vpl-xmlrpc-jail
+ * version:		$Id: xml.h,v 1.15 2014-02-21 19:16:21 juanca Exp $
+ * package:		Part of vpl-jail-system
  * copyright:	Copyright (C) 2009 Juan Carlos Rodríguez-del-Pino. All rights reserved.
- * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-2.0.html
+ * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 
 #ifndef XML_INC_H
 #define XML_INC_H
 #include <stdlib.h>
 #include <iconv.h>
+#include <limits.h>
 #include <string>
 #include <map>
 #include <vector>
 #include <syslog.h>
+
+#include "httpServer.h"
 
 using namespace std;
 /**
@@ -32,8 +35,8 @@ public:
 		vector<TreeNode*> children;	//List of child tags
 	public:
 		TreeNode(const string &raw,string tag,size_t tag_offset):
-		    raw(raw),tag(tag),tag_offset(tag_offset){
-		    	tag_len=0;
+			raw(raw),tag(tag),tag_offset(tag_offset){
+			tag_len=0;
 		}
 		~TreeNode(){
 			for(size_t i=0; i<children.size(); i++){
@@ -58,24 +61,31 @@ public:
 		int getInt() const {
 			if(tag=="int")
 				return atoi(getContent().c_str());
-			syslog(LOG_ERR, "RPC/XML parse type error: expected int found %s",tag.c_str());
-			throw "RPC/XML parse type error";
+			if(tag=="double"){
+				double value=atof(getContent().c_str());
+				if(value>INT_MAX) return INT_MAX;
+				return (int) value;
+			}
+			throw HttpException(badRequestCode
+					 ,"RPC/XML parse type error: expected int found "+tag);
 		}
 		/**
 		 * return content as string
 		 */
 		string getString() const {
-			if(tag=="string")
+			if(tag=="string" || tag =="name")
 				return XML::decodeXML(getContent());
-			syslog(LOG_ERR, "RPC/XML parse type error: expected string found %s",tag.c_str());
-			throw "RPC/XML parse type error";
+			throw HttpException(badRequestCode
+					,"RPC/XML parse type error",
+					"expected string or name  and found "+tag);
 		}
 		size_t nchild() const{
 			return children.size();
 		}
 		TreeNode* child(size_t i) const{
 			if(i>=children.size())
-				throw "RPC/XML parse child error";
+				throw HttpException(badRequestCode
+						,"RPC/XML parse child error");
 			return children[i];
 		}
 		TreeNode* child(string stag) const{
@@ -83,7 +93,8 @@ public:
 				if(children[i]->getName()==stag)
 					return children[i];
 			}
-			throw "RPC/XML search child by name error";
+			throw HttpException(badRequestCode
+					,"RPC/XML search child by name error");
 		}
 
 		/**
@@ -100,13 +111,14 @@ public:
 					while(offset<raw.size()){
 						if(raw[offset]=='>'){ //tag from btag i to etag
 							tag=raw.substr(btag+1,offset-(btag+1));
-							syslog(LOG_DEBUG,"tag: %s",tag.c_str());
+							//syslog(LOG_DEBUG,"tag: %s",tag.c_str());
 							offset++;
 							return true;
 						}
 						offset++;
 					}
-					throw "XML parse error: unexpected end of XML";
+					throw HttpException(badRequestCode
+							,"XML parse error: unexpected end of XML");
 				}
 				offset++;
 			}
@@ -126,8 +138,8 @@ public:
 						tag_len=ontag-tag_offset;
 						return offset;
 					}else{
-						syslog(LOG_ERR,"Error unexpected end of tag: %s",ntag.c_str());
-						throw "XML parse error: unexpected end of tag";
+						throw HttpException(badRequestCode
+								,"XML parse error: unexpected end of tag",ntag);
 					}
 				}else if(ntag[l-1]=='/'){
 					ntag.erase(l-1,1);
@@ -138,7 +150,8 @@ public:
 					offset = child->process();
 				}
 			}
-			throw "XML parse error: end tag not found";
+			throw HttpException(badRequestCode
+					,"XML parse error: end tag not found");
 		}
 	};
 private:
@@ -147,9 +160,13 @@ public:
 	//parse xml
 	XML(const string &raw):raw(raw){
 		size_t offset=0, aux;
+		if(raw.find("</methodCall>",raw.size()-13) != string::npos){
+			syslog(LOG_INFO,"XML: data pass end tag of methodcall");
+		}
 		string tag;
 		if(!TreeNode::nextTag(raw,offset,tag,aux) || !TreeNode::nextTag(raw,offset,tag,aux)){
-			throw "XML parse error: begin tag not found";
+			throw HttpException(badRequestCode
+					,"XML parse error: start tag not found");
 		}
 		root = new TreeNode(raw,tag,offset);
 		root->process();
@@ -164,7 +181,7 @@ public:
 	}
 
 	static string encodeXML(const string &data){
-		iconv_t cd=iconv_open("utf-8", "utf-8");
+		iconv_t cd=iconv_open("UTF-8//TRANSLIT", "UTF-8");
 		char *chars=(char *)data.c_str();
 		size_t inbytesleft=data.size();
 		size_t outbytesleft=data.size();
@@ -184,31 +201,31 @@ public:
 		iconv_close(cd);
 		//Convert entities
 		string ret;
-		size_t l=data.size();
+		size_t l=out-output;
 		for(size_t i=0; i<l; i++){
 			unsigned char c=output[i];
 			if(c <= 0x1f){ //Control char
-				if(c== '\n' || c=='\r' || c=='\t' ) //Acept TAB, LF and CR
+				if(c== '\n' || c=='\r' || c=='\t' ) //Accept TAB, LF and CR
 					ret += c;
 				else
 					ret += 126; //Change by tilde
 			}
 			else
-			switch(c){
+				switch(c){
 				case '&':ret += "&amp;";
-					break;
+				break;
 				case '<':ret += "&lt;";
-					break;
+				break;
 				case '>':ret += "&gt;";
-					break;
+				break;
 				case '\'':ret += "&apos;";
-					break;
+				break;
 				case '"':ret += "&quot;";
-					break;
+				break;
 				case 127:ret += 126;
-				    break;
+				break;
 				default: ret += c;
-			}
+				}
 		}
 		delete []output;
 		return ret;
@@ -236,12 +253,14 @@ public:
 						}else if(code=="quot"){
 							ret += '"';
 						}
-						else throw "XML string decode error";
+						else throw HttpException(badRequestCode
+								,"XML string decode error");
 						break;
 					}
 				}
 				if(i>=data.size())
-					throw "XML string decode error";
+					throw HttpException(badRequestCode
+							,"XML string decode error");
 			}else{
 				ret+=data[i];
 			}
