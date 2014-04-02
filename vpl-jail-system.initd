@@ -36,21 +36,22 @@
 #          |___ lib   #Replicate readonly dir by mount --bind
 #          |___ lib64 #Replicate readonly dir by mount --bind
 #          |___ var   #dir for replicate subdirs
-#                |___ lib       #Replicate reonly dir by mount --bind
+#                |___ lib       #Replicate readonly dir by mount --bind
 
 # load init.d common functions
 . /lib/lsb/init-functions
 
+LOGFILE=/etc/vpl/vpl-jail-service.log
 DEAMON=/etc/vpl/vpl-jail-server
 PIDFILE=/var/run/vpl-jail-server.pid
 NOMOUNT="^vpl|^init|^ldap|^udev|grub|^rc[0-6S]|^pam|^cron|^apm|^logrotate"
 NOMOUNT="$NOMOUNT|^mail|^rsyslog|^security|^ssl|^ssh|^update"
 create_check_dir() {
 	if [ ! -d "$1" ] ; then
-		mkdir "$1" >/dev/null 2>&1
+		mkdir "$1"
 	fi
 	if [ -d "$1" ] ; then
-		chmod $2 "$1" >/dev/null 2>&1
+		chmod $2 "$1"
 	else
 		log_failure_msg $"Can't mkdir $1"
 		exit 1
@@ -73,8 +74,9 @@ set_etc() {
 		echo "p$I:*:$I:p$I" >> "$GROUPFILE"
 	done
 	chmod 644 "$GROUPFILE"
-	cp -p /etc/ld.so.conf  "$JAILPATH/etc" >/dev/null 2>&1
-	cp -p /etc/ld.so.cache  "$JAILPATH/etc" >/dev/null 2>&1
+	cp -p /etc/ld.so.conf  "$JAILPATH/etc"
+	cp -p /etc/ld.so.cache  "$JAILPATH/etc"
+	cp -p /etc/hosts  "$JAILPATH/etc"
 	chmod a-s "$JAILPATH/etc/ld.so.conf"
 	chmod a-s "$JAILPATH/etc/ld.so.cache"
 	for DIR in $(ls -d /etc/*)
@@ -109,10 +111,10 @@ unset_etc() {
 
 create_device() {
 	if [ -f "$1" ] ; then
-		rm "$1" >/dev/null 2>&1
+		rm "$1"
 	fi
-	mknod "$1" c $2 $3 >/dev/null 2>&1
-	chmod 666 "$1" >/dev/null 2>&1
+	mknod "$1" c $2 $3
+	chmod 666 "$1"
 }
 
 set_dev() {
@@ -125,23 +127,33 @@ set_dev() {
 	create_device "$DEVPATH/urandom" 1 9
 	create_device "$DEVPATH/tty" 5 0
 	create_device "$DEVPATH/ptmx" 5 2
+	ln -s /proc/sef/fd/0 $DEVPATH/stdin
+	ln -s /proc/sef/fd/1 $DEVPATH/stdout
+	ln -s /proc/sef/fd/2 $DEVPATH/stderr
+	set_other_noro /dev/pts
+}
+
+unset_dev() {
+	DEVPATH="$JAILPATH/dev"
+	unset_other /dev/pts
+	rm $DEVPATH/*
 }
 
 set_tmp() {
 	create_check_dir "$JAILPATH/tmp" 1777
-	rm -Rf $JAILPATH/tmp/* >/dev/null 2>&1
+	rm -Rf $JAILPATH/tmp/*
 }
 
 set_home() {
 	create_check_dir "$JAILPATH/home" 0711
-	rm -Rf $JAILPATH/home/* >/dev/null 2>&1
+	rm -Rf $JAILPATH/home/*
 }
 
 set_other_noro() {
 	if [ -d $1 ] ; then
 		create_check_dir "$JAILPATH$1" 0755
 		mount --bind $1 "$JAILPATH$1"
-		mount -o remount,nosuid "$JAILPATH$1"
+		mount -o remount,nosuid,bind "$JAILPATH$1"
 	fi
 }
 
@@ -149,7 +161,7 @@ set_other() {
 	if [ -d $1 ] ; then
 		create_check_dir "$JAILPATH$1" 0755
 		mount --bind $1 "$JAILPATH$1"
-		mount -o remount,ro,nosuid "$JAILPATH$1"
+		mount -o remount,ro,nosuid,bind "$JAILPATH$1"
 	fi
 }
 
@@ -168,7 +180,6 @@ set_others() {
 	create_check_dir "$JAILPATH/var" 0755
 	set_other /var/lib
 	set_other /proc
-	set_other_noro /dev/pts
 }
 
 unset_others() {
@@ -181,19 +192,20 @@ unset_others() {
 		rmdir "$JAILPATH/var"
 	fi
 	unset_other /proc
-	unset_other /dev/pts	
 }
 
 start(){
 	if [ -f $PIDFILE ] ; then
 		stop
 	fi
-	create_check_dir "$JAILPATH" 0755
-	set_etc
-	set_dev
-	set_tmp
-	set_home
-	set_others
+	{
+		create_check_dir "$JAILPATH" 0755
+		set_etc
+		set_dev
+		set_tmp
+		set_home
+		set_others
+	} 2>> $LOGFILE
 	start_daemon /etc/vpl/vpl-jail-server $1 $2
 	sleep 1
 	if [ -f $PIDFILE ] ; then
@@ -204,12 +216,15 @@ start(){
 }
 
 stop(){
-	killproc /etc/vpl/vpl-jail-server 15
-	if [ -f $PIDFILE ] ; then
-		rm $PIDFILE
-	fi
-	unset_etc
-	unset_others
+	{
+		killproc /etc/vpl/vpl-jail-server 15
+		if [ -f $PIDFILE ] ; then
+			rm $PIDFILE
+		fi
+		unset_etc
+		unset_dev
+		unset_others
+	} 2>> $LOGFILE
 	log_success_msg $"Stopping vpl-jail-system service:"
 }
 
@@ -228,7 +243,8 @@ if [ -f "$JAILPATH" ] ; then
 	log_failure_msg $"vpl-jail-system jail path error '$JAILPATH'"
 	exit 1
 fi
-
+echo "===== vpl-jail-system ====== $1 $2 $3" >> $LOGFILE
+date >> $LOGFILE
 case "$1" in
   start)
         start $2 $3
@@ -253,4 +269,3 @@ case "$1" in
         exit 1
 esac
 exit 0
-
