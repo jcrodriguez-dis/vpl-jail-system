@@ -1,5 +1,4 @@
 #!/bin/bash
-# version:		$Id: install-vpl-sh,v 1.4 2014-02-26 18:06:10 juanca Exp $
 # package:		Part of vpl-jail-system
 # copyright:    Copyright (C) 2014 Juan Carlos Rodriguez-del-Pino
 # license:      GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl.txt
@@ -186,25 +185,32 @@ else
         vpl_install "SQL interpreter" sqlite3
         vpl_install "TCL interpreter" tcl
         vpl_install "Valgrind tool" valgrind
-        #vpl_install "clojure" clojure
-        #vpl_install "Cobol" open-cobol
-        #vpl_install "CoffeScript" coffescript
-        #vpl_install "D compiler (GNU)" gdc
-        #vpl_install "Erlang" erlang
+    fi
+    echo "Do you want to install other development software?"
+    echo "  (Clisp, Clojure, D, Erlang, Go, Lua, etc.) (y/n)"
+    read A
+    if [ "$A" != "n" ] ; then
+    	vpl_install "Clisp" clisp
+        vpl_install "Clojure" clojure
+        vpl_install "Cobol" open-cobol
+        vpl_install "CoffeeScript" coffeescript
+        vpl_install "D compiler (GNU)" gdc
+        vpl_install "Erlang" erlang
+        vpl_install "Go programming language compiler" golang
+        vpl_install "Haxe programming language" haxe
+        vpl_install "Lua compiler 5.1" lua5.1
+        vpl_install "R statistical computation and graphics system (GNU)" r-base
+        vpl_install "XQuery interpreter" galax
         #vpl_install "Expect tool" expect
         #vpl_install "VHDL compiler" ghdl
-        #vpl_install "Go programming language compiler" golang
         #vpl_install "Groovy programming language" groovy
-        #vpl_install "Haxe programming language" haxe
-        #vpl_install "R statistical computation and graphics system (GNU)" r-base
-        #vpl_install "XQuery interpreter" galax
-        echo -n "Remove apache2 ? (y/n) "
-        read A
-        if [ "$A" != "n" ] ; then
-            #remove apache2
-            rm /etc/init.d/apache2 >/dev/null 2>&1
-            update-rc.d apache2 remove
-        fi
+    fi
+    echo -n "Remove apache2 ? (y/n) "
+    read A
+    if [ "$A" != "n" ] ; then
+        #remove apache2
+        rm /etc/init.d/apache2 >/dev/null 2>&1
+        update-rc.d apache2 remove
     fi
 fi
 service vpl-jail-system start
