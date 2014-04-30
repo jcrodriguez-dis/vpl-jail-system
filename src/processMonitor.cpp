@@ -319,6 +319,7 @@ processState processMonitor::getState(){
 	if(aliveCompiler && runner_pid==0) return compiling;
 	if(runner_pid==0){
 		if(interactive) return beforeRunning;
+		if(controlFileExists("compilation")) return retrieve;
 		return stopped;
 	}
 	bool aliveRunner=Util::processExists(runner_pid);
