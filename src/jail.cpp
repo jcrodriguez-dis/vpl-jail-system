@@ -1,5 +1,4 @@
 /**
- * @version:   $Id: jail.cpp,v 1.42 2014-02-26 16:49:49 juanca Exp $
  * @package:   Part of vpl-jail-system
  * @copyright: Copyright (C) 2014 Juan Carlos Rodríguez-del-Pino
  * @license:   GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
@@ -163,8 +162,10 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 				else{
 					ws.send("close:");
 					ws.close();
+					ws.wait(500); //wait client response
 					pm.clean();
 					pm.cleanMonitor();
+					ws.receive();
 					return;
 				}
 				break;
@@ -185,6 +186,8 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 			case stopped:
 				syslog(LOG_DEBUG,"Monitor stopped");
 				ws.send("close:");
+				ws.close();
+				ws.wait(500); //wait client response
 			}
 		}
 		ws.wait(100); // 10 time a second
@@ -204,6 +207,8 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 			usleep(3000000);
 			ws.send("close:");
 			ws.close();
+			ws.wait(500); //wait client response
+			ws.receive();
 			return;
 		}
 		if(lastTime != now && pm.isOutOfMemory()){ //Every second check memory usage
@@ -216,6 +221,8 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 			usleep(1500000);
 			ws.send("close:");
 			ws.close();
+			ws.wait(500); //wait client response
+			ws.receive();
 			return;
 		}
 		lastTime = now;
