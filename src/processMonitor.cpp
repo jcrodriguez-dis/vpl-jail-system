@@ -1,5 +1,4 @@
 /**
- * @version:   $Id: processMonitor.cpp,v 1.11 2014-02-21 18:13:30 juanca Exp $
  * @package:   Part of vpl-jail-system
  * @copyright: Copyright (C) 2013 Juan Carlos Rodríguez-del-Pino
  * @license:   GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
@@ -65,11 +64,13 @@ void processMonitor::stopPrisonerProcess(bool soft){
 			usleep(100000);
 		}
 		kill(-1,SIGKILL);
-		abort();
+		exit(EXIT_SUCCESS);
 	}
 	else{
-		usleep(200000);
-		waitpid(pid,NULL,WNOHANG); //Wait for pid end
+		for(int i=0;i <50 ; i++){
+			usleep(100000);
+			waitpid(pid,NULL,WNOHANG); //Wait for pid end
+		}
 	}
 }
 
@@ -100,6 +101,7 @@ void processMonitor::selectPrisoner(){
 		prisoner = configuration->getMinPrisioner()+Util::random()%range;
 		setControlPath();
 		string controlPath=getControlPath();
+		//TODO check existence of old home dir and remove it
 		if(mkdir(controlPath.c_str(),umask)==0){
 			homePath=prisonerHomePath();
 			if(mkdir(homePath.c_str(),umask)==0){
@@ -319,7 +321,6 @@ processState processMonitor::getState(){
 	if(aliveCompiler && runner_pid==0) return compiling;
 	if(runner_pid==0){
 		if(interactive) return beforeRunning;
-		if(controlFileExists("compilation")) return retrieve;
 		return stopped;
 	}
 	bool aliveRunner=Util::processExists(runner_pid);
@@ -343,6 +344,7 @@ void processMonitor::setCompiler(){
 }
 
 bool processMonitor::isMonitored(){
+	if(!Util::dirExists(getControlPath())) return false;
 	Lock lock(getControlPath());
 	if(monitor==0) readInfo();
 	if(monitor==0) return false;
