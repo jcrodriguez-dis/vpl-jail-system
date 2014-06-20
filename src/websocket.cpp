@@ -1,7 +1,6 @@
 /**
- * version:		$Id: websocket.cpp,v 1.13 2014-02-21 18:13:30 juanca Exp $
  * package:		Part of vpl-jail-system
- * copyright:	Copyright (C) 2013 Juan Carlos Rodríguez-del-Pino
+ * copyright:	Copyright (C) 2014 Juan Carlos Rodríguez-del-Pino
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 #include <stdio.h>
@@ -160,7 +159,7 @@ string webSocket::encodeFrame(const string &rdata,FrameType ft){
 webSocket::webSocket(Socket *s){
 	socket=s;
 	base64 = false;
-	closing = false;
+	closeSent = false;
 	socket->send(getHandshakeAnswer());
 }
 
@@ -179,13 +178,8 @@ string webSocket::receive(){
 			break;
 		case CONNECTION_CLOSE_FRAME:
 		{
-			if(closing){
-				socket->close();
-			}else{
-				string bye=encodeFrame("bye",CONNECTION_CLOSE_FRAME);
-				socket->send(bye);
-				socket->close();
-			}
+			close(data);
+			socket->close();
 			break;
 		}
 		case PING_FRAME:
@@ -199,10 +193,8 @@ string webSocket::receive(){
 		default:
 		case ERROR_FRAME:
 		{
-			string bye=encodeFrame("Error",CONNECTION_CLOSE_FRAME);
-			socket->send(bye);
+			close("Error");
 			socket->close();
-			closing=true;
 			break;
 		}
 		}
@@ -216,12 +208,12 @@ void webSocket::send(const string &s, FrameType ft){
 	//syslog(LOG_INFO,"Frame send \"%s\"",frame.c_str());
 	socket->send(frame);
 }
-void webSocket::close(){
-	if(!closing){
-		string bye=encodeFrame("Error",CONNECTION_CLOSE_FRAME);
+void webSocket::close(string t){
+	if(!closeSent){
+		string bye=encodeFrame(t,CONNECTION_CLOSE_FRAME);
 		socket->send(bye);
+		closeSent=true;
 	}
-	closing=true;
 }
 
 bool webSocket::wait(const int msec){

@@ -1,7 +1,6 @@
 /**
- * version:		$Id: websocket.h,v 1.13 2014-02-26 16:50:34 juanca Exp $
  * package:		Part of vpl-jail-system
- * copyright:	Copyright (C) 2013 Juan Carlos Rodríguez-del-Pino
+ * copyright:	Copyright (C) 2014 Juan Carlos Rodríguez-del-Pino
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 #ifndef WEBSOCKET_H_
@@ -18,7 +17,7 @@ enum FrameType {
 	ERROR_FRAME =0xFF
 };
 class webSocket{
-	bool closing;
+	bool closeSent;
 	bool base64;
 	Socket *socket;
 	string receiveBuffer;
@@ -31,7 +30,7 @@ class webSocket{
 public:
 	webSocket(Socket *s);
 	int getSocket(){return socket->getSocket();}
-	void close();
+	void close(string t="");
 	bool isReadBuffered() { return socket->isReadBuffered() || receiveBuffer.size()>0;}
 	bool isWriteBuffered() { return socket->isWriteBuffered();}
 	bool isClosed(){return socket->isClosed();}
