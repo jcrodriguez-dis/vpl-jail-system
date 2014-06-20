@@ -1,5 +1,4 @@
 /**
- * version:		$Id: util.h,v 1.20 2014-02-21 18:13:30 juanca Exp $
  * package:		Part of vpl-jail-system
  * copyright:	Copyright (C) 2009 Juan Carlos Rodríguez-del-Pino. All rights reserved.
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
@@ -439,6 +438,12 @@ public:
 				if(name != parent && name != me){
 					nunlink+=removeDir(fullname,owner,force||owned);
 				}
+				if((force || owned) && dirExists(fullname)){
+					syslog(LOG_DEBUG,"Delete dir \"%s\"",fullname.c_str());
+					if(rmdir(fullname.c_str())){
+						syslog(LOG_ERR,"Can't rmdir \"%s\": %m",fullname.c_str());
+					}
+				}
 			}
 			else{
 				if(force || owned){
@@ -459,12 +464,26 @@ public:
 		}
 		return nunlink;
 	}
+	/**
+ 	* Set/Unset socket operation int block/nonblock mode
+ 	*/
+	static void fdblock(int fd, bool set=true){
+		int flags;
+		if( (flags = fcntl(fd, F_GETFL, 0)) < 0){
+			syslog(LOG_ERR,"fcntl F_GETFL: %m");
+		}
+		if(set && (flags | O_NONBLOCK)==flags) flags ^=O_NONBLOCK;
+		else flags |=O_NONBLOCK;
+		if(fcntl(fd, F_SETFL, flags)<0){
+			syslog(LOG_ERR,"fcntl F_SETFL: %m");
+		}
+	}
 
 	/**
 	 * return server version
 	 */
 	static const char *version(){
-		return "2.0";
+		return "2.0.2";
 	}
 };
 
