@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.65])
-AC_INIT([vpl_jail_system], [2.0], [jcrodriguez@dis.ulpgc.es])
-AM_INIT_AUTOMAKE([vpl_jail_system], [2.0], [jcrodriguez@dis.ulpgc.es])
+AC_INIT([vpl_jail_system], [2.0.2], [jcrodriguez@dis.ulpgc.es])
+AM_INIT_AUTOMAKE([vpl_jail_system], [2.0.2], [jcrodriguez@dis.ulpgc.es])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADER([config.h])
 
