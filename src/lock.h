@@ -1,5 +1,4 @@
 /**
- * @version:   $Id: lock.h,v 1.7 2014-02-21 18:13:30 juanca Exp $
  * @package:   Part of vpl-jail-system
  * @copyright: Copyright (C) 2013 Juan Carlos Rodríguez-del-Pino
  * @license:   GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
@@ -21,7 +20,7 @@ class Lock{
 public:
 	Lock(string DirPath){
 		filePath=DirPath+"/lock";
-		int ntry;
+		int ntry=0;
 		int fd;
 		while((fd=open(filePath.c_str(),O_CREAT|O_EXCL|O_WRONLY, 0x600))==-1 && ntry <1000){
 			struct stat fileInfo;
