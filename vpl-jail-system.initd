@@ -140,8 +140,9 @@ unset_dev() {
 }
 
 set_tmp() {
+	rm -Rf $JAILPATH/tmp
 	create_check_dir "$JAILPATH/tmp" 1777
-	rm -Rf $JAILPATH/tmp/*
+	create_check_dir "$JAILPATH/tmp/.X11-unix" 1777
 }
 
 set_home() {
