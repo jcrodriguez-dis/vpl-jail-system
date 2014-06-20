@@ -1,5 +1,4 @@
 /**
- * @version:   $Id: redirector.cpp,v 1.17 2014-02-26 18:05:22 juanca Exp $
  * @package:   Part of vpl-jail-system
  * @copyright: Copyright (C) 2013 Juan Carlos Rodríguez-del-Pino
  * @license:   GNU/GPL3, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
@@ -15,20 +14,6 @@
 #include "jail_limits.h"
 #include "redirector.h"
 
-/**
- * Set/Unset socket operation int block/nonblock mode
- */
-void Redirector::fdblock(int fd, bool set){
-	int flags;
-	if( (flags = fcntl(fd, F_GETFL, 0)) < 0){
-		syslog(LOG_ERR,"fcntl F_GETFL: %m");
-	}
-	if(set && (flags | O_NONBLOCK)==flags) flags ^=O_NONBLOCK;
-	else flags |=O_NONBLOCK;
-	if(fcntl(fd, F_SETFL, flags)<0){
-		syslog(LOG_ERR,"fcntl F_SETFL: %m");
-	}
-}
 Redirector::Redirector():bufferSizeLimit(50*1024){
 	state=error;
 	fdps=-1;  //Pseudo terminal file descriptor
@@ -93,7 +78,7 @@ void Redirector::advanceBatch(){
 			state=error; //fd pseudo terminal error
 			break;
 		}
-		fdblock(fdps,false);
+		Util::fdblock(fdps,false);
 	case connecting:
 		state=connected;
 		/* no break */
@@ -164,7 +149,7 @@ void Redirector::advanceOnline(){
 			state=error; //fd pseudo terminal error
 			break;
 		}
-		fdblock(fdps,false);
+		Util::fdblock(fdps,false);
 		state=connected;
 	case connected:{
 		//Poll to write and read from program and net
@@ -226,6 +211,7 @@ void Redirector::advanceOnline(){
 			messageBuf="";
 		}
 	}
+	state=end;
 	/* no break */
 	case end:
 	case error:

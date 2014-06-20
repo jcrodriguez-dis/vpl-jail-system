@@ -1,5 +1,4 @@
 /**
- * @version:   $Id: redirector.h,v 1.8 2014-02-21 18:13:30 juanca Exp $
  * @package:   Part of vpl-jail-system
  * @copyright: Copyright (C) 2013 Juan Carlos Rodríguez-del-Pino
  * @license:   GNU/GPL3, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
@@ -43,7 +42,6 @@ class Redirector{
 	void advanceBatch();
 	static string eventsToString(int);
 public:
-	static void fdblock(int fd, bool set=true);
 	Redirector();
 	void start(webSocket *s, const int port);
 	void start(const int fdps, webSocket *s);
