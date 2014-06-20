@@ -1,5 +1,4 @@
 /**
- * version:		$Id: socket.h,v 1.10 2014-02-26 16:50:22 juanca Exp $
  * package:		Part of vpl-jail-system
  * copyright:	Copyright (C) 2014 Juan Carlos Rodríguez-del-Pino
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
@@ -12,6 +11,7 @@
 #include <map>
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -46,10 +46,12 @@ class SSLBase{
 			syslog(LOG_ERR,"SSL_CTX_use_PrivateKey_file() fail: %s",ERR_reason_error_string(ERR_get_error()));
 			exit(EXIT_FAILURE);
 		}
-		if ( !SSL_CTX_check_private_key(context) ){
+		if( !SSL_CTX_check_private_key(context) ){
 			syslog(LOG_ERR,"SSL_CTX_check_private_key() fail: %s",ERR_reason_error_string(ERR_get_error()));
 			exit(EXIT_FAILURE);
 		}
+		SSL_CTX_set_mode(context,SSL_MODE_ENABLE_PARTIAL_WRITE|
+								SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 	}
 public:
 	static SSLBase* getSSLBase(){
@@ -103,19 +105,76 @@ public:
 	string receive(int sizeToReceive=0);
 };
 
+class SSLRetry{
+	struct pollfd devices[1];
+	time_t currentTime,timeLimit;
+	string message;
+	const SSL *ssl;
+public:
+	SSLRetry(int socket, const SSL *s, string action){
+		devices[0].fd=socket;
+		devices[0].events=POLLIN|POLLOUT;
+		ssl=s;
+		message="Error in SSL "+action+" ";
+		currentTime=time(NULL);
+		timeLimit=currentTime+JAIL_SOCKET_TIMEOUT;
+	}
+	bool end(ssize_t ret){
+		if(ret>0) return true;
+		if(ret==0) {
+				throw HttpException(internalServerErrorCode
+					,message+Util::itos(SSL_get_error(ssl,ret))); //Error
+		}
+		if(ret<0) {
+			int code=SSL_get_error(ssl,ret);
+			if(code != SSL_ERROR_WANT_READ &&
+			   code != SSL_ERROR_WANT_WRITE){
+				throw HttpException(internalServerErrorCode
+						,message+Util::itos(code)); //Error
+			}
+		}
+		time_t wait=timeLimit-currentTime;
+		int res=poll(devices,1,wait);
+		if(res==-1) {
+			throw HttpException(internalServerErrorCode
+					,"Error poll "+message); //Error
+		}
+		currentTime=time(NULL);
+		if(currentTime>timeLimit || res==0){
+			throw HttpException(requestTimeoutCode
+					,"Socket read timeout");
+		}
+		return false;
+	}
+};
+
 class SSLSocket: public Socket{
 	SSL *ssl;
 	virtual ssize_t netWrite(const void *b, size_t s){
-		return SSL_write(ssl, b, s);
+		SSLRetry retry(getSocket(),ssl,"write");
+		while(true){
+			ssize_t ret= SSL_write(ssl, b, s);
+			if(retry.end(ret)) return ret;
+		}	
 	}
 	virtual ssize_t netRead(void *b, size_t s){
-		return SSL_read(ssl, b, s);
+		SSLRetry retry(getSocket(),ssl,"read");
+		while(true){
+			ssize_t ret= SSL_read(ssl, b, s);
+			if(retry.end(ret)) return ret;
+		}
 	}
 public:
 	SSLSocket(int s): Socket(s){
 		ssl = SSL_new(SSLBase::getSSLBase()->getContext());
+		Util::fdblock(s,false);
 		SSL_set_fd(ssl, s);
-		SSL_accept(ssl);	
+		//SSL_accept with timeout
+		SSLRetry retry(getSocket(),ssl,"accept");
+		while(true){
+			int ret= SSL_accept(ssl);
+			if(retry.end(ret)) break;
+		}	
 	}
 	~SSLSocket(){
 		SSL_free(ssl);
