@@ -1,4 +1,5 @@
 /**
+ * version:		$Id: util.h,v 1.22 2014-06-23 13:11:27 juanca Exp $
  * package:		Part of vpl-jail-system
  * copyright:	Copyright (C) 2009 Juan Carlos Rodríguez-del-Pino. All rights reserved.
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
@@ -437,11 +438,11 @@ public:
 			if(ent->d_type & DT_DIR){
 				if(name != parent && name != me){
 					nunlink+=removeDir(fullname,owner,force||owned);
-				}
-				if((force || owned) && dirExists(fullname)){
-					syslog(LOG_DEBUG,"Delete dir \"%s\"",fullname.c_str());
-					if(rmdir(fullname.c_str())){
-						syslog(LOG_ERR,"Can't rmdir \"%s\": %m",fullname.c_str());
+					if((force || owned) && dirExists(fullname)){
+						syslog(LOG_DEBUG,"Delete dir \"%s\"",fullname.c_str());
+						if(rmdir(fullname.c_str())){
+							syslog(LOG_ERR,"Can't rmdir \"%s\": %m",fullname.c_str());
+						}
 					}
 				}
 			}
