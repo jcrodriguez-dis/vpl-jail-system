@@ -99,6 +99,7 @@ class Daemon{
 	//Return if the IP is banned
 	bool isBanned(string IP){
 		Log l;
+		cleanOld(); /* Fix by Guilherme Gomes */
 		if(logs.find(IP) != logs.end())
 			l=logs[IP];
 		bool banned=l.errors>10 && l.errors*2>l.requests;
