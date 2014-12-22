@@ -2,24 +2,24 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.65])
-AC_INIT([vpl_jail_system], [2.0.2], [jcrodriguez@dis.ulpgc.es])
-AM_INIT_AUTOMAKE([vpl_jail_system], [2.0.2], [jcrodriguez@dis.ulpgc.es])
+AC_INIT([vpl jail system], [2.1.0])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADER([config.h])
+AM_INIT_AUTOMAKE
 
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
 
 # Checks for libraries.
-AC_CHECK_LIB([util], [forkpty])
-AC_CHECK_LIB([crypto], [SHA1])
-AC_CHECK_LIB([ssl], [SSL_library_init])
+AC_CHECK_LIB([util], [forkpty],)
+AC_CHECK_LIB([crypto], [SHA1],)
+AC_CHECK_LIB([ssl], [SSL_library_init],)
 
 # Checks for header files.
 AC_HEADER_DIRENT
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h jail_limits.h netinet/in.h stdint.h stdlib.h string.h sys/socket.h syslog.h unistd.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h jail_limits.h netinet/in.h stdint.h stdlib.h string.h sys/socket.h syslog.h unistd.h],)
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL

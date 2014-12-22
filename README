@@ -1,0 +1,7 @@
+VPL-JAIL-SYSTEM
+---------------
+The vpl-jail-system is a daemon that serve as execution sandbox for the VPL plugin of  Moodle.
+For more details about VPL, visit
+http://vpl.dis.ulpgc.es
+or
+VPL plugin  at http://www.moodle.org 
