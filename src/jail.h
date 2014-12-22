@@ -1,7 +1,6 @@
 /**
- * @version:   $Id: jail.h,v 1.18 2014-02-21 18:13:30 juanca Exp $
  * @package:   Part of vpl-jail-system
- * @copyright: Copyright (C) 2013 Juan Carlos Rodríguez-del-Pino
+ * @copyright: Copyright (C) 2014 Juan Carlos Rodríguez-del-Pino
  * @license:   GNU/GPL3, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 

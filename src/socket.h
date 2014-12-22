@@ -155,7 +155,8 @@ class SSLSocket: public Socket{
 		while(true){
 			ssize_t ret= SSL_write(ssl, b, s);
 			if(retry.end(ret)) return ret;
-		}	
+		}
+		return 0; //Not reachable
 	}
 	virtual ssize_t netRead(void *b, size_t s){
 		SSLRetry retry(getSocket(),ssl,"read");
@@ -163,6 +164,7 @@ class SSLSocket: public Socket{
 			ssize_t ret= SSL_read(ssl, b, s);
 			if(retry.end(ret)) return ret;
 		}
+		return 0; //Not reachable
 	}
 public:
 	SSLSocket(int s): Socket(s){

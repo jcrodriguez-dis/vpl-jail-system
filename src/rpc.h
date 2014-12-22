@@ -1,5 +1,4 @@
 /**
- * version:		$Id: rpc.h,v 1.12 2014-02-21 18:13:30 juanca Exp $
  * package:		Part of vpl-jail-system
  * copyright:	Copyright (C) 2014 Juan Carlos Rodríguez-del-Pino. All rights reserved.
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
@@ -61,12 +60,13 @@ public:
 	}
 
 	static string requestResponse(const string adminticket,const string monitorticket,
-			const string executionticket, int sport){
+			const string executionticket, int port,int secuport){
 		string response;
 		response += responseMember("adminticket",adminticket);
 		response += responseMember("monitorticket",monitorticket);
 		response += responseMember("executionticket",executionticket);
-		response += responseMember("secureport",sport);
+		response += responseMember("port",port);
+		response += responseMember("secureport",secuport);
 		return responseWraper(response);
 	}
 

@@ -1,5 +1,4 @@
 /**
- * version:		$Id: socket.cpp,v 1.16 2014-02-25 15:13:56 juanca Exp $
  * package:		Part of vpl-jail-system
  * copyright:	Copyright (C) 2014 Juan Carlos Rodríguez-del-Pino
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html

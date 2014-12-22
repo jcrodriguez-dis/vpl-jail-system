@@ -1,5 +1,4 @@
 /**
- * @version:   $Id: jail_limits.h,v 1.1 2014-02-21 14:28:06 juanca Exp $
  * @package:   Part of vpl-jail-system
  * @copyright: Copyright (C) 2014 Juan Carlos Rodríguez-del-Pino
  * @license:   GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html

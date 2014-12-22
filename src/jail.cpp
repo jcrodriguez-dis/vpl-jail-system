@@ -188,6 +188,7 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 				ws.send("close:");
 				ws.close();
 				ws.wait(500); //wait client response
+				break;
 			}
 		}
 		ws.wait(100); // 10 time a second
@@ -325,7 +326,7 @@ void Jail::process(Socket *socket){
 				string adminticket,monitorticket,executionticket;
 				commandRequest(parsedata, adminticket,monitorticket,executionticket);
 				server.send200(RPC::requestResponse(adminticket,monitorticket,executionticket
-						,configuration->getSecurePort()));
+						,configuration->getPort(),configuration->getSecurePort()));
 			}else if(request=="getresult"){
 				string adminticket,compilation,execution;
 				bool executed,interactive;
@@ -708,9 +709,10 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 	signal(SIGKILL,SIG_IGN);
 	string output=run(pm,name,10); //FIXME use constant
 	syslog(LOG_DEBUG,"%s",output.c_str());
+	int VNCServerPort=Util::atoi(output);
 	Redirector redirector;
 	syslog(LOG_INFO, "Redirector start vncserver control");
-	redirector.start(&ws,(int)(pm.getPrisonerID()));
+	redirector.start(&ws,VNCServerPort);
 	const long int waittime= 10000;
 	time_t startTime=time(NULL);
 	time_t lastTime=startTime;

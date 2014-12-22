@@ -1,7 +1,6 @@
 /**
- * version:		$Id: xml.h,v 1.15 2014-02-21 19:16:21 juanca Exp $
  * package:		Part of vpl-jail-system
- * copyright:	Copyright (C) 2009 Juan Carlos Rodríguez-del-Pino. All rights reserved.
+ * copyright:	Copyright (C) 2009-20014 Juan Carlos Rodríguez-del-Pino. All rights reserved.
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 
@@ -225,6 +224,7 @@ public:
 				case 127:ret += 126;
 				break;
 				default: ret += c;
+				break;
 				}
 		}
 		delete []output;

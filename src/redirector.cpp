@@ -79,6 +79,7 @@ void Redirector::advanceBatch(){
 			break;
 		}
 		Util::fdblock(fdps,false);
+		/* no break */
 	case connecting:
 		state=connected;
 		/* no break */
@@ -101,7 +102,7 @@ void Redirector::advanceBatch(){
 			if(readsize == 0){
 				syslog(LOG_INFO,"program output end: %m");
 				state=end;
-				break; //program output read error
+				break;		
 			}
 			if(readsize < 0){
 				syslog(LOG_INFO,"program output read error: %m");
