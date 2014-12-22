@@ -1,5 +1,5 @@
 /**
- * version:		$Id: util.h,v 1.22 2014-06-23 13:11:27 juanca Exp $
+ * version:		$Id: util.h,v 1.23 2014/12/19 13:00:28 juanca Exp $
  * package:		Part of vpl-jail-system
  * copyright:	Copyright (C) 2009 Juan Carlos Rodríguez-del-Pino. All rights reserved.
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
@@ -35,8 +35,8 @@ struct ExecutionLimits{
 	int maxmemory;
 	int maxprocesses;
 	void syslog(const char *s){
-		::syslog(LOG_DEBUG,"%s: maxtime: %d seg, maxfilesize: %d Kb, maxmemory %d byte, maxprocesses: %d",
-				s,maxtime, maxfilesize, maxmemory, maxprocesses);
+		::syslog(LOG_DEBUG,"%s: maxtime: %d seg, maxfilesize: %d Kb, maxmemory %d Kb, maxprocesses: %d",
+				s,maxtime, maxfilesize/1024, maxmemory/1024, maxprocesses);
 	}
 };
 
@@ -367,9 +367,11 @@ public:
 				throw HttpException(internalServerErrorCode
 						,"I can't write file");
 		}
-		if(data.size()>0 && fwrite(data.data(),data.size(),1,fd)!=1)
+		if(data.size()>0 && fwrite(data.data(),data.size(),1,fd)!=1){
+			fclose(fd);
 			throw HttpException(internalServerErrorCode
 					,"I can't write to file");
+		}
 		fclose(fd);
 		if(lchown(name.c_str(),user,user))
 			syslog(LOG_ERR,"Can't change file owner %m");
