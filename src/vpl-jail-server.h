@@ -102,7 +102,7 @@ class Daemon{
 		cleanOld(); /* Fix by Guilherme Gomes */
 		if(logs.find(IP) != logs.end())
 			l=logs[IP];
-		bool banned=l.errors>10 && l.errors*2>l.requests;
+		bool banned=l.errors>20 && l.errors*2>l.requests;
 		if(banned)
 			statistics.banned++;
 		return banned;
@@ -189,20 +189,16 @@ class Daemon{
 				jail.process(socket);
 			}
 			catch(HttpException &exception){
-				syslog(LOG_ERR,"%s",exception.getLog().c_str());
-				if(socket ==NULL)
-					socket = new Socket(actualSocket);
-				HttpJailServer server(socket);
-				server.sendCode(exception.getCode(),exception.getMessage());
+				syslog(LOG_ERR,"%s %s",IP.c_str(),exception.getLog().c_str());
 				delete socket;
 				exit(static_cast<int>(httpError));
 			}
 			catch(const char * const me){
-				syslog(LOG_ERR,"%s",me);
+				syslog(LOG_ERR,"%s %s",IP.c_str(),me);
 				exit(static_cast<int>(internalError));
 			}
 			catch(...){
-				syslog(LOG_ERR,"unexpected exception %s:%d",__FILE__,__LINE__);
+				syslog(LOG_ERR,"unexpected exception %s %s:%d",IP.c_str(),__FILE__,__LINE__);
 				exit(static_cast<int>(internalError));
 			}
 			delete socket;
