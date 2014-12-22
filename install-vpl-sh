@@ -6,13 +6,16 @@
 echo "INSTALLING VPL-JAIL-SYSTEM"
 echo "=========================="
 LOGFILE=installation.log
+date >$LOGFILE
+exec &> >(tee $LOGFILE)
+
 if [ "$USER" != "root" ] ; then
     echo "This script need to be run as root and is run as $USER"
     exit 1;
 fi
 #Detect system
 if [ -f /sbin/chkconfig  ] && [ "$(command -v yum)" != "" ] ; then
-	echo "Detected RedHat or similar distribution (using chkconfig)"
+	echo "Detected RedHat or similar distribution (using chkconfig)" 
     function vpl_install_base {
         yum -y install $1 >>$LOGFILE
     }
@@ -51,9 +54,10 @@ function vpl_installq {
 }
 
 function vpl_generate_selfsigned_certificate {
+	local A=""
 	echo "Generating self-signed SSL certificate"
 	#Get host name to generate the certificate
-	echo -n "Do you want a certificate with wildcar? (y/n)"
+	echo -n "Do you want a certificate with wildcard for a set of servers (eg. *.s.com)? (y/n)"
 	read A
 	if [ "$A" == "y" ] ; then
 		INAME=$(hostname --long| sed 's/^[^\.]*/\*/g')
@@ -63,14 +67,22 @@ function vpl_generate_selfsigned_certificate {
 	#Generate key
 	openssl genrsa -passout pass:12345678 -des3 -out key.pem 1024
 	#Generate certificate for this server
-	openssl req -new -subj "/C=ES/ST=Canarias/L=Las Palmas de Gran Canaria/O=VPL/OU=Execution server/CN=$INAME" -key key.pem -out certini.pem -passin pass:12345678
+	local SUBJOPT="-subj"
+	local SUBJ="/C=ES/ST=State/L=Location/O=VPL/OU=Execution server/CN=$INAME"
+	echo -n "Do you want to customize the certificate info? (y/n)"
+	read A
+	if [ "$A" == "y" ] ; then
+		SUBJOPT=""
+		CERTSUBJ=""	
+	fi
+	openssl req -new $SUBJOPT "$SUBJ" -key key.pem -out certini.pem -passin pass:12345678
 	#Remove key password
 	cp key.pem keyini.pem
 	openssl rsa -in keyini.pem -out key.pem -passin pass:12345678
 	#Generate self signed certificate for 5 years
 	openssl x509 -in certini.pem -out cert.pem -req -signkey key.pem -days 1826 
 }
-
+echo "Installation log file => $LOGFILE"
 echo "Preparing the installation"
 if [ "$LSYSTEM" == "1" ] ; then
 	vpl_install "LSB core" redhat-lsb-core
@@ -84,7 +96,7 @@ else
 	vpl_install "SSL library" openssl libssl-dev
 	vpl_install "X system" xorg
 	vpl_install "VNC server" tightvncserver
-	vpl_install "Window manager" xfonts-75dpi xfonts-100dpi metacity metacity-themes
+	vpl_install "Window manager" xfonts-75dpi xfonts-100dpi openbox
 	vpl_install "Configuration DB system" gconf2
 	gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
 	vpl_install "Web browser" firefox
@@ -119,16 +131,24 @@ if [ ! -d /var/vpl-jail-system ] ; then
 fi
 chmod 0600 /var/vpl-jail-system
 if [ ! -f $VPLJAIL_INSTALL_DIR/cert.pem ] ; then
-	vpl_generate_selfsigned_certificate
-	cp key.pem $VPLJAIL_INSTALL_DIR
-	cp cert.pem $VPLJAIL_INSTALL_DIR
-	chmod 600 $VPLJAIL_INSTALL_DIR/*.pem
-	rm key.pem keyini.pem certini.pem cert.pem
+	echo "VPL execution server needs SSL certificates to accept https:"
+	echo "and wss: requests."
+	echo "If you have certificates then copy the key and the certificate file"
+	echo "in pem format to $VPLJAIL_INSTALL_DIR/key.pem and $VPLJAIL_INSTALL_DIR/cert.pem"
+	echo "If you don't have certificate the intaller can generate one selfsigned for you"
+	echo -n "Generate the certificate?"
+    read A
+    if [ "$A" != "n" ] ; then
+		vpl_generate_selfsigned_certificate
+		cp key.pem $VPLJAIL_INSTALL_DIR
+		cp cert.pem $VPLJAIL_INSTALL_DIR
+		chmod 600 $VPLJAIL_INSTALL_DIR/*.pem
+		rm key.pem keyini.pem certini.pem cert.pem
+	fi
 else
 	echo "Found SSL certificate => Don't create new one"
 fi
-if [ "$LSYSTEM" = "1" ] ;
-then
+if [ "$LSYSTEM" = "1" ] ; then
 	#Add service
     chkconfig --add vpl-jail-system
     echo "Do you want to install development software? (C, C++, Java, etc.) (y/n)"
@@ -160,9 +180,19 @@ then
 else
     update-rc.d -f vpl-jail-system remove >>$LOGFILE
     update-rc.d vpl-jail-system start 50 2 3 4 5 . stop 50 0 1 6 . >>$LOGFILE
-    echo "Do you want to install development software? (C, C++, Java, etc.) (y/n)"
-    read A
-    if [ "$A" != "n" ] ; then
+    echo "Do you want to install development software?"
+    echo "  (Ada, Assambler, C, C++, C#, DDD, Fortran, gdb, Haskell, Java, "
+    echo "   JUnit, Node.js, Octave, Pascal, Perl, PHP, Python, Ruby, Scala,"
+    echo "   Scheme, TCL, valgrind)"
+    echo -n "(y/n)"
+    read A1
+    echo "Do you want to install other development software?"
+    echo "  (Clisp, Clojure, Cobol, CoffeScript, D, Erlang, Go, Haxe, JQuery,"
+    echo "   Lua, R, Xquery, VHDL)"
+    echo -n "(y/n)"
+    read A2
+    if [ "$A1" != "n" ] ; then
+    	echo "This installation may take a long time"
         vpl_install "Ada compiler (GNU)" gnat
         vpl_install "Assembler" nasm
         vpl_install "C compiler (GNU)" gcc
@@ -173,12 +203,13 @@ else
         vpl_install "Haskell 98 interpreter" hugs
         vpl_install "Java (OpenJDK7)" openjdk-7-jdk checkstyle
         vpl_install "Junit framework" junit junit4
+        vpl_install "JavaScript Node.js" nodejs
         vpl_install "Octave (GNU)" octave
         vpl_install "Pascal compiler" fp-compiler
         vpl_install "Perl interpreter" perl
-        vpl_install "PHP interpreter" php5-cli
+        vpl_install "PHP interpreter" php5-cli php5-sqlite
         vpl_install "Prolog" swi-prolog
-        vpl_install "Python interpreter" python pydb
+        vpl_install "Python interpreter" python pydb python-tk
         vpl_install "Ruby interpreter" ruby
         vpl_install "Scala programming language" scala
         vpl_install "Scheme interpreter" plt-scheme
@@ -186,12 +217,10 @@ else
         vpl_install "TCL interpreter" tcl
         vpl_install "Valgrind tool" valgrind
     fi
-    echo "Do you want to install other development software?"
-    echo "  (Clisp, Clojure, D, Erlang, Go, Lua, etc.) (y/n)"
-    read A
-    if [ "$A" != "n" ] ; then
+    if [ "$A2" != "n" ] ; then
+    	echo "This installation may take a long time"
     	vpl_install "Clisp" clisp
-        vpl_install "Clojure" clojure
+        vpl_install "Clojure" clojure1.4
         vpl_install "Cobol" open-cobol
         vpl_install "CoffeeScript" coffeescript
         vpl_install "D compiler (GNU)" gdc
@@ -203,15 +232,22 @@ else
         vpl_install "R statistical computation and graphics system (GNU)" r-base
         vpl_install "XQuery interpreter" galax
         #vpl_install "Expect tool" expect
-        #vpl_install "VHDL compiler" ghdl
+        vpl_install "VHDL compiler" freehdl
         #vpl_install "Groovy programming language" groovy
     fi
-    echo -n "Remove apache2 ? (y/n) "
-    read A
-    if [ "$A" != "n" ] ; then
-        #remove apache2
-        rm /etc/init.d/apache2 >/dev/null 2>&1
-        update-rc.d apache2 remove
+    if [ -f /etc/init.d/apache2 ] ; then
+    	echo "If you are planning to use apache2 or other service in this system,"
+    	echo "beware that you must use differents port that in vpl-jail-system"
+    	echo "It seems that you have apache2 in your system."
+	    echo -n "Remove apache2 ? (y/n) "
+    	read A
+    	if [ "$A" == "y" ] ; then
+        	#remove apache2
+        	echo "Removing apache2"
+        	rm /etc/init.d/apache2 >/dev/null 2>&1
+        	update-rc.d apache2 remove
+    	fi
     fi
 fi
 service vpl-jail-system start
+
