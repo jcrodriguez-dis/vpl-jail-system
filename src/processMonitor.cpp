@@ -13,6 +13,7 @@ using namespace std;
 #include <wait.h>
 #include "lock.h"
 #include "processMonitor.h"
+#include "vpl-jail-server.h"
 /**
  * Return the number of prisoners in jail
  */
@@ -49,6 +50,7 @@ void processMonitor::becomePrisoner(){
 	if(getuid()==0 || geteuid()==0)
 		throw HttpException(internalServerErrorCode
 				,"I can't change to prisoner user 2",Util::itos(prisoner));
+	Daemon::closeSockets();
 	syslog(LOG_INFO,"change user to %d",prisoner);
 }
 
@@ -69,7 +71,8 @@ void processMonitor::stopPrisonerProcess(bool soft){
 	else{
 		for(int i=0;i <50 ; i++){
 			usleep(100000);
-			waitpid(pid,NULL,WNOHANG); //Wait for pid end
+			if(pid==waitpid(pid,NULL,WNOHANG)) //Wait for pid end
+				break;
 		}
 	}
 }
@@ -101,7 +104,7 @@ void processMonitor::selectPrisoner(){
 		prisoner = configuration->getMinPrisioner()+Util::random()%range;
 		setControlPath();
 		string controlPath=getControlPath();
-		//TODO check existence of old home dir and remove it
+		//TODO check existence of old home dir nad remove it
 		if(mkdir(controlPath.c_str(),umask)==0){
 			homePath=prisonerHomePath();
 			if(mkdir(homePath.c_str(),umask)==0){
@@ -321,6 +324,7 @@ processState processMonitor::getState(){
 	if(aliveCompiler && runner_pid==0) return compiling;
 	if(runner_pid==0){
 		if(interactive) return beforeRunning;
+		if(controlFileExists("compilation")) return retrieve;
 		return stopped;
 	}
 	bool aliveRunner=Util::processExists(runner_pid);
