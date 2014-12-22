@@ -1,14 +1,16 @@
 #!/bin/bash
-export LC_ALL=$VPL_LANG 2> .vpl_set_locale_error
-#if current lang not available use en_US.utf8
-if [ -s .vpl_set_locale_error ] ; then
-	export LC_ALL=en_US.utf8
-	rm .vpl_set_locale_error
-fi
-mkdir .vnc
-printf "$VPL_VNCPASSWD\n$VPL_VNCPASSWD\n" | vncpasswd -f >$HOME/.vnc/passwd
-chmod 0600 $HOME/.vnc/passwd
-cat >$HOME/.vnc/xstartup <<"END_OF_FILE"
+{
+	. vpl_environment.sh
+	export LC_ALL=$VPL_LANG 2> .vpl_set_locale_error
+	#if current lang not available use en_US.utf8
+	if [ -s .vpl_set_locale_error ] ; then
+		export LC_ALL=en_US.utf8
+		rm .vpl_set_locale_error
+	fi
+	mkdir .vnc
+	printf "$VPL_VNCPASSWD\n$VPL_VNCPASSWD\n" | vncpasswd -f >$HOME/.vnc/passwd
+	chmod 0600 $HOME/.vnc/passwd
+	cat >$HOME/.vnc/xstartup <<"END_OF_FILE"
 #!/bin/bash
 unset SESSION_MANAGER
 xrdb
@@ -16,7 +18,19 @@ xsetroot -solid MidnightBlue
 #activate clipboard
 [ -x vncconfig ] && vncconfig -iconic 2>/dev/null &
 #start window manager
-metacity &
+if [ -x "$(command -v icewm)" ] ; then
+	mkdir .icewm
+	echo "Theme=SilverXP/default.theme" > .icewm/theme
+	icewm &
+elif [ -x "$(command -v fluxbox)" ] ; then
+	fluxbox &
+elif [ -x "$(command -v openbox)" ] ; then
+	openbox &
+elif [ -x "$(command -v metacity)" ] ; then
+	metacity &
+else
+	xmessage "Window Manager not found"
+fi
 #set execution mode
 chmod +x $HOME/vpl_wexecution
 $HOME/vpl_wexecution &> .std_output
@@ -26,7 +40,17 @@ fi
 VNCDISPLAY=$(ls $HOME/.vnc/*.log | sed -e "s/[^:]*://" -e "s/\.log$//")
 vncserver -kill :$VNCDISPLAY
 END_OF_FILE
-chmod 0755 $HOME/.vnc/xstartup
-export DISPLAY=:$UID.0
-nohup vncserver :$UID -rfbport $UID -localhost -geometry 800x600 -nevershared -name vpl
+	if [ "$VPL_XGEOMETRY" == "" ] ; then
+		VPL_XGEOMETRY="800x600"
+	fi
+	chmod 0755 $HOME/.vnc/xstartup
+	while true; do
+		export VNCPORT=$((6000+$RANDOM%25000))
+		lsof -i :$VNCPORT
+		[ "$?" != "0" ] && break
+	done
+	export DISPLAY=:$VNCPORT.0
+	nohup vncserver :$VNCPORT -rfbport $VNCPORT -localhost -geometry $VPL_XGEOMETRY -nevershared -name vpl
+} &>/dev/null
+echo $VNCPORT
 
