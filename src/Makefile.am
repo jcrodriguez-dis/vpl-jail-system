@@ -1,5 +1,5 @@
 bin_PROGRAMS = vpl-jail-server websocket-echo-test program-test
-vpl_jail_server_SOURCES = vpl-jail-server.cpp jail.cpp jail.h\
+vpl_jail_server_SOURCES = vpl-jail-server.cpp vpl-jail-server.h jail.cpp jail.h\
 httpServer.cpp httpServer.h httpException.h\
 redirector.cpp redirector.h\
 configurationFile.cpp configurationFile.h\
