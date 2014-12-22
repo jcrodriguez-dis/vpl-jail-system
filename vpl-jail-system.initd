@@ -3,6 +3,8 @@
 # Startup script for vpl-jail-system
 #
 # author:     Juan Carlos Rodriguez-del-Pino <jcrodriguez@dis.ulpgc.es>
+# license:    GPL v3 see http://www.gnu.org/licenses/gpl
+
 # chkconfig:  345 99 36
 # description: Virtual Programming Lab jail is a sandbox to compile \
 #              and execute programs. vpl-jail-server receive the code\
@@ -46,6 +48,23 @@ DEAMON=/etc/vpl/vpl-jail-server
 PIDFILE=/var/run/vpl-jail-server.pid
 NOMOUNT="^vpl|^init|^ldap|^udev|grub|^rc[0-6S]|^pam|^cron|^apm|^logrotate"
 NOMOUNT="$NOMOUNT|^mail|^rsyslog|^security|^ssl|^ssh|^update"
+read_config(){
+	local FILE=$1
+	shift
+	while (( "$#" )); do
+		local RES=$(grep -i -e "^[ \\t]*$1[ \\t]*=" $FILE \
+	             | tail -n 1 \
+	             | sed -e "s/^[ \\t]*$1[ \\t]*=[ \\t]*\\(.*\\)\$/\\1/I")
+	    if [ "$RES" == "" ] ; then
+	    	export $1=$2
+	    else
+	    	export $1=$RES
+	    fi
+		shift
+		shift
+	done
+}
+
 create_check_dir() {
 	if [ ! -d "$1" ] ; then
 		mkdir "$1"
@@ -61,7 +80,8 @@ create_check_dir() {
 set_etc() {
 	create_check_dir "$JAILPATH/etc" 755
 	#passwd file
-	PASSWORDFILE="$JAILPATH/etc/passwd"
+	local PASSWORDFILE="$JAILPATH/etc/passwd"
+	local I
 	echo "root:*:0:0:root:/root:/bin/bash" > "$PASSWORDFILE"
 	for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
 		echo "p$I:*:$I:$I:prisoner $I:/home/p$I:/bin/bash" >> "$PASSWORDFILE"
@@ -77,8 +97,11 @@ set_etc() {
 	cp -p /etc/ld.so.conf  "$JAILPATH/etc"
 	cp -p /etc/ld.so.cache  "$JAILPATH/etc"
 	cp -p /etc/hosts  "$JAILPATH/etc"
-	chmod a-s "$JAILPATH/etc/ld.so.conf"
-	chmod a-s "$JAILPATH/etc/ld.so.cache"
+	cp -p /etc/localtime  "$JAILPATH/etc"
+	cp -p /etc/locale.alias  "$JAILPATH/etc"
+	cp -p /etc/profile  "$JAILPATH/etc"
+	cp -p -r /etc/profile.d  "$JAILPATH/etc"
+	chmod -R a-s $JAILPATH/etc/*
 	for DIR in $(ls -d /etc/*)
 	do
 		DIRNAME=$(basename "$DIR")
@@ -106,7 +129,8 @@ unset_etc() {
 			unset_other $DIR
 		fi
 	done
-	rm $JAILPATH/etc/*
+	rm -Rf $JAILPATH/etc/profile.d
+	rm -f $JAILPATH/etc/*
 }
 
 create_device() {
@@ -136,7 +160,7 @@ set_dev() {
 unset_dev() {
 	DEVPATH="$JAILPATH/dev"
 	unset_other /dev/pts
-	rm $DEVPATH/*
+	rm -Rf $DEVPATH
 }
 
 set_tmp() {
@@ -168,7 +192,7 @@ set_other() {
 
 unset_other() {
 	if [ -d $1 -a -d "$JAILPATH$1" ] ; then
-		umount "$JAILPATH$1"
+		umount -l -f "$JAILPATH$1"
 		rmdir "$JAILPATH$1"
 	fi
 }
@@ -195,12 +219,83 @@ unset_others() {
 	unset_other /proc
 }
 
-start(){
+set_firewall() {
+#0: No firewall
+#1: VPL service+DNS+ full internet access
+#2: VPL service+DNS+ Limit internet to port 80 and 443 (super user unlimited)
+#3: VPL service+No internet to normal users (super user unlimited)
+#4: VPL service+No internet to all users (No graphics, only console execution)
+	local OWN=127.0.0.0/8
+	if [ "$FIREWALL" \> "0" ] ; then
+		iptables -N VPL_LOG
+		iptables -N VPL_IN 
+		iptables -N VPL_OUT
+		#Logs
+		[ "$1" != "" ] && (iptables -A VPL_LOG -m limit --limit 20/minute -j LOG --log-prefix "VPL packet dropped: " --log-level 7)
+		iptables -A VPL_LOG -j DROP
+		#input
+		iptables -A VPL_IN -p tcp -m conntrack --ctstate ESTABLISHED -j ACCEPT
+		#Avoid auto request to vpl service
+		iptables -A VPL_IN -p tcp -m multiport -i lo -o etho0 --dports $PORT,$SECURE_PORT -j VPL_LOG
+		#Accept connection to vpl service
+		iptables -A VPL_IN -p tcp -m multiport --dports $PORT,$SECURE_PORT -j ACCEPT
+		#Accept local conections
+		iptables -A VPL_IN -p tcp -i lo -j ACCEPT
+		#DNS query
+		[ "$FIREWALL" \< "3" ] && (iptables -A VPL_IN -p udp --sport 53 -j ACCEPT)
+		[ "$FIREWALL" \< "3" ] && (iptables -A VPL_IN -p tcp --sport 53 -j ACCEPT)
+		iptables -A VPL_IN -j VPL_LOG
+		#Output
+		#Accept established connections
+		iptables -A VPL_OUT -p tcp -m conntrack --ctstate ESTABLISHED -j ACCEPT
+		#Accept all from super user
+		[ "$FIREWALL" \< "4" ] && (iptables -A VPL_OUT -m owner --uid-owner 0 -j ACCEPT)
+		#Drop auto connections to VPL service
+		iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -m multiport -i lo -o eth0 --dports $PORT,$SECURE_PORT -j VPL_LOG
+		#Accept request to internet
+		[ "$FIREWALL" == "1" ] && (iptables -A VPL_OUT -p tcp -o eth0 -m conntrack --ctstate NEW -j ACCEPT)
+		#Accept request to internet only 80,443
+		[ "$FIREWALL" == "2" ] && (iptables -A VPL_OUT -p tcp -o eth0 -m conntrack --ctstate NEW -m multiport --dports 80,443 -j ACCEPT)
+		#Accept DNS requests
+		[ "$FIREWALL" \< "3" ] && (iptables -A VPL_OUT -p udp --dport 53 -j ACCEPT)
+		[ "$FIREWALL" \< "3" ] && (iptables -A VPL_OUT -p tcp --dport 53 -j ACCEPT)
+		#Accept Auto conections (php builtin server, etc)
+		[ "$FIREWALL" \< "4" ] && (iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -s $OWN -d $OWN -j ACCEPT)
+		iptables -A VPL_OUT -j VPL_LOG
+		iptables -A INPUT -j VPL_IN
+		iptables -A OUTPUT -j VPL_OUT
+	fi
+}
+
+unset_firewall() {
+	if [ "$FIREWALL" \> "0" ] ; then
+		iptables -D INPUT -j VPL_IN
+		iptables -F VPL_IN
+		iptables -X VPL_IN
+		iptables -D OUTPUT -j VPL_OUT
+		iptables -F VPL_OUT
+		iptables -X VPL_OUT
+		iptables -F VPL_LOG
+		iptables -X VPL_LOG
+	fi
+}
+
+start_vpl() {
 	if [ -f $PIDFILE ] ; then
-		stop
+		stop_vpl
 	fi
 	{
 		create_check_dir "$JAILPATH" 0755
+		#Check $JAILPATH not been "/"
+		if [ -d "$JAILPATH" ] ; then
+			if [ "$(stat -c "%d:%i" /)" == "$(stat -c "%d:%i" $JAILPATH)" ] ; then
+				log_failure_msg $"vpl-jail-system error jail path is the root directory"
+				exit 1
+			fi
+		else
+			log_failure_msg $"vpl-jail-system jail path error '$JAILPATH' not a directory"
+			exit 1
+		fi
 		set_etc
 		set_dev
 		set_tmp
@@ -210,21 +305,32 @@ start(){
 	start_daemon /etc/vpl/vpl-jail-server $1 $2
 	sleep 1
 	if [ -f $PIDFILE ] ; then
+		set_firewall $1
 		log_success_msg $"Starting vpl-jail-system service:"
 	else
 		log_failure_msg $"Daemon not started"
 	fi
 }
 
-stop(){
+stop_vpl() {
 	{
 		killproc /etc/vpl/vpl-jail-server 15
 		if [ -f $PIDFILE ] ; then
 			rm $PIDFILE
 		fi
+		if [ -d "$JAILPATH" ] ; then
+			if [ "$(stat -c "%d:%i" /)" == "$(stat -c "%d:%i" $JAILPATH)" ] ; then
+				log_failure_msg $"vpl-jail-system error jail path is the root directory"
+				exit 1
+			fi
+		else
+			log_failure_msg $"vpl-jail-system jail path error '$JAILPATH' not a directory"
+			exit 1
+		fi
 		unset_etc
 		unset_dev
 		unset_others
+		unset_firewall
 	} 2>> $LOGFILE
 	log_success_msg $"Stopping vpl-jail-system service:"
 }
@@ -233,33 +339,32 @@ VPLJAIL_INSTALL_DIR=/etc/vpl
 CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf"
 #Load config file
 if [ -f "$CONFIG_FILE" ]; then
-	. "$CONFIG_FILE"
+	read_config "$CONFIG_FILE" JAILPATH /jail
+	read_config "$CONFIG_FILE" MIN_PRISONER_UGID 10000 MAX_PRISONER_UGID 20000
+	read_config "$CONFIG_FILE" CONTROLPATH /var/vpl-jail-system
+	read_config "$CONFIG_FILE" PORT 80 SECURE_PORT 443
+	read_config "$CONFIG_FILE" FIREWALL 0
 else
 	log_failure_msg $"vpl-jail-system config file not found: $CONFIG_FILE"
 	exit 1
 fi
 
-#Check $JAILPATH not been "/"
-if [ -f "$JAILPATH" ] ; then
-	log_failure_msg $"vpl-jail-system jail path error '$JAILPATH'"
-	exit 1
-fi
 echo "===== vpl-jail-system ====== $1 $2 $3" >> $LOGFILE
 date >> $LOGFILE
 case "$1" in
   start)
-        start $2 $3
+        start_vpl $2 $3
         ;;
   stop)
-        stop
+        stop_vpl
         ;;
   restart)
-        stop
-        start
+        stop_vpl
+        start_vpl
         ;;
   force-reload)
-        stop
-        start
+        stop_vpl
+        start_vpl
         ;;
   status)
         pidofproc /etc/vpl/vpl-jail-server
