@@ -120,7 +120,7 @@ Socket::~Socket(){
 	close();
 }
 void Socket::readHeaders(){
-	if(headers.size()==0){
+	if(header.size()==0){
 		receive(); //First receive => read and parse http headers
 	}
 }
@@ -134,14 +134,14 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 		}
 		return ret;
 	}
-	if(headers.size()==0)
+	if(header.size()==0)
 		sizeToReceive = JAIL_HEADERS_SIZE_LIMIT;
 	if(sizeToReceive){
 		syslog(LOG_INFO,"Receiving until %d bytes",sizeToReceive);
 	}
 	//If already read, return data
 	if(sizeToReceive>0 && readBuffer.size()>=sizeToReceive
-			&& headers.size()!=0){
+			&& header.size()!=0){
 		string ret = readBuffer.substr(0,sizeToReceive);
 		readBuffer.erase(0,sizeToReceive);
 		return ret;
@@ -164,10 +164,10 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 		}
 		time_t currentTime=time(NULL);
 		if(currentTime>timeLimit || currentTime>fullTimeLimit){
-			syslog(LOG_ERR,"Socket read timeout");
-			if(sizeToReceive==0)
+			if(sizeToReceive==0){
+				syslog(LOG_DEBUG,"Socket read timeout, closed connection?");
 				return "";
-			else
+			}else
 				throw HttpException(requestTimeoutCode
 						,"Socket read timeout");
 		}
