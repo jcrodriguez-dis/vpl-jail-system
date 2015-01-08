@@ -22,7 +22,6 @@ class SSLBase{
 	static SSLBase* singlenton;
 	const SSL_METHOD *method;
 	SSL_CTX *context;
-
 	SSLBase(){
 		const char *certFile="/etc/vpl/cert.pem";
 		const char *keyFile="/etc/vpl/key.pem";
@@ -31,24 +30,24 @@ class SSLBase{
 		SSL_load_error_strings(); 
 		method = SSLv23_server_method();
 		if(method == NULL){
-			syslog(LOG_ERR,"SSLv23_server_method() fail: %s",ERR_reason_error_string(ERR_get_error()));
-			exit(EXIT_FAILURE);
+			syslog(LOG_ERR,"SSLv23_server_method() fail: %s",getError());
+			_exit(EXIT_FAILURE);
 		}
 		if((context = SSL_CTX_new((SSL_METHOD *)method)) == NULL){ //Conversion for backward compatibility
-			syslog(LOG_ERR,"SSL_CTX_new() fail: %s",ERR_reason_error_string(ERR_get_error()));
-			exit(EXIT_FAILURE);
+			syslog(LOG_ERR,"SSL_CTX_new() fail: %s",getError());
+			_exit(EXIT_FAILURE);
 		}
 		if(SSL_CTX_use_certificate_file(context, certFile, SSL_FILETYPE_PEM) != 1){
-			syslog(LOG_ERR,"SSL_CTX_use_certificate_file() fail: %s",ERR_reason_error_string(ERR_get_error()));
-			exit(EXIT_FAILURE);
+			syslog(LOG_ERR,"SSL_CTX_use_certificate_file() fail: %s",getError());
+			_exit(EXIT_FAILURE);
 		}
 		if(SSL_CTX_use_PrivateKey_file(context, keyFile, SSL_FILETYPE_PEM) != 1){
-			syslog(LOG_ERR,"SSL_CTX_use_PrivateKey_file() fail: %s",ERR_reason_error_string(ERR_get_error()));
-			exit(EXIT_FAILURE);
+			syslog(LOG_ERR,"SSL_CTX_use_PrivateKey_file() fail: %s",getError());
+			_exit(EXIT_FAILURE);
 		}
 		if( !SSL_CTX_check_private_key(context) ){
-			syslog(LOG_ERR,"SSL_CTX_check_private_key() fail: %s",ERR_reason_error_string(ERR_get_error()));
-			exit(EXIT_FAILURE);
+			syslog(LOG_ERR,"SSL_CTX_check_private_key() fail: %s",getError());
+			_exit(EXIT_FAILURE);
 		}
 		SSL_CTX_set_mode(context,SSL_MODE_ENABLE_PARTIAL_WRITE|
 								SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
@@ -58,6 +57,17 @@ public:
 		if(singlenton == NULL) singlenton= new SSLBase();
 		return singlenton;
 	}
+    static const char *getError(){
+    	int error_n=ERR_get_error();
+		const char* error_string="No detail";
+		if(error_n !=0){
+			error_string = ERR_error_string(error_n,NULL);
+			if(error_string == NULL){
+				error_string ="unregister error";
+			}
+		}
+		return error_string;
+    }
 	SSL_CTX *getContext(){
 		return context; 
 	}
@@ -89,6 +99,7 @@ public:
 	Socket(int socket);
 	virtual ~Socket();
 	void readHeaders();
+	size_t headerSize(){return header.size();}
 	uint32_t getClientIP(){return clientip;}
 	string getProtocol(){return protocol;}
 	string getMethod(){return method;}
@@ -98,6 +109,7 @@ public:
 	int getSocket(){ return socket;}
 	bool isReadBuffered() { return readBuffer.size()>0;}
 	bool isWriteBuffered() { return writeBuffer.size()>0;}
+	virtual bool isSecure() { return false;}
 	bool isClosed(){return closed;}
 	void close(){if(!closed) shutdown(socket,SHUT_WR);closed=true;}
 	bool wait(const int msec=50); //Wait for a socket change until milisec time
@@ -121,18 +133,36 @@ public:
 	}
 	bool end(ssize_t ret){
 		if(ret>0) return true;
-		if(ret==0) {
+		int code=SSL_get_error(ssl,ret);
+		const char *scode=NULL;
+		switch(code){
+			case SSL_ERROR_NONE: return true;
+			case SSL_ERROR_ZERO_RETURN: return true;
+			case SSL_ERROR_WANT_READ: break;
+			case SSL_ERROR_WANT_WRITE: break;
+			case SSL_ERROR_WANT_CONNECT: break;
+			case SSL_ERROR_WANT_ACCEPT: break;
+			case SSL_ERROR_SYSCALL:
+				scode="SSL_ERROR_SYSCALL ";
+				if(ret == 0){
+					syslog(LOG_INFO,"SSL socket closed unexpected ret==0: %s %s",message.c_str(),scode);
+					return true;
+				}
+				/* no break */
+			case SSL_ERROR_SSL:
+				if(scode == NULL){
+					scode="SSL_ERROR_SSL ";
+				}
+				/* no break */
+			default:
+				if(scode == NULL){
+					scode="UNKNOW SSL_ERROR ";
+				}
 				throw HttpException(internalServerErrorCode
-					,message+Util::itos(SSL_get_error(ssl,ret))); //Error
+						,message+scode+SSLBase::getError()); //Error
 		}
-		if(ret<0) {
-			int code=SSL_get_error(ssl,ret);
-			if(code != SSL_ERROR_WANT_READ &&
-			   code != SSL_ERROR_WANT_WRITE){
-				throw HttpException(internalServerErrorCode
-						,message+Util::itos(code)); //Error
-			}
-		}
+		usleep(10000);//avoids high load in endless loops
+		ERR_clear_error();
 		time_t wait=timeLimit-currentTime;
 		int res=poll(devices,1,wait);
 		if(res==-1) {
@@ -181,6 +211,7 @@ public:
 	~SSLSocket(){
 		SSL_free(ssl);
 	}
+	virtual bool isSecure() { return true;}
 };
 
 #endif /* SOCKET_H_ */
