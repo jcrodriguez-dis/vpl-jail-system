@@ -66,7 +66,7 @@ void processMonitor::stopPrisonerProcess(bool soft){
 			usleep(100000);
 		}
 		kill(-1,SIGKILL);
-		exit(EXIT_SUCCESS);
+		_exit(EXIT_SUCCESS);
 	}
 	else{
 		for(int i=0;i <50 ; i++){
