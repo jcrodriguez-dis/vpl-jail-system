@@ -43,57 +43,52 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 	processMonitor pm(adminticket,monitorticket,executionticket);
 	pid_t pid=fork();
 	if(pid==0){ //new process
-		try{
-			syslog(LOG_INFO,"parse files %lu",(long unsigned int)parsedata.size());
-			mapstruct files=RPC::getFiles(parsedata["files"]);
-			mapstruct filestodelete=RPC::getFiles(parsedata["filestodelete"]);
-			string script=parsedata["execute"]->getString();
-			//Retrieve files to execution dir and options
-			for(mapstruct::iterator i=files.begin(); i!=files.end(); i++){
-				string name=i->first,data=i->second->getString();
-				syslog(LOG_INFO,"Write file %s data size %lu",name.c_str(),(long unsigned int)data.size());
-				pm.writeFile(name,data);
-			}
-			ExecutionLimits executionLimits=Configuration::getConfiguration()->getLimits();
-			syslog(LOG_INFO,"Reading parms");
-			executionLimits.syslog("Config");
-			executionLimits.maxtime=min(parsedata["maxtime"]->getInt(),executionLimits.maxtime);
-			executionLimits.maxfilesize=min(parsedata["maxfilesize"]->getInt(),executionLimits.maxfilesize);
-			executionLimits.maxmemory=min(parsedata["maxmemory"]->getInt(),executionLimits.maxmemory);
-			executionLimits.maxprocesses=min(parsedata["maxprocesses"]->getInt(),executionLimits.maxprocesses);
-			executionLimits.syslog("Request");
-			string vpl_lang=parsedata["lang"]->getString();
-			syslog(LOG_DEBUG,"VPL_LANG %s",vpl_lang.c_str());
-			bool interactive=parsedata["interactive"]->getInt()>0;
-			syslog(LOG_DEBUG,"interactive %d",parsedata["interactive"]->getInt());
-			pm.setExtraInfo(executionLimits,interactive,vpl_lang);
-			pm.setCompiler();
-			syslog(LOG_INFO,"Compilation");
-			string compilationOutput=run(pm,script);
-			pm.setCompilationOutput(compilationOutput);
-			bool compiled=pm.FileExists(VPL_EXECUTION)||pm.FileExists(VPL_WEXECUTION);
-			if(compiled){
-				//Delete files
-				for(mapstruct::iterator i=filestodelete.begin(); i!=filestodelete.end(); i++){
-					string name=i->first;
-					syslog(LOG_INFO,"Delete file %s",name.c_str());
-					pm.deleteFile(name);
-				}
-				if(!interactive && pm.FileExists(VPL_EXECUTION)){
-					pm.setRunner();
-					syslog(LOG_INFO,"Non interactive execution");
-					string executionOutput=run(pm,VPL_EXECUTION);
-					syslog(LOG_INFO,"Write execution result");
-					pm.setExecutionOutput(executionOutput,true);
-				}
-			}else{
-				syslog(LOG_INFO,"Compilation fail");
-			}
-			exit(0);
+		syslog(LOG_INFO,"parse files %lu",(long unsigned int)parsedata.size());
+		mapstruct files=RPC::getFiles(parsedata["files"]);
+		mapstruct filestodelete=RPC::getFiles(parsedata["filestodelete"]);
+		string script=parsedata["execute"]->getString();
+		//Retrieve files to execution dir and options
+		for(mapstruct::iterator i=files.begin(); i!=files.end(); i++){
+			string name=i->first,data=i->second->getString();
+			syslog(LOG_INFO,"Write file %s data size %lu",name.c_str(),(long unsigned int)data.size());
+			pm.writeFile(name,data);
 		}
-		catch(...){
-			syslog(LOG_INFO,"Internal error");
+		ExecutionLimits executionLimits=Configuration::getConfiguration()->getLimits();
+		syslog(LOG_INFO,"Reading parms");
+		executionLimits.syslog("Config");
+		executionLimits.maxtime=min(parsedata["maxtime"]->getInt(),executionLimits.maxtime);
+		executionLimits.maxfilesize=min(parsedata["maxfilesize"]->getInt(),executionLimits.maxfilesize);
+		executionLimits.maxmemory=min(parsedata["maxmemory"]->getInt(),executionLimits.maxmemory);
+		executionLimits.maxprocesses=min(parsedata["maxprocesses"]->getInt(),executionLimits.maxprocesses);
+		executionLimits.syslog("Request");
+		string vpl_lang=parsedata["lang"]->getString();
+		syslog(LOG_DEBUG,"VPL_LANG %s",vpl_lang.c_str());
+		bool interactive=parsedata["interactive"]->getInt()>0;
+		syslog(LOG_DEBUG,"interactive %d",parsedata["interactive"]->getInt());
+		pm.setExtraInfo(executionLimits,interactive,vpl_lang);
+		pm.setCompiler();
+		syslog(LOG_INFO,"Compilation");
+		string compilationOutput=run(pm,script);
+		pm.setCompilationOutput(compilationOutput);
+		bool compiled=pm.FileExists(VPL_EXECUTION)||pm.FileExists(VPL_WEXECUTION);
+		if(compiled){
+			//Delete files
+			for(mapstruct::iterator i=filestodelete.begin(); i!=filestodelete.end(); i++){
+				string name=i->first;
+				syslog(LOG_INFO,"Delete file %s",name.c_str());
+				pm.deleteFile(name);
+			}
+			if(!interactive && pm.FileExists(VPL_EXECUTION)){
+				pm.setRunner();
+				syslog(LOG_INFO,"Non interactive execution");
+				string executionOutput=run(pm,VPL_EXECUTION);
+				syslog(LOG_INFO,"Write execution result");
+				pm.setExecutionOutput(executionOutput,true);
+			}
+		}else{
+			syslog(LOG_INFO,"Compilation fail");
 		}
+		_exit(EXIT_SUCCESS);
 	}
 }
 void Jail::commandGetResult(string adminticket,string &compilation,string &execution, bool &executed, bool &interactive){
@@ -113,8 +108,9 @@ void Jail::commandStop(string adminticket){
 			pm.clean();
 			pm.cleanMonitor();
 		}catch(...){
+
 		}
-		exit(0);
+		_exit(EXIT_SUCCESS);
 	}
 }
 void Jail::commandMonitor(string monitorticket,Socket *s){
@@ -236,7 +232,7 @@ void Jail::commandExecute(string executeticket,Socket *s){
 	processMonitor pm(executeticket);
 	webSocket ws(s);
 	if(pm.getSecurityLevel() != execute){
-		syslog(LOG_ERR,"Security: execute request with no monitor ticket");
+		syslog(LOG_ERR,"%s: Security. Try to execute request with no monitor ticket",IP.c_str());
 		throw "Internal server error";
 	}
 	syslog(LOG_INFO,"Start executing");
@@ -254,9 +250,9 @@ void Jail::commandExecute(string executeticket,Socket *s){
 			if(pm.installScript(".vpl_launcher.sh","vpl_vnc_launcher.sh"))
 				runVNC(pm, ws, ".vpl_launcher.sh");
 			else
-				syslog(LOG_ERR,"Error: vpl_vnc_launcher.sh not installed");
+				syslog(LOG_ERR,"%s:Error: vpl_vnc_launcher.sh not installed",IP.c_str());
 		}else{
-			syslog(LOG_ERR,"Error: no thing to run");
+			syslog(LOG_ERR,"%s:Error: no thing to run",IP.c_str());
 		}
 	}
 }
@@ -292,10 +288,12 @@ void Jail::process(Socket *socket){
 	string httpURLPath=configuration->getURLPath();
 	syslog(LOG_INFO,"urlpath for requests %s",httpURLPath.c_str());
 	HttpJailServer server(socket);
-	socket->readHeaders();
-	if(Util::toUppercase(socket->getHeader("Upgrade"))
-	!="WEBSOCKET"){
-		try{
+	try{
+		socket->readHeaders();
+		if(socket->isSecure() && socket->headerSize()==0){
+			_exit(EXIT_SUCCESS);
+		}
+		if(Util::toUppercase(socket->getHeader("Upgrade"))!="WEBSOCKET"){
 			syslog(LOG_INFO,"http request");
 			if(!isValidIPforRequest())
 				throw HttpException(badRequestCode,"Client not allowed");
@@ -346,21 +344,7 @@ void Jail::process(Socket *socket){
 			}else{ //Error
 				throw HttpException(badRequestCode,"Unknown request:"+request);
 			}
-		}
-		catch(HttpException &exception){
-			syslog(LOG_ERR,"%s",exception.getLog().c_str());
-			server.sendCode(exception.getCode(),exception.getMessage());
-		}
-		catch(const char *s){
-			syslog(LOG_ERR,"%s",s);
-			server.sendCode(internalServerErrorCode,s);
-		}
-		catch(...){
-			syslog(LOG_ERR, "Unexpected exception %s:%d",__FILE__,__LINE__);
-			server.sendCode(internalServerErrorCode,"Unknown error");
-		}
-	}else{ //Websocket
-		try{
+		}else{ //Websocket
 			if(socket->getMethod() != "GET"){
 				throw "Unsupported METHOD "+socket->getMethod();
 			}
@@ -380,25 +364,25 @@ void Jail::process(Socket *socket){
 			}else
 				throw string("Bad command");
 		}
-		catch(HttpException &exception){
-			syslog(LOG_ERR, "%s",exception.getLog().c_str());
-			sleep(3);
-			socket->send(exception.getMessage());
-		}
-		catch(string &exception){
-			syslog(LOG_ERR, "%s", exception.c_str());
-			sleep(3);
-			socket->send(exception);
-		}
-		catch(const char *s){
-			syslog(LOG_ERR, "%s", s);
-			sleep(3);
-		}
-		catch(...){
-			syslog(LOG_ERR, "Unexpected exception %s:%d",__FILE__,__LINE__);
-			socket->send("Unexpected exception");
-		}
+		_exit(EXIT_SUCCESS);
 	}
+	catch(HttpException &exception){
+		syslog(LOG_ERR,"%s:%s",IP.c_str(),exception.getLog().c_str());
+		server.sendCode(exception.getCode(),exception.getMessage());
+	}
+	catch(string &exception){
+		syslog(LOG_ERR,"%s:%s",IP.c_str(),exception.c_str());
+		server.sendCode(internalServerErrorCode,exception);
+	}
+	catch(const char *s){
+		syslog(LOG_ERR,"%s:%s",IP.c_str(),s);
+		server.sendCode(internalServerErrorCode,s);
+	}
+	catch(...){
+		syslog(LOG_ERR, "%s:Unexpected exception %s:%d",IP.c_str(),__FILE__,__LINE__);
+		server.sendCode(internalServerErrorCode,"Unknown error");
+	}
+	_exit(EXIT_FAILURE);
 }
 
 /**
@@ -514,18 +498,18 @@ string Jail::run(processMonitor &pm,string name, int othermaxtime){
 			pm.becomePrisoner();
 			transferExecution(pm,name);
 		}catch(const char *s){
-			syslog(LOG_INFO,"Error running: %s",s);
+			syslog(LOG_ERR,"Error running: %s",s);
 			printf("\nJail error: %s\n",s);
 		}
 		catch(const string &s){
-			syslog(LOG_INFO,"Error running: %s",s.c_str());
+			syslog(LOG_ERR,"Error running: %s",s.c_str());
 			printf("\nJail error: %s\n",s.c_str());
 		}
 		catch(...){
-			syslog(LOG_INFO,"Error running");
+			syslog(LOG_ERR,"Error running");
 			printf("\nJail error: at execution stage\n");
 		}
-		exit(EXIT_SUCCESS);
+		_exit(EXIT_SUCCESS);
 	}
 	syslog(LOG_INFO, "child pid %d",newpid);
 	Redirector redirector;
@@ -631,12 +615,12 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 			setsid();
 			transferExecution(pm,name);
 		}catch(const char *s){
-			syslog(LOG_INFO,"Error running: %s",s);
+			syslog(LOG_ERR,"Error running terminal: %s",s);
 		}
 		catch(...){
-			syslog(LOG_INFO,"Error running");
+			syslog(LOG_ERR,"Error running terminal");
 		}
-		exit(EXIT_SUCCESS);
+		_exit(EXIT_SUCCESS);
 	}
 	syslog(LOG_INFO, "child pid %d",newpid);
 	Redirector redirector;
