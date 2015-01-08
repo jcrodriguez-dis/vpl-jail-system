@@ -7,10 +7,11 @@
 /**
  * Deamon vpl-jail-system. jail for vpl using xmlrpc
  **/
+#include <exception>
 #include "vpl-jail-server.h"
 
 Daemon* Daemon::singlenton=NULL;
-
+bool Daemon::finishRequest=false;
 using namespace std;
 void setLogLevel(string debugLevel){
 	openlog("vpl-jail-system",LOG_PID,LOG_DAEMON);
@@ -26,9 +27,6 @@ void setLogLevel(string debugLevel){
 	}
 }
 
-void SIGTERMsignalHandler(int sn){
-	Daemon::closeSockets();
-}
 /**
  * main accept command line [-d level] [-uri URI]
  * where level is the syslog log level and URI is the xmlrpc server uri
@@ -36,34 +34,26 @@ void SIGTERMsignalHandler(int sn){
 int main(int const argc, const char ** const argv, char * const * const env) {
 	//Set log level from command arg "-d level"
 	setLogLevel(Util::getCommand(argc,argv,"-d"));
+	int exitStatus=static_cast<int>(internalError);
 	try{
-		signal(SIGTERM,SIGTERMsignalHandler);
 		Daemon::getDaemon()->loop();
+		exitStatus=EXIT_SUCCESS;
 	}
 	catch(HttpException &exception){
 		syslog(LOG_ERR,"%s",exception.getLog().c_str());
-		Daemon::getDaemon()->closeSockets();
-		exit(static_cast<int>(httpError));
+		exitStatus=static_cast<int>(httpError);
 	}
 	catch(const string &me){
 		syslog(LOG_ERR,"%s",me.c_str());
-		perror(me.c_str());
-		exit(1);
 	}
 	catch(const char * const me){
 		syslog(LOG_ERR,"%s",me);
-		exit(2);
+	}
+	catch(std::exception &e){
+		syslog(LOG_ERR,"unexpected exception: %s %s:%d",e.what(),__FILE__,__LINE__);
 	}
 	catch(...){
 		syslog(LOG_ERR,"unexpected exception %s:%d",__FILE__,__LINE__);
-		exit(3);
 	}
-	try{
-		Daemon::getDaemon()->closeSockets();
-	}
-	catch(...){
-		syslog(LOG_ERR,"Exception closing sockets");
-		exit(4);	
-	}
-	return 0;
+	exit(exitStatus);
 }

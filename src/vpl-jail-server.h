@@ -12,6 +12,7 @@
 #include <config.h>
 #endif
 
+#include <memory>
 #include <map>
 #include <list>
 #include <arpa/inet.h>
@@ -49,8 +50,9 @@ class Daemon{
 		time_t start;
 	};
 	map<pid_t,Child> children;
-	static void catchSIGPIPE(int n){
-		//Do nothing
+	static bool finishRequest;
+	static void SIGTERMHandler(int n){
+		finishRequest=true;
 	}
 
 	/**
@@ -107,9 +109,9 @@ class Daemon{
 			statistics.banned++;
 		return banned;
 	}
-	void endChild(pid_t pid, ExitStatus es){
+	void processChildEnd(pid_t pid, ExitStatus es){
 		if(children.find(pid) == children.end())
-			syslog(LOG_ERR,"Child end but not found");
+			syslog(LOG_ERR,"Child end, but pid not found");
 		Child c=children[pid];
 		children.erase(pid);
 		Log l;
@@ -136,9 +138,9 @@ class Daemon{
 			statistics.requests++;
 			if(WIFSIGNALED(status)){
 				int signal = WTERMSIG(status);
-				endChild(wret,internalError);
+				processChildEnd(wret,internalError);
 			}else if(WIFEXITED(status)){
-				endChild(wret, static_cast<ExitStatus>(WEXITSTATUS(status)));
+				processChildEnd(wret, static_cast<ExitStatus>(WEXITSTATUS(status)));
 			}
 		}
 	}
@@ -170,39 +172,27 @@ class Daemon{
 		if(d != NULL)
 			IP=d;
 		if(isBanned(IP)){
-			syslog(LOG_ERR,"Request rejected: IP banned %s", IP.c_str());
 			close(actualSocket);
 			statistics.banned++;
+			throw "";
+			syslog(LOG_ERR,"%s: Request rejected: IP banned", IP.c_str());
 			return;
 		}
+		fcntl(actualSocket,FD_CLOEXEC); //Close socket on execve
 		pid_t pid=fork();
 		Socket *socket;
 		if(pid==0){ //new process
 			Socket *socket=NULL;
-			try{
-				close(listenSocket);
-				if(sec)
-					socket= new SSLSocket(actualSocket);
-				else
-					socket= new Socket(actualSocket);
-				Jail jail(IP);
-				jail.process(socket);
-			}
-			catch(HttpException &exception){
-				syslog(LOG_ERR,"%s %s",IP.c_str(),exception.getLog().c_str());
-				delete socket;
-				exit(static_cast<int>(httpError));
-			}
-			catch(const char * const me){
-				syslog(LOG_ERR,"%s %s",IP.c_str(),me);
-				exit(static_cast<int>(internalError));
-			}
-			catch(...){
-				syslog(LOG_ERR,"unexpected exception %s %s:%d",IP.c_str(),__FILE__,__LINE__);
-				exit(static_cast<int>(internalError));
-			}
-			delete socket;
-			exit(static_cast<int>(success));
+			close(listenSocket);
+			if(sec)
+				socket= new SSLSocket(actualSocket);
+			else
+				socket= new Socket(actualSocket);
+			auto_ptr<Socket> auto_destroy(socket);
+			Jail jail(IP);
+			jail.process(socket);
+			usleep(10000);//Wait for father process child
+			_exit(EXIT_SUCCESS);
 		}
 		close(actualSocket);
 		Child c;
@@ -271,17 +261,20 @@ class Daemon{
 	void demonize(){
 		pid_t child_pid = fork();
 		if(child_pid < 0) exit(EXIT_FAILURE);
-		if(child_pid > 0) exit(EXIT_SUCCESS); //gradparent exit
+		if(child_pid > 0) _exit(EXIT_SUCCESS); //gradparent exit
 		if(setsid() < 0) exit(EXIT_FAILURE);
 		pid_t grandchild_pid = fork();
 		if(grandchild_pid < 0) exit(EXIT_FAILURE);
-		if(grandchild_pid > 0) exit(EXIT_SUCCESS); //parent exit
+		if(grandchild_pid > 0) _exit(EXIT_SUCCESS); //parent exit
 		FILE *fd=fopen("/var/run/vpl-jail-server.pid","w");
 		fprintf(fd,"%d",(int)getpid());
 		fclose(fd);
 	}
 	Daemon(){
 		signal(SIGPIPE,SIG_IGN);
+		signal(SIGTERM,SIGTERMHandler);
+		listenSocket=-1;
+		secureListenSocket=-1;
 		configuration=Configuration::getConfiguration();
 		checkJail();
 		checkControlDir();
@@ -299,17 +292,19 @@ public:
 		close(daemon->listenSocket);
 		if(daemon->secureListenSocket>0){
 			close(daemon->secureListenSocket);
+			daemon->secureListenSocket=-1;
 		}
 		if(daemon->actualSocket>0){
 			close(daemon->actualSocket);
+			daemon->actualSocket=-1;
 		}
 	}
 	//Main loop: receive requests/dispatch and control child
-	void loop(){ //FIXME implement e adecuate exit
-		while(true){
+	void loop(){ //FIXME implement e adequate exit
+		while(!finishRequest){
 			accept(); //Accept one request waiting 20 msec
 			harvest(); //Process all dead childrens
-			//TODO check SIG_TERM and then clean close 
 		}
+		closeSockets();
 	}
 };
