@@ -40,7 +40,7 @@ void HttpJailServer::validateRequest(string path){
 	if(path != URLPath){
 		throw HttpException(notFoundCode
 				,"http request URL path not found"
-				, "unexpected path '"+path);
+				, "unexpected path '"+path+"'");
 	}
 }
 
