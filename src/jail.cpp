@@ -301,7 +301,11 @@ void Jail::process(Socket *socket){
 				string page="<!DOCTYPE html><html><body>OK</body></html>";
 				page += "<script>setTimeout(function(){window.close();},2000);</script>";
 				server.send200(page);
-				return;
+				_exit(EXIT_SUCCESS);
+			}
+			if(socket->getURLPath() == "/favicon.ico"){
+				server.sendCode(notFoundCode,"");
+				_exit(EXIT_SUCCESS);
 			}
 			server.validateRequest(httpURLPath);
 			string data=server.receive();
