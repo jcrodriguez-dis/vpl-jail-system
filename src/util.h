@@ -27,7 +27,11 @@
 #define VPL_WEXECUTION "vpl_wexecution"
 using namespace std;
 
-enum ExitStatus {success, internalError, httpError, websocketError};
+enum ExitStatus {success=EXIT_SUCCESS,
+				internalError=EXIT_FAILURE,
+				neutral,
+				httpError,
+				websocketError};
 
 struct ExecutionLimits{
 	int maxtime;
