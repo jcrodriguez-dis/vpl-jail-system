@@ -286,27 +286,41 @@ Jail::Jail(string IP){
 void Jail::process(Socket *socket){
 	syslog(LOG_INFO,"Start server version %s",Util::version());
 	string httpURLPath=configuration->getURLPath();
-	syslog(LOG_INFO,"urlpath for requests %s",httpURLPath.c_str());
 	HttpJailServer server(socket);
 	try{
 		socket->readHeaders();
-		if(socket->isSecure() && socket->headerSize()==0){
-			_exit(EXIT_SUCCESS);
+		if(socket->headerSize()==0){
+			if(socket->isSecure()){ //Don't count SSL error
+				_exit(static_cast<int>(neutral));
+			}else{
+				_exit(EXIT_FAILURE);
+			}
 		}
+		string httpMethod=socket->getMethod();
 		if(Util::toUppercase(socket->getHeader("Upgrade"))!="WEBSOCKET"){
-			syslog(LOG_INFO,"http request");
+			syslog(LOG_INFO,"http(s) request");
+			if(httpMethod=="GET" || httpMethod== "HEAD"){
+				if(socket->getURLPath() == "/OK"){
+					string page;
+					if(httpMethod=="GET"){
+						page="<!DOCTYPE html><html><body>OK</body></html>";
+						page += "<script>setTimeout(function(){window.close();},2000);</script>";
+					}
+					server.send200(page);
+					_exit(static_cast<int>(neutral));
+				}
+				if(socket->getURLPath() == "/favicon.ico"){
+					server.sendCode(notFoundCode,"");
+					_exit(static_cast<int>(neutral));
+				}else{
+					throw HttpException(notFoundCode,"Url path not found");
+				}
+			}
+			if(httpMethod != "POST"){
+				throw HttpException(badRequestCode,"http(s) Unsupported METHOD "+httpMethod);
+			}
 			if(!isValidIPforRequest())
 				throw HttpException(badRequestCode,"Client not allowed");
-			if(socket->getURLPath() == "/OK"){
-				string page="<!DOCTYPE html><html><body>OK</body></html>";
-				page += "<script>setTimeout(function(){window.close();},2000);</script>";
-				server.send200(page);
-				_exit(EXIT_SUCCESS);
-			}
-			if(socket->getURLPath() == "/favicon.ico"){
-				server.sendCode(notFoundCode,"");
-				_exit(EXIT_SUCCESS);
-			}
 			server.validateRequest(httpURLPath);
 			string data=server.receive();
 			XML xml(data);
@@ -350,7 +364,7 @@ void Jail::process(Socket *socket){
 			}
 		}else{ //Websocket
 			if(socket->getMethod() != "GET"){
-				throw "Unsupported METHOD "+socket->getMethod();
+				throw "ws(s) Unsupported METHOD "+httpMethod;
 			}
 			string URLPath=socket->getURLPath();
 			regex_t reg;
