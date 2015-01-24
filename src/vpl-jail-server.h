@@ -32,7 +32,7 @@ class Daemon{
 	struct {
 		int requests;
 		int errors;
-		int banned;
+		int rejected;
 	} statistics;
 	//Error log by IP
 	struct Log{
@@ -104,25 +104,28 @@ class Daemon{
 		cleanOld(); /* Fix by Guilherme Gomes */
 		if(logs.find(IP) != logs.end())
 			l=logs[IP];
-		bool banned=l.errors>20 && l.errors*2>l.requests;
-		if(banned)
-			statistics.banned++;
-		return banned;
+		return l.errors>20 && l.errors*2>l.requests;
+	}
+	void countRequest(string IP, ExitStatus es){
+		if(es == neutral){
+			return;
+		}
+		Log log;
+		if(logs.find(IP) != logs.end())
+			log=logs[IP];
+		log.requests++;
+		if( es != success ){
+			log.errors++;
+			statistics.errors++;
+		}
+		logs[IP]=log;
 	}
 	void processChildEnd(pid_t pid, ExitStatus es){
 		if(children.find(pid) == children.end())
 			syslog(LOG_ERR,"Child end, but pid not found");
 		Child c=children[pid];
 		children.erase(pid);
-		Log l;
-		if(logs.find(c.IP) != logs.end())
-			l=logs[c.IP];
-		l.requests++;
-		if( es != success ){
-			l.errors++;
-			statistics.errors++;
-		}
-		logs[c.IP]=l;
+		countRequest(c.IP,es);
 	}
 	//Check children finish and retrieve exit code
 	void harvest(){
@@ -164,8 +167,10 @@ class Daemon{
 		struct sockaddr_in client;
 		socklen_t slen=sizeof(client);
 		actualSocket = ::accept(listen,(struct sockaddr *)&client,&slen);
-		if(actualSocket < 0)
-			throw "Error accept";
+		if(actualSocket < 0){
+			syslog(LOG_ERR,"accept() Error:%d  %m", actualSocket);
+			return;
+		}
 		string IP;
 		char dst[INET_ADDRSTRLEN];
 		const char *d=inet_ntop(client.sin_family,&client.sin_addr,dst,INET_ADDRSTRLEN);
@@ -173,14 +178,13 @@ class Daemon{
 			IP=d;
 		if(isBanned(IP)){
 			close(actualSocket);
-			statistics.banned++;
-			throw "";
+			statistics.rejected++;
+			countRequest(IP,internalError);
 			syslog(LOG_ERR,"%s: Request rejected: IP banned", IP.c_str());
 			return;
 		}
 		fcntl(actualSocket,FD_CLOEXEC); //Close socket on execve
 		pid_t pid=fork();
-		Socket *socket;
 		if(pid==0){ //new process
 			Socket *socket=NULL;
 			close(listenSocket);
