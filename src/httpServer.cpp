@@ -27,20 +27,20 @@
  * Check request line and parse headers
  * @param input lines that form the request line and headers
  */
-void HttpJailServer::validateRequest(string path){
+void HttpJailServer::validateRequest(string expected_path){
 	if(socket->getMethod() != "POST"){
 		throw HttpException(notImplementedCode,
 				"http METHOD not implemented",socket->getMethod());
 	}
-	if(path == "")
-		path="/";
+	if(expected_path == "")
+		expected_path="/";
 	string URLPath=socket->getURLPath();
 	if(URLPath == "")
 		URLPath="/";
-	if(path != URLPath){
+	if(expected_path != URLPath){
 		throw HttpException(notFoundCode
 				,"http request URL path not found"
-				, "unexpected path '"+path+"'");
+				, "unexpected path '"+URLPath+"'");
 	}
 }
 
