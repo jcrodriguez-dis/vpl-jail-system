@@ -88,12 +88,14 @@ if [ "$LSYSTEM" == "1" ] ; then
 	vpl_install "LSB core" redhat-lsb-core
 	vpl_install "C++ compiler" make gcc gcc-c++
 	vpl_install "SSL library" openssl openssl-devel
+	vpl_install "Firewall" iptables
 	vpl_install "Window manager" metacity xterm
 	vpl_install "VNC server" tigervnc-server
 	vpl_install "Web browser" firefox
 else
 	vpl_install "C++ compiler" make g++
 	vpl_install "SSL library" openssl libssl-dev
+	vpl_install "Firewall" iptables
 	vpl_install "X system" xorg
 	vpl_install "VNC server" tightvncserver
 	vpl_install "Window manager" xfonts-75dpi xfonts-100dpi openbox
