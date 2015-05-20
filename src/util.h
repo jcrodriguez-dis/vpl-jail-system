@@ -490,7 +490,7 @@ public:
 	 * return server version
 	 */
 	static const char *version(){
-		return "2.1";
+		return "2.1.1";
 	}
 };
 
