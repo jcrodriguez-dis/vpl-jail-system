@@ -37,8 +37,8 @@ class SSLBase{
 			syslog(LOG_ERR,"SSL_CTX_new() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
-		if(SSL_CTX_use_certificate_file(context, certFile, SSL_FILETYPE_PEM) != 1){
-			syslog(LOG_ERR,"SSL_CTX_use_certificate_file() fail: %s",getError());
+		if(SSL_CTX_use_certificate_chain_file(context, certFile) != 1){
+			syslog(LOG_ERR,"SSL_CTX_use_certificate_chain_file() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
 		if(SSL_CTX_use_PrivateKey_file(context, keyFile, SSL_FILETYPE_PEM) != 1){
