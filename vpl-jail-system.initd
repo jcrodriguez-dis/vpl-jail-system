@@ -151,9 +151,9 @@ set_dev() {
 	create_device "$DEVPATH/urandom" 1 9
 	create_device "$DEVPATH/tty" 5 0
 	create_device "$DEVPATH/ptmx" 5 2
-	ln -s /proc/sef/fd/0 $DEVPATH/stdin
-	ln -s /proc/sef/fd/1 $DEVPATH/stdout
-	ln -s /proc/sef/fd/2 $DEVPATH/stderr
+	ln -s /proc/self/fd/0 $DEVPATH/stdin
+	ln -s /proc/self/fd/1 $DEVPATH/stdout
+	ln -s /proc/self/fd/2 $DEVPATH/stderr
 	set_other_noro /dev/pts
 }
 
