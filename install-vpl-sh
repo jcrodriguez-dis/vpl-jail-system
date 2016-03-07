@@ -73,7 +73,7 @@ function vpl_generate_selfsigned_certificate {
 	read A
 	if [ "$A" == "y" ] ; then
 		SUBJOPT=""
-		CERTSUBJ=""	
+		SUBJ=""	
 	fi
 	openssl req -new $SUBJOPT "$SUBJ" -key key.pem -out certini.pem -passin pass:12345678
 	#Remove key password
