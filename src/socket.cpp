@@ -231,12 +231,12 @@ void Socket::send(const string &data, bool async){
 	writeBuffer += data;
 	size_t size=writeBuffer.size();
 	const unsigned char *s=(const unsigned char *)writeBuffer.data();
-	syslog(LOG_INFO,"Sending %lu",(long unsigned int)size);
+	syslog(LOG_INFO,"Sending %lu to fd %u",(long unsigned int)size,socket);
 	size_t offset=0;
 	struct pollfd devices[1];
 	devices[0].fd=socket;
 	devices[0].events=POLLOUT;
-	const int wait=1; // 1 milisec
+	const int wait=10; // 10 milisec
 	const int bad=POLLERR|POLLHUP|POLLNVAL;
 	time_t timeLimit=time(NULL)+JAIL_SOCKET_TIMEOUT;
 	time_t fullTimeLimit=time(NULL)+JAIL_SOCKET_REQUESTTIMEOUT;
