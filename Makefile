@@ -259,15 +259,15 @@ OBJEXT = o
 PACKAGE = vpl-jail-system
 PACKAGE_BUGREPORT = 
 PACKAGE_NAME = vpl jail system
-PACKAGE_STRING = vpl jail system 2.1.1
+PACKAGE_STRING = vpl jail system 2.2.0
 PACKAGE_TARNAME = vpl-jail-system
 PACKAGE_URL = 
-PACKAGE_VERSION = 2.1.1
+PACKAGE_VERSION = 2.2.0
 PATH_SEPARATOR = :
 SET_MAKE = 
 SHELL = /bin/bash
 STRIP = 
-VERSION = 2.1.1
+VERSION = 2.2.0
 abs_builddir = /home/juanca/git/vpl-xmlrpc-jail
 abs_srcdir = /home/juanca/git/vpl-xmlrpc-jail
 abs_top_builddir = /home/juanca/git/vpl-xmlrpc-jail
@@ -312,7 +312,7 @@ top_build_prefix =
 top_builddir = .
 top_srcdir = .
 SUBDIRS = src
-dist_pkgdata_DATA = vpl_terminal_launcher.sh vpl_vnc_launcher.sh vpl_vnc_stopper.sh vpl-jail-system.initd vpl-jail-system.conf install-vpl-sh
+dist_pkgdata_DATA = vpl_terminal_launcher.sh vpl_vnc_launcher.sh vpl_batch_launcher.sh vpl_vnc_stopper.sh vpl-jail-system.initd vpl-jail-system.conf install-vpl-sh
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
