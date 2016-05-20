@@ -12,6 +12,7 @@
 	chmod 0600 $HOME/.vnc/passwd
 	cat >$HOME/.vnc/xstartup <<"END_OF_FILE"
 #!/bin/bash
+export TERM=xterm
 unset SESSION_MANAGER
 xrdb
 xsetroot -solid MidnightBlue 
