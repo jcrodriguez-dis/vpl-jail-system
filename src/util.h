@@ -20,6 +20,7 @@
 #include <string.h>
 #include <string>
 #include <map>
+#include "../config.h"
 #include "jail_limits.h"
 #include "httpException.h"
 
@@ -441,7 +442,7 @@ public:
 			const string fullname=dir+"/"+name;
 			lstat(fullname.c_str(),&filestat);
 			bool owned=filestat.st_uid == owner || filestat.st_gid == owner;
-			if(ent->d_type & DT_DIR){
+			if(S_ISDIR(filestat.st_mode)){
 				if(name != parent && name != me){
 					nunlink+=removeDir(fullname,owner,force||owned);
 					if((force || owned) && dirExists(fullname)){
@@ -490,7 +491,7 @@ public:
 	 * return server version
 	 */
 	static const char *version(){
-		return "2.1.1";
+		return VERSION;
 	}
 };
 
