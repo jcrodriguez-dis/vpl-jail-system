@@ -6,6 +6,7 @@
 #include <cassert>
 #include <iostream>
 #include "util.h"
+#include "configuration.h"
 using namespace std;
 void testBase64Encode(){
 	assert(Base64::encode("Hello")=="SGVsbG8="||(cerr <<Base64::encode("Hello")<<endl,0));
@@ -92,6 +93,16 @@ void testCorrectFileName(){
 	assert(Util::correctFileName("b"));
 	assert(Util::correctFileName("fichero con espacios. y varios . puntos"));
 }
+
+void testCleanPATH(){
+	assert(Configuration::generateCleanPATH("","")=="");
+	assert(Configuration::generateCleanPATH("/usr","")=="");
+	assert(Configuration::generateCleanPATH("","/usr:/usr/bin")=="/usr:/usr/bin");
+	assert(Configuration::generateCleanPATH("/usr","/bin")=="/bin");
+	assert(Configuration::generateCleanPATH("/usr","/bin:/kk:/sbin")=="/bin:/sbin");
+	assert(Configuration::generateCleanPATH("/usr","/bin:/kk:/sbin:/local/bin:/local/nada")=="/bin:/sbin:/local/bin");
+}
+
 int main(){
 	//Test util
 	testBase64Encode();
