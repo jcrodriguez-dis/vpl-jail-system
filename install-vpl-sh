@@ -18,7 +18,12 @@ if [ -f /sbin/chkconfig  ] && [ "$(command -v yum)" != "" ] ; then
 	echo "Detected RedHat or similar distribution (using chkconfig)" 
     function vpl_install_base {
         yum -y install $1 >>$LOGFILE
+        return $?
     }
+    function vpl_install_check {
+        yum list $1 &> /dev/null
+        return $?
+	}
     LSYSTEM="1"
 else
 	if [ -f /usr/sbin/update-rc.d ] && [ "$(command -v apt-get)" != "" ] ; then
@@ -27,6 +32,11 @@ else
 		apt-get update >>$LOGFILE
 	    function vpl_install_base {
             apt-get -q -y --allow-unauthenticated install $1 >>$LOGFILE
+            return $?
+	    }
+	    function vpl_install_check {
+            apt-cache pkgnames $1 | grep -q -x -F $1
+            return $?
 	    }
     	LSYSTEM="2"
     else
@@ -35,13 +45,29 @@ else
 	fi
 fi
 function vpl_install {
-   echo "Installing $1:"
-   shift
-   while [ "$#" != "0" ] ; do
-   	   echo "     $1"
-       vpl_install_base $1
+	local found=1
+	local checked=""
+	echo -n "Installing $1: "
+	shift
+	while [ "$#" != "0" ] ; do
+		checked="$checked $1"
+   		vpl_install_check $1
+		if [ $? -eq 0 ] ; then
+	   	   echo -n $1
+	       vpl_install_base $1
+	   	   if [ $? -eq 0 ] ; then
+	   	   		echo " [OK]"
+	   	   else
+	   	   		echo " [ERROR]"
+	   	   fi
+	       found=0
+	       break
+   	   fi
        shift
    done
+   if [ $found -eq 1 ] ; then
+   	   echo "[Package not found. Checked $checked"
+   fi
 }
 
 function vpl_installq {
@@ -55,27 +81,29 @@ function vpl_installq {
 
 function vpl_generate_selfsigned_certificate {
 	local A=""
-	echo "Generating self-signed SSL certificate"
+	local HNAMEW=$(hostname --long| sed 's/^[^\.]*/\*/g')
+	local HNAME=$(hostname --long)
+	local INAME
+	echo "Generating self-signed SSL certificate for $HNAME machine"
 	#Get host name to generate the certificate
-	echo -n "Do you want a certificate with wildcard for a set of servers (eg. *.s.com)? (y/n)"
+	echo -n "Do you want a certificate with wildcard for a set of servers ($HNAMEW)? (y/n)"
 	read A
 	if [ "$A" == "y" ] ; then
-		INAME=$(hostname --long| sed 's/^[^\.]*/\*/g')
+		INAME=$HNAMEW
 	else
-		INAME=$(hostname --long)
+		INAME=$HNAME
 	fi
 	#Generate key
 	openssl genrsa -passout pass:12345678 -des3 -out key.pem 1024
 	#Generate certificate for this server
-	local SUBJOPT="-subj"
-	local SUBJ="/C=ES/ST=State/L=Location/O=VPL/OU=Execution server/CN=$INAME"
 	echo -n "Do you want to customize the certificate info? (y/n)"
 	read A
 	if [ "$A" == "y" ] ; then
-		SUBJOPT=""
-		SUBJ=""	
+		openssl req -new -key key.pem -out certini.pem -passin pass:12345678
+	else
+		local SUBJ="/C=ES/ST=State/L=Location/O=VPL/OU=Execution server/CN=$INAME"
+		openssl req -new -subj "$SUBJ" -key key.pem -out certini.pem -passin pass:12345678
 	fi
-	openssl req -new $SUBJOPT "$SUBJ" -key key.pem -out certini.pem -passin pass:12345678
 	#Remove key password
 	cp key.pem keyini.pem
 	openssl rsa -in keyini.pem -out key.pem -passin pass:12345678
@@ -86,19 +114,27 @@ echo "Installation log file => $LOGFILE"
 echo "Preparing the installation"
 if [ "$LSYSTEM" == "1" ] ; then
 	vpl_install "LSB core" redhat-lsb-core
-	vpl_install "C++ compiler" make gcc gcc-c++
-	vpl_install "SSL library" openssl openssl-devel
+	vpl_install "make" make
+	vpl_install "C compiler" gcc
+	vpl_install "C++ compiler" gcc-c++
+	vpl_install "SSL library" openssl
+	vpl_install "SSL library" openssl-devel
 	vpl_install "Firewall" iptables
-	vpl_install "Window manager" metacity xterm
+	vpl_install "Window manager" metacity
+	vpl_install "xterm" xterm
 	vpl_install "VNC server" tigervnc-server
 	vpl_install "Web browser" firefox
 else
-	vpl_install "C++ compiler" make g++
-	vpl_install "SSL library" openssl libssl-dev
+	vpl_install "make" make
+	vpl_install "C++ compiler" g++
+	vpl_install "SSL library" openssl
+	vpl_install "SSL library" libssl-dev
 	vpl_install "Firewall" iptables
 	vpl_install "X system" xorg
 	vpl_install "VNC server" tightvncserver
-	vpl_install "Window manager" xfonts-75dpi xfonts-100dpi openbox
+	vpl_install "Fonts" xfonts-75dpi
+	vpl_install "Fonts" xfonts-100dpi
+	vpl_install "Window manager" openbox
 	vpl_install "Configuration DB system" gconf2
 	gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
 	vpl_install "Web browser" firefox
@@ -148,7 +184,7 @@ if [ ! -f $VPLJAIL_INSTALL_DIR/cert.pem ] ; then
 		rm key.pem keyini.pem certini.pem cert.pem
 	fi
 else
-	echo "Found SSL certificate => Don't create new one"
+	echo "Found SSL certificate => Don't create a new one"
 fi
 if [ "$LSYSTEM" = "1" ] ; then
 	#Add service
@@ -159,29 +195,24 @@ if [ "$LSYSTEM" = "1" ] ; then
         vpl_install "Ada compiler (GNU)" gcc-gnat
         vpl_install "Assembler" nasm
         vpl_install "C compiler (GNU)" gcc
-        #vpl_install "C# development framework (mono)" mono-complete monodevelop monodevelop-debugger-gdb
-        #vpl_install "DDD graphical front end debugger (GNU)" ddd
         vpl_install "Fortran compiler (GNU)" gcc-gfortran
         vpl_install "General purpose debugger (GNU)" gdb
-        #vpl_install "Haskell 98 interpreter" hugs
-        vpl_install "Java (OpenJDK7)" java-1.7.0-openjdk-devel
-        vpl_install "Junit framework" junit junit4
-        #vpl_install "Octave (GNU)" octave
-        #vpl_install "Pascal compiler" fp-compiler
+        vpl_install "Java (OpenJDK)" java-1.8.0-openjdk-devel java-1.7.0-openjdk-devel
+        vpl_install "Junit framework" junit
         vpl_install "Perl interpreter" perl
         vpl_install "PHP interpreter" php-cli
         vpl_install "Prolog" pl
         vpl_install "Python interpreter" python
         vpl_install "Ruby interpreter" ruby
-        #vpl_install "Scala programming language" scala
-        #vpl_install "Scheme interpreter" plt-scheme
         vpl_install "SQL interpreter" sqlite
         vpl_install "TCL interpreter" tcl
         vpl_install "Valgrind tool" valgrind
     fi
+    echo "IMPORTANT: Please, set properly the ENVPATH in the config file /etc/vpl/vpl-jail-system.conf" 
+    echo "           e.g. \"ENVPATH=/usr/bin:/bin\" and restart the service"
 else
     update-rc.d -f vpl-jail-system remove >>$LOGFILE
-    update-rc.d vpl-jail-system start 50 2 3 4 5 . stop 50 0 1 6 . >>$LOGFILE
+    update-rc.d vpl-jail-system defaults >>$LOGFILE
     echo "Do you want to install development software?"
     echo "  (Ada, Assambler, C, C++, C#, DDD, Fortran, gdb, Haskell, Java, "
     echo "   JUnit, Node.js, Octave, Pascal, Perl, PHP, Python, Ruby, Scala,"
@@ -198,20 +229,24 @@ else
         vpl_install "Ada compiler (GNU)" gnat
         vpl_install "Assembler" nasm
         vpl_install "C compiler (GNU)" gcc
-        vpl_install "C# development framework (mono)" mono-complete monodevelop monodevelop-debugger-gdb
+        vpl_install "C# development framework (mono)" mono-complete
         vpl_install "DDD graphical front end debugger (GNU)" ddd
         vpl_install "Fortran compiler (GNU)" gfortran
         vpl_install "General purpose debugger (GNU)" gdb
         vpl_install "Haskell 98 interpreter" hugs
-        vpl_install "Java (OpenJDK7)" openjdk-7-jdk checkstyle
-        vpl_install "Junit framework" junit junit4
-        vpl_install "JavaScript Node.js" nodejs
+        vpl_install "Java (OpenJDK)" default-jdk openjdk-7-jdk
+        vpl_install "Java Checkstyle" checkstyle
+        vpl_install "Junit framework" junit4 junit
+        vpl_install "JavaScript (Node.js)" nodejs
         vpl_install "Octave (GNU)" octave
         vpl_install "Pascal compiler" fp-compiler
         vpl_install "Perl interpreter" perl
-        vpl_install "PHP interpreter" php5-cli php5-sqlite
+        vpl_install "PHP interpreter" php-cli php5-cli
+        vpl_install "Sqlite for PHP" php-sqlite3 php5-sqlite
         vpl_install "Prolog" swi-prolog
         vpl_install "Python interpreter" python pydb python-tk
+        vpl_install "Python pydb" pydb
+        vpl_install "Python tk" python-tk
         vpl_install "Ruby interpreter" ruby
         vpl_install "Scala programming language" scala
         vpl_install "Scheme interpreter" plt-scheme
@@ -222,18 +257,18 @@ else
     if [ "$A2" != "n" ] ; then
     	echo "This installation may take a long time"
     	vpl_install "Clisp" clisp
-        vpl_install "Clojure" clojure1.4
+        vpl_install "Clojure" clojure1.6 clojure1.4
         vpl_install "Cobol" open-cobol
         vpl_install "CoffeeScript" coffeescript
         vpl_install "D compiler (GNU)" gdc
         vpl_install "Erlang" erlang
         vpl_install "Go programming language compiler" golang
         vpl_install "Haxe programming language" haxe
-        vpl_install "JQuery JavaScript Lib" libjs-jquery libjs-jquery-ui 
+        vpl_install "JQuery JavaScript Lib" libjs-jquery
+        vpl_install "JQuery-UI JavaScript Lib" libjs-jquery-ui 
         vpl_install "Lua compiler 5.1" lua5.1
         vpl_install "R statistical computation and graphics system (GNU)" r-base
         vpl_install "XQuery interpreter" galax
-        #vpl_install "Expect tool" expect
         vpl_install "VHDL compiler" freehdl
         #vpl_install "Groovy programming language" groovy
     fi
@@ -251,5 +286,6 @@ else
     	fi
     fi
 fi
+echo "Starting the service (vpl-jail-system)"
 service vpl-jail-system start
 
