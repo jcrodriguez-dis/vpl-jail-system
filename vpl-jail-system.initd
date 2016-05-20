@@ -47,8 +47,8 @@ LOGFILE=/etc/vpl/vpl-jail-service.log
 DEAMON=/etc/vpl/vpl-jail-server
 PIDFILE=/var/run/vpl-jail-server.pid
 NOMOUNT="^vpl|^init|^ldap|^udev|grub|^rc[0-6S]|^pam|^cron|^apm|^logrotate"
-NOMOUNT="$NOMOUNT|^mail|^rsyslog|^security|^ssl|^ssh|^update"
-read_config(){
+NOMOUNT="$NOMOUNT|^mail|^rsyslog|^shadow|^security|^ssl|^ssh|^update"
+read_config_var(){
 	local FILE=$1
 	shift
 	while (( "$#" )); do
@@ -79,6 +79,16 @@ create_check_dir() {
 
 set_etc() {
 	create_check_dir "$JAILPATH/etc" 755
+	#Copy config files in /etc
+	for CONF in $(ls -f /etc/*)
+	do
+		local CONFNAME=$(basename "$CONF")
+		echo "$CONFNAME" | grep -q -E "$NOMOUNT"
+		if [ $? = 1 -a -f $CONF ] ; then
+			cp -a -L $CONF  "$JAILPATH/etc/$CONFNAME"
+			chmod a-x "$JAILPATH/etc/$CONFNAME"
+		fi
+	done
 	#passwd file
 	local PASSWORDFILE="$JAILPATH/etc/passwd"
 	local I
@@ -88,7 +98,7 @@ set_etc() {
 	done
 	chmod 644 "$PASSWORDFILE"
 	#group file
-	GROUPFILE="$JAILPATH/etc/group"
+	local GROUPFILE="$JAILPATH/etc/group"
 	echo "root:*:0:root" > "$GROUPFILE"
 	for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
 		echo "p$I:*:$I:p$I" >> "$GROUPFILE"
@@ -104,20 +114,10 @@ set_etc() {
 	chmod -R a-s $JAILPATH/etc/*
 	for DIR in $(ls -d /etc/*)
 	do
-		DIRNAME=$(basename "$DIR")
+		local DIRNAME=$(basename "$DIR")
 		echo "$DIRNAME" | grep -q -E "$NOMOUNT"
 		if [ $? = 1 -a -d $DIR ] ; then
 			set_other $DIR
-		fi
-	done
-	#Copy /etc/*.conf files
-	for CONF in $(ls -f /etc/*.conf)
-	do
-		CONFNAME=$(basename "$CONF")
-		echo "$CONFNAME" | grep -q -E "$NOMOUNT"
-		if [ $? = 1 -a -f $CONF ] ; then
-			cp -a -L $CONF  "$JAILPATH/etc/$CONFNAME"
-			chmod a-x "$JAILPATH/etc/$CONFNAME"
 		fi
 	done
 }
@@ -151,14 +151,14 @@ set_dev() {
 	create_device "$DEVPATH/urandom" 1 9
 	create_device "$DEVPATH/tty" 5 0
 	create_device "$DEVPATH/ptmx" 5 2
-	ln -s /proc/sef/fd/0 $DEVPATH/stdin
-	ln -s /proc/sef/fd/1 $DEVPATH/stdout
-	ln -s /proc/sef/fd/2 $DEVPATH/stderr
+	ln -s /proc/self/fd/0 $DEVPATH/stdin
+	ln -s /proc/self/fd/1 $DEVPATH/stdout
+	ln -s /proc/self/fd/2 $DEVPATH/stderr
 	set_other_noro /dev/pts
 }
 
 unset_dev() {
-	DEVPATH="$JAILPATH/dev"
+	local DEVPATH="$JAILPATH/dev"
 	unset_other /dev/pts
 	rm -Rf $DEVPATH
 }
@@ -225,7 +225,7 @@ set_firewall() {
 #2: VPL service+DNS+ Limit internet to port 80 and 443 (super user unlimited)
 #3: VPL service+No internet to normal users (super user unlimited)
 #4: VPL service+No internet to all users (No graphics, only console execution)
-	local OWN=127.0.0.0/8
+	local OWN="127.0.0.0/8,$(hostname -I)"
 	if [ "$FIREWALL" \> "0" ] ; then
 		iptables -N VPL_LOG
 		iptables -N VPL_IN 
@@ -234,28 +234,28 @@ set_firewall() {
 		[ "$1" != "" ] && (iptables -A VPL_LOG -m limit --limit 20/minute -j LOG --log-prefix "VPL packet dropped: " --log-level 7)
 		iptables -A VPL_LOG -j DROP
 		#input
-		iptables -A VPL_IN -p tcp -m conntrack --ctstate ESTABLISHED -j ACCEPT
+		iptables -A VPL_IN -p tcp -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 		#Avoid auto request to vpl service
-		iptables -A VPL_IN -p tcp -m multiport -i lo -o etho0 --dports $PORT,$SECURE_PORT -j VPL_LOG
+		iptables -A VPL_IN -p tcp -m multiport -s $OWN -d $OWN --dports $PORT,$SECURE_PORT -j VPL_LOG
 		#Accept connection to vpl service
 		iptables -A VPL_IN -p tcp -m multiport --dports $PORT,$SECURE_PORT -j ACCEPT
 		#Accept local conections
-		iptables -A VPL_IN -p tcp -i lo -j ACCEPT
+		iptables -A VPL_IN -p tcp -s $OWN -j ACCEPT
 		#DNS query
 		[ "$FIREWALL" \< "3" ] && (iptables -A VPL_IN -p udp --sport 53 -j ACCEPT)
 		[ "$FIREWALL" \< "3" ] && (iptables -A VPL_IN -p tcp --sport 53 -j ACCEPT)
 		iptables -A VPL_IN -j VPL_LOG
 		#Output
 		#Accept established connections
-		iptables -A VPL_OUT -p tcp -m conntrack --ctstate ESTABLISHED -j ACCEPT
+		iptables -A VPL_OUT -p tcp -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 		#Accept all from super user
 		[ "$FIREWALL" \< "4" ] && (iptables -A VPL_OUT -m owner --uid-owner 0 -j ACCEPT)
 		#Drop auto connections to VPL service
-		iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -m multiport -i lo -o eth0 --dports $PORT,$SECURE_PORT -j VPL_LOG
+		iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -m multiport -s $OWN -d $OWN --dports $PORT,$SECURE_PORT -j VPL_LOG
 		#Accept request to internet
-		[ "$FIREWALL" == "1" ] && (iptables -A VPL_OUT -p tcp -o eth0 -m conntrack --ctstate NEW -j ACCEPT)
+		[ "$FIREWALL" == "1" ] && (iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -j ACCEPT)
 		#Accept request to internet only 80,443
-		[ "$FIREWALL" == "2" ] && (iptables -A VPL_OUT -p tcp -o eth0 -m conntrack --ctstate NEW -m multiport --dports 80,443 -j ACCEPT)
+		[ "$FIREWALL" == "2" ] && (iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -m multiport --dports 80,443 -j ACCEPT)
 		#Accept DNS requests
 		[ "$FIREWALL" \< "3" ] && (iptables -A VPL_OUT -p udp --dport 53 -j ACCEPT)
 		[ "$FIREWALL" \< "3" ] && (iptables -A VPL_OUT -p tcp --dport 53 -j ACCEPT)
@@ -268,7 +268,8 @@ set_firewall() {
 }
 
 unset_firewall() {
-	if [ "$FIREWALL" \> "0" ] ; then
+	#try to remove the VPL config in any case
+	{
 		iptables -D INPUT -j VPL_IN
 		iptables -F VPL_IN
 		iptables -X VPL_IN
@@ -277,6 +278,33 @@ unset_firewall() {
 		iptables -X VPL_OUT
 		iptables -F VPL_LOG
 		iptables -X VPL_LOG
+	} &> /dev/null
+}
+
+read_config() {
+	local VPLJAIL_INSTALL_DIR=/etc/vpl
+	case "$1" in
+  		start)
+			local CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf"
+			cp "$CONFIG_FILE" "$CONFIG_FILE.LAST"
+        ;;
+  		stop)
+        	local CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf.LAST"
+        ;;
+	esac
+	if [ ! -f "$CONFIG_FILE" ] ; then
+		CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf"
+	fi  
+	#Load config file
+	if [ -f "$CONFIG_FILE" ] ; then
+		read_config_var "$CONFIG_FILE" JAILPATH /jail
+		read_config_var "$CONFIG_FILE" MIN_PRISONER_UGID 10000 MAX_PRISONER_UGID 20000
+		read_config_var "$CONFIG_FILE" CONTROLPATH /var/vpl-jail-system
+		read_config_var "$CONFIG_FILE" PORT 80 SECURE_PORT 443
+		read_config_var "$CONFIG_FILE" FIREWALL 0
+	else
+		log_failure_msg $"vpl-jail-system config file not found: $CONFIG_FILE"
+		exit 1
 	fi
 }
 
@@ -285,6 +313,7 @@ start_vpl() {
 		stop_vpl
 	fi
 	{
+		read_config start
 		create_check_dir "$JAILPATH" 0755
 		#Check $JAILPATH not been "/"
 		if [ -d "$JAILPATH" ] ; then
@@ -314,6 +343,7 @@ start_vpl() {
 
 stop_vpl() {
 	{
+		read_config stop
 		killproc /etc/vpl/vpl-jail-server 15
 		if [ -f $PIDFILE ] ; then
 			rm $PIDFILE
@@ -334,20 +364,6 @@ stop_vpl() {
 	} 2>> $LOGFILE
 	log_success_msg $"Stopping vpl-jail-system service:"
 }
-
-VPLJAIL_INSTALL_DIR=/etc/vpl
-CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf"
-#Load config file
-if [ -f "$CONFIG_FILE" ]; then
-	read_config "$CONFIG_FILE" JAILPATH /jail
-	read_config "$CONFIG_FILE" MIN_PRISONER_UGID 10000 MAX_PRISONER_UGID 20000
-	read_config "$CONFIG_FILE" CONTROLPATH /var/vpl-jail-system
-	read_config "$CONFIG_FILE" PORT 80 SECURE_PORT 443
-	read_config "$CONFIG_FILE" FIREWALL 0
-else
-	log_failure_msg $"vpl-jail-system config file not found: $CONFIG_FILE"
-	exit 1
-fi
 
 echo "===== vpl-jail-system ====== $1 $2 $3" >> $LOGFILE
 date >> $LOGFILE
