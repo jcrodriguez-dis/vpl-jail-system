@@ -9,7 +9,30 @@
 #include "configurationFile.h"
 
 #include "jail_limits.h"
+#include "util.h"
 Configuration *Configuration::singlenton=0;
+string Configuration::generateCleanPATH(string jailPath, string dirtyPATH){
+	string dir;
+	size_t pos=0, found;
+	string cleanPATH="";
+	while(true){
+		if((found=dirtyPATH.find(':',pos)) != string::npos){
+			dir=dirtyPATH.substr(pos,found-pos);
+		}else{
+			dir=dirtyPATH.substr(pos);
+		}
+		if(Util::dirExists(jailPath+dir)){
+			if(cleanPATH.size()>0){
+				cleanPATH+=':';
+			}
+			cleanPATH+=dir;
+		}
+		if(found == string::npos) return cleanPATH;
+		pos=found+1;
+	}
+	return "";
+}
+
 void Configuration::checkConfigFile(string fileName, string men){
 	struct stat info;
 	if(lstat(fileName.c_str(),&info))
@@ -36,6 +59,7 @@ void Configuration::readConfigFile(){
 	configDefault["PORT"]="80";
 	configDefault["SECURE_PORT"]="443";
 	configDefault["URLPATH"]="/";
+	configDefault["ENVPATH"]=Util::getEnv("PATH");
 	ConfigData data=ConfigurationFile::readConfiguration(configPath,configDefault);
 	minPrisoner = atoi(data["MIN_PRISONER_UGID"].c_str());
 	if(minPrisoner < JAIL_MIN_PRISIONER_UID)
@@ -79,12 +103,14 @@ void Configuration::readConfigFile(){
 	port=atoi(data["PORT"].c_str());
 	sport=atoi(data["SECURE_PORT"].c_str());
 	URLPath = data["URLPATH"];
+	cleanPATH = data["ENVPATH"];
 }
 
 Configuration::Configuration(){
 	configPath="/etc/vpl/vpl-jail-system.conf";
 	checkConfigFile(configPath,"Config file");
 	readConfigFile();
+	cleanPATH=generateCleanPATH(getJailPath(),cleanPATH);
 }
 
 

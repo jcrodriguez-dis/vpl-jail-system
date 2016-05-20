@@ -17,6 +17,7 @@ private:
 	static Configuration* singlenton;
 	ExecutionLimits jailLimits;
 	string jailPath;   //Path to jail file system
+	string cleanPATH; //Path environment variable cleaned
 	string configPath; //Path to configuration file
 	string controlPath; //Path to the control directory
 	uid_t  minPrisoner, maxPrisoner; //uid prisoner selection limits
@@ -33,8 +34,10 @@ public:
 		if(singlenton == NULL) singlenton= new Configuration();
 		return singlenton;
 	}
+	static string generateCleanPATH(string jailPath, string dirtyPATH);
 	ExecutionLimits getLimits(){ return jailLimits;}
 	string getJailPath(){ return jailPath;}
+	string getCleanPATH(){ return cleanPATH;}
 	string getControlPath(){ return controlPath;}
 	size_t getMinPrisioner(){ return minPrisoner;}
 	size_t getMaxPrisioner(){ return maxPrisoner;}
