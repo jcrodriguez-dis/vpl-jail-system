@@ -12,6 +12,7 @@
 #include <limits>
 #include <cstring>
 #include <algorithm>
+#include <exception>
 #include <sys/types.h>
 #include <dirent.h>
 #include <sys/socket.h>
@@ -81,7 +82,12 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 			if(!interactive && pm.FileExists(VPL_EXECUTION)){
 				pm.setRunner();
 				syslog(LOG_INFO,"Non interactive execution");
-				string executionOutput=run(pm,VPL_EXECUTION);
+				string program;
+				if(pm.installScript(".vpl_launcher.sh","vpl_batch_launcher.sh"))
+					program=".vpl_launcher.sh";
+				else
+					program=VPL_EXECUTION;
+				string executionOutput=run(pm,program);
 				syslog(LOG_INFO,"Write execution result");
 				pm.setExecutionOutput(executionOutput,true);
 			}
@@ -313,7 +319,7 @@ void Jail::process(Socket *socket){
 					server.sendCode(notFoundCode,"");
 					_exit(static_cast<int>(neutral));
 				}else{
-					throw HttpException(notFoundCode,"Url path not found");
+					throw HttpException(notFoundCode,"Url path not found '"+socket->getURLPath()+"'");
 				}
 			}
 			if(httpMethod != "POST"){
@@ -388,6 +394,10 @@ void Jail::process(Socket *socket){
 		syslog(LOG_ERR,"%s:%s",IP.c_str(),exception.getLog().c_str());
 		server.sendCode(exception.getCode(),exception.getMessage());
 	}
+	catch(std::exception &e){
+		syslog(LOG_ERR,"%s:Unexpected exception %s on %s:%d",IP.c_str(), e.what(),__FILE__,__LINE__);
+		server.sendCode(internalServerErrorCode,"Unknown error");
+	}
 	catch(string &exception){
 		syslog(LOG_ERR,"%s:%s",IP.c_str(),exception.c_str());
 		server.sendCode(internalServerErrorCode,exception);
@@ -440,9 +450,9 @@ void Jail::transferExecution(processMonitor &pm, string fileName){
 	string uid=Util::itos(pm.getPrisonerID());
 	string HOME="HOME=/home/p"+uid;
 	env[nenv++]=(char *)HOME.c_str();
-	string PATH="PATH="+Util::getEnv("PATH");
+	string PATH="PATH="+configuration->getCleanPATH();
 	env[nenv++]=(char *)PATH.c_str();
-	env[nenv++]=(char *)"TERM=xterm";
+	env[nenv++]=(char *)"TERM=dumb";
 	string UID="UID="+uid;
 	env[nenv++]=(char *)UID.c_str();
 	string USER="USER=p"+uid;
