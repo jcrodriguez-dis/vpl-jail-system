@@ -13,6 +13,7 @@ using namespace std;
 #include <wait.h>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 #include "lock.h"
 #include "processMonitor.h"
 #include "vpl-jail-server.h"
@@ -560,7 +561,9 @@ void processMonitor::freeWatchDog(){
 void processMonitor::setOutputFilenames(vector<string> filenames) {
     string output;
     for(vector<string>::const_iterator it = filenames.begin(); it != filenames.end(); ++it){
-        output += *it;
+		string filename = *it;
+		replace(filename.begin(), filename.end(), '\n', ' ');
+		output += filename;
         output += "\n";
     }
 
