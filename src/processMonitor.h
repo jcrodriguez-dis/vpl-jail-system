@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include <string>
+#include <vector>
 using namespace std;
 #include "configurationFile.h"
 #include "configuration.h"
@@ -46,14 +47,21 @@ class processMonitor{
 	void removePrisonerHome();
 	static void catchSIGTERM(int n){}
 	void limitResultSize(string &);
+
 	void setControlPath(){
 		processControlPath=configuration->getControlPath()+"/p"+Util::itos(getPrisonerID());
 	}
+
 	string getControlPath(){
 		return processControlPath;
 	}
+
 	string getControlPath(string name){
 		return processControlPath+"/"+name;
+	}
+
+	string getHomePath(string name){
+		return getHomePath()+"/"+name;
 	}
 public:
 	processMonitor(string & adminticket, string & monitorticket, string & executionticket);
@@ -91,9 +99,10 @@ public:
 	uint64_t getMemoryUsed();
 	string getMemoryLimit();
 	string getCompilation();
-	void getResult(string &compilation, string &execution, bool &executed);
+	void getResult(string &compilation, string &execution, map<string, string> &outputfiles, bool &executed);
 	void setCompilationOutput(const string &compilation);
 	void setExecutionOutput(const string &execution, bool executed);
 	void freeWatchDog();
+	void setOutputFilenames(vector<string> filenames);
 };
 #endif

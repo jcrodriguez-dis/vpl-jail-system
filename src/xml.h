@@ -74,6 +74,9 @@ public:
 		string getString() const {
 			if(tag=="string" || tag =="name")
 				return XML::decodeXML(getContent());
+			if(tag == "base64")
+				return Base64::decode(getContent());
+
 			throw HttpException(badRequestCode
 					,"RPC/XML parse type error",
 					"expected string or name  and found "+tag);

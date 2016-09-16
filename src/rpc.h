@@ -43,6 +43,14 @@ public:
 				"</int></value>\n"
 				"</member>\n";
 	}
+	static string responseMemberBase64(string name, const string & value){
+		return "<member><name>"
+			   +name+"</name>\n"
+					   "<value><base64>"
+			   + Base64::encode(value) +
+			   "</base64></value>\n"
+					   "</member>\n";
+	}
 	/**
 	 * return a ready response
 	 */
@@ -70,12 +78,22 @@ public:
 		return responseWraper(response);
 	}
 
-	static string getResultResponse(const string &compilation,const string & execution, bool executed,bool interactive){
+	static string getResultResponse(const string &compilation, const string &execution, const map<string, string> &outputFiles, bool executed, bool interactive){
 		string response;
 		response += responseMember("compilation",compilation);
 		response += responseMember("execution",execution);
 		response += responseMember("executed",(executed?1:0));
 		response += responseMember("interactive",(interactive?1:0));
+
+		// load output files
+		if (!outputFiles.empty()) {
+			response += "<member><name>outputfiles</name><value><struct>";
+			for (map<string, string>::const_iterator it = outputFiles.begin(); it!=outputFiles.end(); ++it) {
+                response += responseMemberBase64(it->first, it->second);
+			}
+			response +=	"</struct></value></member>";
+		}
+
 		return responseWraper(response);
 	}
 	static string runningResponse(bool running){
@@ -118,6 +136,23 @@ public:
 		throw HttpException(badRequestCode
 				,"RPC/XML getStructMembers parse error");
 	}
+
+	/**
+	 * Returns vector of names forming a struct. If the root is not a struct, the empty vector is returned.
+	 * @param st root node of a struct
+	 * @return vector of names.
+	 */
+	static vector<string> getStructMemberNames(const XML::TreeNode *st) {
+		vector<string> result;
+		if(st->getName() == "struct"){
+			for(size_t i=0; i< st->nchild(); i++){
+				result.push_back(st->child(i)->child("name")->getString());
+			}
+		}
+
+		return result;
+	}
+
 	/**
 	 * return struct of method call data as mapstruct
 	 */
@@ -135,6 +170,5 @@ public:
 	static mapstruct getFiles(const XML::TreeNode *files){
 		return getStructMembers(files);
 	}
-
 };
 #endif

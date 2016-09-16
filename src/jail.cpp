@@ -45,10 +45,22 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 	pid_t pid=fork();
 	if(pid==0){ //new process
 		syslog(LOG_INFO,"parse files %lu",(long unsigned int)parsedata.size());
-		mapstruct files=RPC::getFiles(parsedata["files"]);
-		mapstruct filestodelete=RPC::getFiles(parsedata["filestodelete"]);
 		string script=parsedata["execute"]->getString();
+
+		// Retrieve lists of filenames submitted as names of struct members
+		mapstruct::iterator mapentry;
+		vector<string> filestodelete;
+		mapentry = parsedata.find("filestodelete");
+		if (mapentry != parsedata.end()) {
+			filestodelete = RPC::getStructMemberNames(mapentry->second);
+		}
+		mapentry = parsedata.find("outputfiles");
+		if (mapentry != parsedata.end()) {
+            pm.setOutputFilenames(RPC::getStructMemberNames(mapentry->second));
+		}
+
 		//Retrieve files to execution dir and options
+		mapstruct files=RPC::getFiles(parsedata["files"]);
 		for(mapstruct::iterator i=files.begin(); i!=files.end(); i++){
 			string name=i->first,data=i->second->getString();
 			syslog(LOG_INFO,"Write file %s data size %lu",name.c_str(),(long unsigned int)data.size());
@@ -67,15 +79,17 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 		bool interactive=parsedata["interactive"]->getInt()>0;
 		syslog(LOG_DEBUG,"interactive %d",parsedata["interactive"]->getInt());
 		pm.setExtraInfo(executionLimits,interactive,vpl_lang);
+
 		pm.setCompiler();
 		syslog(LOG_INFO,"Compilation");
 		string compilationOutput=run(pm,script);
 		pm.setCompilationOutput(compilationOutput);
 		bool compiled=pm.FileExists(VPL_EXECUTION)||pm.FileExists(VPL_WEXECUTION);
+
 		if(compiled){
 			//Delete files
-			for(mapstruct::iterator i=filestodelete.begin(); i!=filestodelete.end(); i++){
-				string name=i->first;
+			for(vector<string>::iterator i=filestodelete.begin(); i!=filestodelete.end(); i++){
+				string name=*i;
 				syslog(LOG_INFO,"Delete file %s",name.c_str());
 				pm.deleteFile(name);
 			}
@@ -97,9 +111,9 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 		_exit(EXIT_SUCCESS);
 	}
 }
-void Jail::commandGetResult(string adminticket,string &compilation,string &execution, bool &executed, bool &interactive){
+void Jail::commandGetResult(string adminticket,string &compilation,string &execution, map<string, string> &outputFiles, bool &executed, bool &interactive){
 	processMonitor pm(adminticket);
-	pm.getResult(compilation,execution,executed);
+	pm.getResult(compilation, execution, outputFiles, executed);
 	interactive=pm.isInteractive();
 }
 bool Jail::commandRunning(string adminticket){
@@ -351,10 +365,11 @@ void Jail::process(Socket *socket){
 						,configuration->getPort(),configuration->getSecurePort()));
 			}else if(request=="getresult"){
 				string adminticket,compilation,execution;
-				bool executed,interactive;
+                map<string, string> outputFiles;
+                bool executed,interactive;
 				adminticket=parsedata["adminticket"]->getString();
-				commandGetResult(adminticket, compilation, execution,executed,interactive);
-				server.send200(RPC::getResultResponse(compilation,execution,executed,interactive));
+				commandGetResult(adminticket, compilation, execution, outputFiles, executed, interactive);
+				server.send200(RPC::getResultResponse(compilation, execution, outputFiles, executed, interactive));
 			}else if(request=="running"){
 				string adminticket;
 				adminticket=parsedata["adminticket"]->getString();
