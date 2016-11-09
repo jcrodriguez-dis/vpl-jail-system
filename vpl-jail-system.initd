@@ -123,13 +123,13 @@ set_etc() {
 }
 
 unset_etc() {
+	rm -Rf $JAILPATH/etc/profile.d
 	for DIR in $(ls -d /etc/*)
 	do
 		if [ -d $DIR -a -d "$JAILPATH$DIR" ] ; then
 			unset_other $DIR
 		fi
 	done
-	rm -Rf $JAILPATH/etc/profile.d
 	rm -f $JAILPATH/etc/*
 }
 
