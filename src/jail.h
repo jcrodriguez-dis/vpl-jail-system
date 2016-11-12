@@ -43,7 +43,7 @@ class Jail{
 	//Action commands
 	string commandAvailable(int memRequested);
 	void commandRequest(mapstruct &parsedata, string &adminticket,string &monitorticket,string &executionticket);
-	void commandGetResult(string adminticket,string &compilation,string &execution,bool &executed,bool &interactive);
+	void commandGetResult(string adminticket,string &compilation, string &execution, map<string, string> &outputFiles, bool &executed, bool &interactive);
 	bool commandRunning(string adminticket);
 	void commandStop(string adminticket);
 	void commandMonitor(string userticket,Socket *s);

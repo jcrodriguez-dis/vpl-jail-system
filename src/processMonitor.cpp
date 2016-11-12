@@ -11,6 +11,9 @@ using namespace std;
 #include <unistd.h>
 #include <signal.h>
 #include <wait.h>
+#include <iostream>
+#include <sstream>
+#include <algorithm>
 #include "lock.h"
 #include "processMonitor.h"
 #include "vpl-jail-server.h"
@@ -255,7 +258,7 @@ processMonitor::processMonitor(string ticket){
 }
 
 bool processMonitor::FileExists(string name){
-	return Util::fileExists(getHomePath()+"/"+name);
+	return Util::fileExists(getHomePath(name));
 }
 
 bool processMonitor::controlFileExists(string name){
@@ -263,7 +266,7 @@ bool processMonitor::controlFileExists(string name){
 }
 
 string processMonitor::readFile(string name){
-	return Util::readFile(getHomePath()+"/"+name);
+	return Util::readFile(getHomePath(name));
 }
 
 void processMonitor::writeFile(string name, const string &data){
@@ -295,7 +298,7 @@ void processMonitor::writeFile(string name, const string &data){
  * Delete a file from prisoner home directory
  */
 void processMonitor::deleteFile(string name){
-	Util::deleteFile(getHomePath()+"/"+name);
+	Util::deleteFile(getHomePath(name));
 }
 
 bool processMonitor::installScript(string to, string from){
@@ -379,7 +382,7 @@ void processMonitor::limitResultSize(string &r){
 		r = men+r.substr(0,JAIL_RESULT_MAX_SIZE/2)+men+r.substr(r.size()-JAIL_RESULT_MAX_SIZE/2);
 	}
 }
-void processMonitor::getResult(string &compilation, string &execution, bool &executed){
+void processMonitor::getResult(string &compilation, string &execution,  map<string, string> &outputfiles, bool &executed){
 	if(security != admin)
 		throw HttpException(internalServerErrorCode,"Security: requiere admin ticket for request");
 	processState state=getState(); //May be a problem with next acction
@@ -397,12 +400,25 @@ void processMonitor::getResult(string &compilation, string &execution, bool &exe
 			limitResultSize(compilation);
 			Util::deleteFile(fileName);
 		}
+
 		fileName=getControlPath("execution");
 		if((executed=Util::fileExists(fileName))){
 			execution=Util::readFile(fileName);
 			limitResultSize(execution);
 			Util::deleteFile(fileName);
 		}
+
+        fileName=getControlPath("outputfiles");
+        if (executed && Util::fileExists(fileName)) {
+            string outputFilenames = Util::readFile(fileName, false);
+            istringstream iss(outputFilenames);
+            string outputFilename;
+            while (getline(iss, outputFilename, '\n')) {
+                if ((outputFilename.size() > 0) && FileExists(outputFilename)) {
+                    outputfiles[outputFilename] = readFile(outputFilename);
+                }
+            }
+        }
 	}
 }
 
@@ -540,4 +556,17 @@ uint64_t processMonitor::getMemoryUsed(){
 void processMonitor::freeWatchDog(){
 	//TODO check process running based on /proc
 	//looking for inconsistences
+}
+
+void processMonitor::setOutputFilenames(vector<string> filenames) {
+    string output;
+    for(vector<string>::const_iterator it = filenames.begin(); it != filenames.end(); ++it){
+		string filename = *it;
+		replace(filename.begin(), filename.end(), '\n', ' ');
+		output += filename;
+        output += "\n";
+    }
+
+    Lock lock(getControlPath());
+    Util::writeFile(getControlPath("outputfiles"), output);
 }
