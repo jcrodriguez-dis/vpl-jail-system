@@ -8,6 +8,10 @@
 		rm .vpl_set_locale_error
 	fi
 	mkdir .vnc
+	VNCACCELDIR=/etc/vncaccel
+	if [ -d "$VNCACCELDIR" ] ; then
+		cp -a $VNCACCELDIR/.??* $HOME
+	fi
 	printf "$VPL_VNCPASSWD\n$VPL_VNCPASSWD\n" | vncpasswd -f >$HOME/.vnc/passwd
 	chmod 0600 $HOME/.vnc/passwd
 	cat >$HOME/.vnc/xstartup <<"END_OF_FILE"
