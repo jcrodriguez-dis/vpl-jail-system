@@ -93,6 +93,9 @@ function vpl_generate_selfsigned_certificate {
 	else
 		INAME=$HNAME
 	fi
+	if [ "$INAME" = "" ] ; then
+		INAME=localhost
+	fi
 	#Generate key
 	openssl genrsa -passout pass:12345678 -des3 -out key.pem 1024
 	#Generate certificate for this server
