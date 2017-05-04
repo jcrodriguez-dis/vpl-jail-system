@@ -76,6 +76,21 @@ create_check_dir() {
 		exit 1
 	fi
 }
+run_root_script() {
+	if [ -s "$1" ] ; then
+		if [ "$(stat -c '%u' $1)" = "0" ] ; then
+			$1
+		else
+			log_failure_msg $"Security error: script $1 not owned by root then not ran" 
+		fi
+	fi
+}
+pre_start() {
+	run_root_script /etc/vpl/pre_start.sh
+}
+post_stop() {
+	run_root_script /etc/vpl/post_stop.sh
+}
 
 set_etc() {
 	create_check_dir "$JAILPATH/etc" 755
@@ -167,6 +182,10 @@ set_tmp() {
 	rm -Rf $JAILPATH/tmp
 	create_check_dir "$JAILPATH/tmp" 1777
 	create_check_dir "$JAILPATH/tmp/.X11-unix" 1777
+}
+
+unset_tmp() {
+	rm -Rf $JAILPATH/tmp
 }
 
 set_home() {
@@ -313,6 +332,7 @@ start_vpl() {
 		stop_vpl
 	fi
 	{
+		pre_start
 		read_config start
 		create_check_dir "$JAILPATH" 0755
 		#Check $JAILPATH not been "/"
@@ -360,7 +380,9 @@ stop_vpl() {
 		unset_etc
 		unset_dev
 		unset_others
+		unset_tmp
 		unset_firewall
+		post_stop
 	} 2>> $LOGFILE
 	log_success_msg $"Stopping vpl-jail-system service:"
 }
