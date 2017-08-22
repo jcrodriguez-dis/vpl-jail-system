@@ -9,19 +9,19 @@
  **/
 #include <exception>
 #include "vpl-jail-server.h"
+#include "configuration.h"
 
 Daemon* Daemon::singlenton=NULL;
 bool Daemon::finishRequest=false;
 using namespace std;
-void setLogLevel(string debugLevel){
+void setLogLevel(int level){
 	openlog("vpl-jail-system",LOG_PID,LOG_DAEMON);
-	if(debugLevel.size()>0){
-		int mlevels[8]={LOG_EMERG,  LOG_ALERT, LOG_CRIT, LOG_ERR, LOG_WARNING,
+	if(level > 0){
+		int mlevels[8]={LOG_EMERG, LOG_ALERT, LOG_CRIT, LOG_ERR, LOG_WARNING,
 				LOG_NOTICE, LOG_INFO, LOG_DEBUG};
-		int level=atoi(debugLevel.c_str());
+		syslog(LOG_INFO,"Set log mask up to %d",level);
 		if(level>7 || level<0) level=7;
 		setlogmask(LOG_UPTO(mlevels[level]));
-		syslog(LOG_INFO,"Set log mask up to %s",debugLevel.c_str());
 	}else{
 		setlogmask(LOG_UPTO(LOG_ERR));
 	}
@@ -32,8 +32,8 @@ void setLogLevel(string debugLevel){
  * where level is the syslog log level and URI is the xmlrpc server uri
  */
 int main(int const argc, const char ** const argv, char * const * const env) {
-	//Set log level from command arg "-d level"
-	setLogLevel(Util::getCommand(argc,argv,"-d"));
+	Configuration *conf = Configuration::getConfiguration();
+	setLogLevel(conf->getLogLevel());
 	int exitStatus=static_cast<int>(internalError);
 	try{
 		Daemon::getDaemon()->loop();
