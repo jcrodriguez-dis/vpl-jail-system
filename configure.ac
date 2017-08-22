@@ -14,7 +14,7 @@ AC_PROG_CC
 # Checks for libraries.
 AC_CHECK_LIB([util], [forkpty],)
 AC_CHECK_LIB([crypto], [SHA1],)
-AC_CHECK_LIB([ssl], [SSL_library_init],)
+AC_CHECK_LIB([ssl], [SSL_CTX_new],)
 
 # Checks for header files.
 AC_HEADER_DIRENT
