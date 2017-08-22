@@ -12,7 +12,11 @@
 	if [ -d "$VNCACCELDIR" ] ; then
 		cp -a $VNCACCELDIR/.??* $HOME
 	fi
+	#try vcnpasswd: 1-tightvnc 2:tigervnc
 	printf "$VPL_VNCPASSWD\n$VPL_VNCPASSWD\n" | vncpasswd -f >$HOME/.vnc/passwd
+	if [ ! -s $HOME/.vnc/passwd ] ; then
+		printf "$VPL_VNCPASSWD\n$VPL_VNCPASSWD\n" | vncpasswd
+	fi
 	chmod 0600 $HOME/.vnc/passwd
 	cat >$HOME/.vnc/xstartup <<"END_OF_FILE"
 #!/bin/bash
