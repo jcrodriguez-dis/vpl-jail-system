@@ -25,6 +25,7 @@ private:
 	string interface; //Interface to serve default all
 	string URLPath; //URL path to accept tasks
 	int port, sport; //Server ports
+	int logLevel; //Log level 0 to 8, 0 = no log, 8 += do not remove home dir.
 	regex_t reg;
 	void checkConfigFile(string fileName, string men);
 	void readConfigFile();
@@ -46,6 +47,7 @@ public:
 	string getURLPath(){ return URLPath;}
 	int getPort(){ return port;}
 	int getSecurePort(){ return sport;}
+	int getLogLevel(){ return logLevel;}
 };
 #endif
 

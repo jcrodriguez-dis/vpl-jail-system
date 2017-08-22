@@ -60,6 +60,7 @@ void Configuration::readConfigFile(){
 	configDefault["SECURE_PORT"]="443";
 	configDefault["URLPATH"]="/";
 	configDefault["ENVPATH"]=Util::getEnv("PATH");
+	configDefault["LOGLEVEL"]="0";
 	ConfigData data=ConfigurationFile::readConfiguration(configPath,configDefault);
 	minPrisoner = atoi(data["MIN_PRISONER_UGID"].c_str());
 	if(minPrisoner < JAIL_MIN_PRISIONER_UID)
@@ -104,6 +105,7 @@ void Configuration::readConfigFile(){
 	sport=atoi(data["SECURE_PORT"].c_str());
 	URLPath = data["URLPATH"];
 	cleanPATH = data["ENVPATH"];
+	logLevel = atoi(data["LOGLEVEL"].c_str());
 }
 
 Configuration::Configuration(){
