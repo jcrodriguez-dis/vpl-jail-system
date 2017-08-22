@@ -192,9 +192,9 @@ class Daemon{
 				socket= new SSLSocket(actualSocket);
 			else
 				socket= new Socket(actualSocket);
-			auto_ptr<Socket> auto_destroy(socket);
 			Jail jail(IP);
 			jail.process(socket);
+			delete socket;
 			usleep(10000);//Wait for father process child
 			_exit(EXIT_SUCCESS);
 		}
