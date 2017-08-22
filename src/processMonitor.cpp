@@ -455,9 +455,13 @@ int processMonitor::removeDir(string dir, bool force){
  * remove prisoner home directory and /tmp prisoner files
  */
 void processMonitor::removePrisonerHome(){
-	syslog(LOG_INFO,"Remove prisoner home (%d)",prisoner);
-	Util::removeDir(configuration->getJailPath()+"/tmp",getPrisonerID(),false); //Only prisoner files and dirs
-	Util::removeDir(prisonerHomePath(),getPrisonerID(),true); //All files and dir
+	if ( configuration->getLogLevel() != 8 ) {
+		syslog(LOG_INFO,"Remove prisoner home (%d)",prisoner);
+		Util::removeDir(configuration->getJailPath()+"/tmp",getPrisonerID(),false); //Only prisoner files and dirs
+		Util::removeDir(prisonerHomePath(),getPrisonerID(),true); //All files and dir
+	} else {
+		syslog(LOG_INFO,"Loglevel = 8 => do not remove prisoner home (%d)",prisoner);
+	}
 }
 
 /**
