@@ -112,7 +112,7 @@ public:
 	bool isWriteBuffered() { return writeBuffer.size()>0;}
 	virtual bool isSecure() { return false;}
 	bool isClosed(){return closed;}
-	void close(){if(!closed) shutdown(socket,SHUT_WR);closed=true;}
+	void close(){if(!closed) shutdown(socket,SHUT_RDWR);closed=true;}
 	bool wait(const int msec=50); //Wait for a socket change until milisec time
 	void send(const string &data, bool async=false);
 	string receive(int sizeToReceive=0);
