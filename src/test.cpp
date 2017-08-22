@@ -7,6 +7,7 @@
 #include <iostream>
 #include "util.h"
 #include "configuration.h"
+#include <assert.h>
 using namespace std;
 void testBase64Encode(){
 	assert(Base64::encode("Hello")=="SGVsbG8="||(cerr <<Base64::encode("Hello")<<endl,0));
