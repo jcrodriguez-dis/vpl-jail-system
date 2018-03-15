@@ -20,9 +20,11 @@ public:
 				"<methodResponse>\n"
 				"<params>\n"
 				"<param>\n"
+				"<value>\n"
 				"<struct>\n"
 				+response+
 				"</struct>\n"
+				"</value>\n"
 				"</param>\n"
 				"</params>\n"
 				"</methodResponse>\n";
