@@ -260,6 +260,7 @@ void Redirector::advanceIndirect(){
 			break;
 		}else{
 			syslog(LOG_INFO, "socket connect to (127.0.0.1:%d) error: %m",(int)port);
+			usleep(100000); // 1/10 seg
 		}
 		if(timeout<time(NULL)){
 			syslog(LOG_ERR, "socket connect timeout: %m");
