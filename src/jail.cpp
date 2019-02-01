@@ -47,10 +47,27 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 		syslog(LOG_INFO,"parse files %lu",(long unsigned int)parsedata.size());
 		mapstruct files=RPC::getFiles(parsedata["files"]);
 		mapstruct filestodelete=RPC::getFiles(parsedata["filestodelete"]);
+		mapstruct fileencoding;
+		if ( parsedata.find("fileencoding") != parsedata.end() ) {
+			fileencoding = RPC::getFiles(parsedata["fileencoding"]);
+		}
 		string script=parsedata["execute"]->getString();
-		//Retrieve files to execution dir and options
+		//Retrieve files to execution dir and options, decode data if needed
 		for(mapstruct::iterator i=files.begin(); i!=files.end(); i++){
-			string name=i->first,data=i->second->getString();
+			string name=i->first;
+			string data=i->second->getString();
+			if ( fileencoding.find(name) != fileencoding.end()
+				 && fileencoding[name]->getInt() == 1 ) {
+				syslog(LOG_INFO,"Decoding file %s from b64",name.c_str());
+				data = Base64::decode(data);
+				if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
+					string oldname = name;
+					name = name.substr(0, name.length() - 4);
+					if ( filestodelete.find(oldname) != filestodelete.end() ) {
+						filestodelete[name] = filestodelete[oldname];
+					}
+				}
+			}
 			syslog(LOG_INFO,"Write file %s data size %lu",name.c_str(),(long unsigned int)data.size());
 			pm.writeFile(name,data);
 		}
@@ -524,6 +541,7 @@ string Jail::run(processMonitor &pm,string name, int othermaxtime){
 			goJail();
 			setLimits(pm);
 			pm.becomePrisoner();
+			setsid();
 			transferExecution(pm,name);
 		}catch(const char *s){
 			syslog(LOG_ERR,"Error running: %s",s);
