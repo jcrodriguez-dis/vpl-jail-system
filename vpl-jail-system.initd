@@ -24,22 +24,15 @@
 # Description: build jail filesystem and start or stop the vpl-jail-server
 ### END INIT INFO
 
-# Jail filesystem structure
-# $JAILPATH____ dev   #fake with minimum files
+# Jail filesystem structure $JAILPATH overlayfs of / with nosuid
+# $JAILPATH____ dev       #fake with minimum files
 #          |     |___ pts #Replicate original
-#          |___ etc   #fake with own passwd and group
-#          |     |___ subdirs  #Replicate readonly dir by mount --bind
-#          |          except
-#          |___ home  #dir to create apropiate prisoner home dir
-#          |___ tmp   #tmp of jail filesystem 
-#          |___ proc  #Real dir by mount --bind
-#          |___ usr   #Replicate readonly dir by mount --bind
-#          |___ bin   #Replicate readonly dir by mount --bind
-#          |___ lib   #Replicate readonly dir by mount --bind
-#          |___ lib64 #Replicate readonly dir by mount --bind
-#          |___ var   #dir for replicate subdirs
-#                |___ lib       #Replicate readonly dir by mount --bind
-
+#          |     |___ shm #tmpfs
+#          |___ etc       #Replaced passwd and group
+#          |___ home      #tmfs dir to create apropiate prisoner home dir
+#          |___ proc      #Real dir by mount --bind
+#          |___ run       #tmpfs
+#          |     |___ lock #tmpfs
 # load init.d common functions
 . /lib/lsb/init-functions
 
@@ -56,8 +49,10 @@ read_config_var(){
 	             | tail -n 1 \
 	             | sed -e "s/^[ \\t]*$1[ \\t]*=[ \\t]*\\(.*\\)\$/\\1/I")
 	    if [ "$RES" == "" ] ; then
+	    	echo "Param read from config $1=$2" >> $LOGFILE
 	    	export $1=$2
 	    else
+	    	echo "Param using default $1=$RES" >> $LOGFILE
 	    	export $1=$RES
 	    fi
 		shift
@@ -66,6 +61,12 @@ read_config_var(){
 }
 
 create_check_dir() {
+	if [ -d "$1" ] ; then
+		if [ "$(stat -c "%d:%i" /)" == "$(stat -c "%d:%i" $1)" ] ; then
+			log_failure_msg $"vpl-jail-system error in configuration: root directory used"
+			exit 1
+		fi
+	fi
 	if [ ! -d "$1" ] ; then
 		mkdir "$1"
 	fi
@@ -90,62 +91,6 @@ pre_start() {
 }
 post_stop() {
 	run_root_script /etc/vpl/post_stop.sh
-}
-
-set_etc() {
-	create_check_dir "$JAILPATH/etc" 755
-	#Copy config files in /etc
-	for CONF in $(ls -f /etc/*)
-	do
-		local CONFNAME=$(basename "$CONF")
-		echo "$CONFNAME" | grep -q -E "$NOMOUNT"
-		if [ $? = 1 -a -f $CONF ] ; then
-			cp -a -L $CONF  "$JAILPATH/etc/$CONFNAME"
-			chmod a-x "$JAILPATH/etc/$CONFNAME"
-		fi
-	done
-	#passwd file
-	local PASSWORDFILE="$JAILPATH/etc/passwd"
-	local I
-	echo "root:*:0:0:root:/root:/bin/bash" > "$PASSWORDFILE"
-	for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
-		echo "p$I:*:$I:$I:prisoner $I:/home/p$I:/bin/bash" >> "$PASSWORDFILE"
-	done
-	chmod 644 "$PASSWORDFILE"
-	#group file
-	local GROUPFILE="$JAILPATH/etc/group"
-	echo "root:*:0:root" > "$GROUPFILE"
-	for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
-		echo "p$I:*:$I:p$I" >> "$GROUPFILE"
-	done
-	chmod 644 "$GROUPFILE"
-	cp -p /etc/ld.so.conf  "$JAILPATH/etc"
-	cp -p /etc/ld.so.cache  "$JAILPATH/etc"
-	cp -p /etc/hosts  "$JAILPATH/etc"
-	cp -p /etc/localtime  "$JAILPATH/etc"
-	cp -p /etc/locale.alias  "$JAILPATH/etc"
-	cp -p /etc/profile  "$JAILPATH/etc"
-	cp -p -r /etc/profile.d  "$JAILPATH/etc"
-	chmod -R a-s $JAILPATH/etc/*
-	for DIR in $(ls -d /etc/*)
-	do
-		local DIRNAME=$(basename "$DIR")
-		echo "$DIRNAME" | grep -q -E "$NOMOUNT"
-		if [ $? = 1 -a -d $DIR ] ; then
-			set_other $DIR
-		fi
-	done
-}
-
-unset_etc() {
-	rm -Rf $JAILPATH/etc/profile.d
-	for DIR in $(ls -d /etc/*)
-	do
-		if [ -d $DIR -a -d "$JAILPATH$DIR" ] ; then
-			unset_other $DIR
-		fi
-	done
-	rm -f $JAILPATH/etc/*
 }
 
 create_device() {
@@ -178,64 +123,58 @@ unset_dev() {
 	rm -Rf $DEVPATH
 }
 
-set_tmp() {
-	rm -Rf $JAILPATH/tmp
-	create_check_dir "$JAILPATH/tmp" 1777
-	create_check_dir "$JAILPATH/tmp/.X11-unix" 1777
+set_etc() {
+	#passwd file
+	local PASSWORDFILE="$JAILPATH/etc/passwd"
+	local I
+	echo "root:*:0:0:root:/root:/bin/bash" > "$PASSWORDFILE"
+	for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
+		echo "p$I:*:$I:$I:prisoner $I:/home/p$I:/bin/bash" >> "$PASSWORDFILE"
+	done
+	chmod 644 "$PASSWORDFILE"
+	#group file
+	local GROUPFILE="$JAILPATH/etc/group"
+	echo "root:*:0:root" > "$GROUPFILE"
+	for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
+		echo "p$I:*:$I:p$I" >> "$GROUPFILE"
+	done
+	chmod 644 "$GROUPFILE"
+	local SHADOWFILE="$JAILPATH/etc/shadow"
+	chown root.root "$SHADOWFILE"
+	chmod 600 "$SHADOWFILE"
 }
 
-unset_tmp() {
-	rm -Rf $JAILPATH/tmp
+set_tmpdir() {
+	if [ "$2" == "" ] ; then
+		echo "Error mounting $JAILPATH/$1 : no SIZE set"
+	fi
+	local mask=0711
+	if [ "$3" != "" ] ; then
+		mask=$3
+	fi
+	unset_tmpdir $1
+	create_check_dir "$JAILPATH/$1" $mask
+	mount -t tmpfs -osize="$2" tmpfs "$JAILPATH/$1"
 }
 
-set_home() {
-	create_check_dir "$JAILPATH/home" 0711
-	rm -Rf $JAILPATH/home/*
-}
-
-set_other_noro() {
-	if [ -d $1 ] ; then
-		create_check_dir "$JAILPATH$1" 0755
-		mount --bind $1 "$JAILPATH$1"
-		mount -o remount,nosuid,bind "$JAILPATH$1"
+unset_tmpdir() {
+	if mountpoint -q "$JAILPATH/$1"; then
+		umount "$JAILPATH/$1"
 	fi
 }
 
 set_other() {
 	if [ -d $1 ] ; then
-		create_check_dir "$JAILPATH$1" 0755
+		create_check_dir "$JAILPATH$1" $(stat -a %a $1)
 		mount --bind $1 "$JAILPATH$1"
-		mount -o remount,ro,nosuid,bind "$JAILPATH$1"
+		mount -o remount,nosuid,bind "$JAILPATH$1"
 	fi
 }
 
 unset_other() {
 	if [ -d $1 -a -d "$JAILPATH$1" ] ; then
 		umount -l -f "$JAILPATH$1"
-		rmdir "$JAILPATH$1"
 	fi
-}
-
-set_others() {
-	set_other /bin
-	set_other /usr
-	set_other /lib
-	set_other /lib64
-	create_check_dir "$JAILPATH/var" 0755
-	set_other /var/lib
-	set_other /proc
-}
-
-unset_others() {
-	unset_other /bin
-	unset_other /usr
-	unset_other /lib
-	unset_other /lib64
-	unset_other /var/lib
-	if [ -d $DIR ] ; then
-		rmdir "$JAILPATH/var"
-	fi
-	unset_other /proc
 }
 
 set_firewall() {
@@ -313,7 +252,7 @@ read_config() {
 	esac
 	if [ ! -f "$CONFIG_FILE" ] ; then
 		CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf"
-	fi  
+	fi
 	#Load config file
 	if [ -f "$CONFIG_FILE" ] ; then
 		read_config_var "$CONFIG_FILE" JAILPATH /jail
@@ -321,6 +260,10 @@ read_config() {
 		read_config_var "$CONFIG_FILE" CONTROLPATH /var/vpl-jail-system
 		read_config_var "$CONFIG_FILE" PORT 80 SECURE_PORT 443
 		read_config_var "$CONFIG_FILE" FIREWALL 0
+		read_config_var "$CONFIG_FILE" HOMESIZE 30%
+		read_config_var "$CONFIG_FILE" SHMSIZE 30%
+		read_config_var "$CONFIG_FILE" RUNSIZE 10%
+		read_config_var "$CONFIG_FILE" RUNLOCKSIZE 2%		
 	else
 		log_failure_msg $"vpl-jail-system config file not found: $CONFIG_FILE"
 		exit 1
@@ -334,22 +277,29 @@ start_vpl() {
 	{
 		pre_start
 		read_config start
+		local JAIL_LIVE="$CONTROLPATH/jail_live"
+		local JAIL_WORK="$CONTROLPATH/jail_work"
 		create_check_dir "$JAILPATH" 0755
-		#Check $JAILPATH not been "/"
-		if [ -d "$JAILPATH" ] ; then
-			if [ "$(stat -c "%d:%i" /)" == "$(stat -c "%d:%i" $JAILPATH)" ] ; then
-				log_failure_msg $"vpl-jail-system error jail path is the root directory"
-				exit 1
-			fi
-		else
-			log_failure_msg $"vpl-jail-system jail path error '$JAILPATH' not a directory"
+		create_check_dir "$CONTROLPATH" 0700
+		rm -R "$CONTROLPATH/*"
+		create_check_dir "$JAIL_LIVE" 0755
+		rm -R "$JAIL_LIVE/*"
+		create_check_dir "$JAIL_WORK" 0755
+		rm -R "$JAIL_WORK/*"
+		mount -t overlay overlay -olowerdir=/,upperdir=$JAIL_LIVE,workdir=$JAIL_WORK,nosuid "$JAILPATH"
+		if [ "$?" != "0" ] ; then
+			log_failure_msg $"Error mountig jail dir"
 			exit 1
 		fi
 		set_etc
-		set_dev
-		set_tmp
-		set_home
-		set_others
+		rm -R /home
+		set_tmpdir /home $HOMESIZE
+		set_other /proc
+		set_other /dev
+		set_tmpdir /dev/shm $SHMSIZE 1777
+		set_other /dev/pts
+		set_other /run
+		set_other /run/lock
 	} 2>> $LOGFILE
 	start_daemon /etc/vpl/vpl-jail-server $1 $2
 	sleep 1
@@ -377,10 +327,14 @@ stop_vpl() {
 			log_failure_msg $"vpl-jail-system jail path error '$JAILPATH' not a directory"
 			exit 1
 		fi
-		unset_etc
-		unset_dev
-		unset_others
-		unset_tmp
+		unset_other /run/lock
+		unset_other /run
+		unset_other /dev/pts
+		unset_tmpdir /dev/shm
+		unset_other /dev
+		unset_other /proc
+		unset_tmpdir /home
+		umount "$JAILPATH"
 		unset_firewall
 		post_stop
 	} 2>> $LOGFILE
