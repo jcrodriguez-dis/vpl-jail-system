@@ -70,6 +70,38 @@ function vpl_install {
    fi
 }
 
+function vpl_install_npm_check {
+    vpl_install_check npm
+	if [ $? -eq 0 ] ; then
+		vpl_install_base npm
+	fi
+}
+
+function vpl_install_npm {
+    vpl_install_check npm
+	if [ $? -eq 0 ] ; then
+		vpl_install_base npm
+	fi
+	local found=1
+	local checked=""
+	echo -n "Installing with npm $1: "
+	shift
+	while [ "$#" != "0" ] ; do
+	    checked="$checked $1"
+   	    npm install -g $1 &> /dev/null
+   	    if [ $? -eq 0 ] ; then
+   	   	    echo " [OK]"
+	        found=0
+   	   	    break
+   	    fi
+        shift
+   done
+   if [ $found -eq 1 ] ; then
+   	   echo "[Package npm not found. Checked $checked"
+   fi
+}
+
+
 function vpl_installq {
    echo -n "Do you want to install $1 (y/n) "
    A="y"
@@ -129,11 +161,13 @@ if [ "$LSYSTEM" == "1" ] ; then
 	vpl_install "Web browser" firefox
 else
 	vpl_install "make" make
+	vpl_install "LSB" lsb
 	vpl_install "C++ compiler" g++
 	vpl_install "SSL library" openssl
 	vpl_install "SSL library" libssl-dev
 	vpl_install "Firewall" iptables
 	vpl_install "X system" xorg
+	vpl_install "dbus-x11" dbus-x11
 	vpl_install "VNC server" tightvncserver
 	vpl_install "Fonts" xfonts-75dpi
 	vpl_install "Fonts" xfonts-100dpi
@@ -236,23 +270,32 @@ else
         vpl_install "DDD graphical front end debugger (GNU)" ddd
         vpl_install "Fortran compiler (GNU)" gfortran
         vpl_install "General purpose debugger (GNU)" gdb
-        vpl_install "Haskell 98 interpreter" hugs
+        vpl_install "Haskell" hgc hugs
         vpl_install "Java (OpenJDK)" default-jdk openjdk-7-jdk
+        vpl_install "JavaFX" openjfx
         vpl_install "Java Checkstyle" checkstyle
         vpl_install "Junit framework" junit4 junit
-        vpl_install "JavaScript (Node.js)" nodejs
+        vpl_install "JavaScript (Nodejs)" nodejs
+        vpl_install "JavaScript (Nodejs-legacy)" nodejs-legacy
+        vpl_install_npm "TypeScript" typescript
+        vpl_install_npm "Sass" sass
         vpl_install "Octave (GNU)" octave
         vpl_install "Pascal compiler" fp-compiler
         vpl_install "Perl interpreter" perl
         vpl_install "PHP interpreter" php-cli php5-cli
+        vpl_install "PHP readline" php-readline
         vpl_install "Sqlite for PHP" php-sqlite3 php5-sqlite
         vpl_install "Prolog" swi-prolog
-        vpl_install "Python interpreter" python pydb python-tk
+        vpl_install "Python interpreter" python
         vpl_install "Python pydb" pydb
+        vpl_install "Python pudb" python-pudb
         vpl_install "Python tk" python-tk
+        vpl_install "Python3" python3
+        vpl_install "Python3 tk" python3-tk
+        vpl_install "Python3 pudb" python3-pudb
         vpl_install "Ruby interpreter" ruby
         vpl_install "Scala programming language" scala
-        vpl_install "Scheme interpreter" plt-scheme
+        vpl_install "Scheme interpreter" plt-scheme racket
         vpl_install "SQL interpreter" sqlite3
         vpl_install "TCL interpreter" tcl
         vpl_install "Valgrind tool" valgrind
@@ -260,7 +303,7 @@ else
     if [ "$A2" != "n" ] ; then
     	echo "This installation may take a long time"
     	vpl_install "Clisp" clisp
-        vpl_install "Clojure" clojure1.6 clojure1.4
+        vpl_install "Clojure" clojure clojure1.6 clojure1.4
         vpl_install "Cobol" open-cobol
         vpl_install "CoffeeScript" coffeescript
         vpl_install "D compiler (GNU)" gdc
@@ -272,7 +315,9 @@ else
         vpl_install "Lua compiler 5.1" lua5.1
         vpl_install "R statistical computation and graphics system (GNU)" r-base
         vpl_install "XQuery interpreter" galax
+        vpl_install "Verilog compiler" iverilog
         vpl_install "VHDL compiler" freehdl
+        vpl_install "libtool required for VHDL" libtool-bin
         #vpl_install "Groovy programming language" groovy
     fi
     if [ -f /etc/init.d/apache2 ] ; then
