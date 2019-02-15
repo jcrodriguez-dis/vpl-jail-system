@@ -292,7 +292,7 @@ start_vpl() {
 			exit 1
 		fi
 		set_etc
-		rm -R /home
+		rm -R "$JAILPATH/home"
 		set_tmpdir /home $HOMESIZE
 		set_other /proc
 		set_other /dev
