@@ -61,11 +61,7 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 				syslog(LOG_INFO,"Decoding file %s from b64",name.c_str());
 				data = Base64::decode(data);
 				if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
-					string oldname = name;
 					name = name.substr(0, name.length() - 4);
-					if ( filestodelete.find(oldname) != filestodelete.end() ) {
-						filestodelete[name] = filestodelete[oldname];
-					}
 				}
 			}
 			syslog(LOG_INFO,"Write file %s data size %lu",name.c_str(),(long unsigned int)data.size());
