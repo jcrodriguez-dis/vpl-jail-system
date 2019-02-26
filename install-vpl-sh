@@ -111,6 +111,47 @@ function vpl_installq {
    fi
 }
 
+function vpl_install_jgrasp {
+	local URLBASE="https://www.jgrasp.org/dl4g/jgrasp/"
+	local VERSION="205_04"
+	local FILENAME="jgrasp205_04.zip"
+	local CDIR=""
+	while true ; do
+		echo -n "Version number of JGrasp to install e.g. 2.0.5_04 (0 to exit)"
+		read VERSION
+		if [ "$VERSION" == "0" ] ; then
+			break
+		fi 
+		VERSION=$(echo $VERSION | sed 's/\.//g')
+		FILENAME="jgrasp$VERSION.zip"
+		wget -q $URLBASE$FILENAME
+		if [ "$?" == "0" -a -f "$FILENAME" ] ; then
+			unzip $FILENAME > /dev/null
+			if [ -d "jgrasp" ] ; then
+				rm -R /usr/local/jgrasp
+				rm /usr/bin/jgrasp
+				mv jgrasp /usr/local/jgrasp
+				ln -s /usr/local/jgrasp/bin/jgrasp /usr/bin/jgrasp
+				CDIR=$(pwd)
+				cd /usr/local/jgrasp/src
+				./configure > /dev/null
+				./Make.sh
+				if [ "$?" == "0" ] ; then
+					cd $CDIR
+					break
+				else
+					cd $CDIR
+					echo "Error compiling code. Try again"
+				fi
+			else
+				echo "Error uncompressing package, jgrasp dir not found. Try again"
+			fi
+		else
+			echo "Version not found. Try gain."
+		fi
+	done
+}
+
 function vpl_generate_selfsigned_certificate {
 	local A=""
 	local HNAMEW=$(hostname --long| sed 's/^[^\.]*/\*/g')
@@ -161,7 +202,7 @@ if [ "$LSYSTEM" == "1" ] ; then
 	vpl_install "Web browser" firefox
 else
 	vpl_install "make" make
-	vpl_install "LSB" lsb
+	vpl_install "LSB" lsb lsb-core lsb-compat
 	vpl_install "C++ compiler" g++
 	vpl_install "SSL library" openssl
 	vpl_install "SSL library" libssl-dev
@@ -174,7 +215,9 @@ else
 	vpl_install "Window manager" openbox
 	vpl_install "Configuration DB system" gconf2
 	gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
-	vpl_install "Web browser" firefox
+	vpl_install "Web browser" firefox firefox-esr
+	vpl_install "wget" wget
+	vpl_install "curl" curl
 fi
 echo "Checking installed software"
 ./configure >>$LOGFILE
@@ -319,6 +362,12 @@ else
         vpl_install "VHDL compiler" freehdl
         vpl_install "libtool required for VHDL" libtool-bin
         #vpl_install "Groovy programming language" groovy
+    fi
+    echo "Do you want to try to install JGrasp?"
+    echo -n "(y/n)"
+    read A3
+    if [ "$A3" != "n" ] ; then
+    	vpl_install_jgrasp
     fi
     if [ -f /etc/init.d/apache2 ] ; then
     	echo "If you are planning to use apache2 or other service in this system,"
