@@ -128,8 +128,8 @@ function vpl_install_jgrasp {
 		if [ "$?" == "0" -a -f "$FILENAME" ] ; then
 			unzip $FILENAME > /dev/null
 			if [ -d "jgrasp" ] ; then
-				rm -R /usr/local/jgrasp
-				rm /usr/bin/jgrasp
+				rm -R /usr/local/jgrasp 2> /dev/null
+				rm /usr/bin/jgrasp 2> /dev/null
 				mv jgrasp /usr/local/jgrasp
 				ln -s /usr/local/jgrasp/bin/jgrasp /usr/bin/jgrasp
 				CDIR=$(pwd)
