@@ -218,6 +218,7 @@ else
 	vpl_install "Web browser" firefox firefox-esr
 	vpl_install "wget" wget
 	vpl_install "curl" curl
+	vpl_install "net-tools" net-tools
 fi
 echo "Checking installed software"
 ./configure >>$LOGFILE
