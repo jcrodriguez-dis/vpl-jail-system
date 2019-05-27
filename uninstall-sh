@@ -4,17 +4,36 @@
 # license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
 # Description:	Script to uninstall vpl-xmlrpc-jail (Centos 5.5 and Ubuntu)
 
+read_config_var(){
+	local FILE=$1
+	shift
+	while (( "$#" )); do
+		local RES=$(grep -i -e "^[ \\t]*$1[ \\t]*=" $FILE \
+	             | tail -n 1 \
+	             | sed -e "s/^[ \\t]*$1[ \\t]*=[ \\t]*\\(.*\\)\$/\\1/I")
+	    if [ "$RES" == "" ] ; then
+	    	echo "Param read from config $1=$2" >> $LOGFILE
+	    	export $1=$2
+	    else
+	    	echo "Param using default $1=$RES" >> $LOGFILE
+	    	export $1=$RES
+	    fi
+		shift
+		shift
+	done
+}
+
 remove_dir() {
-	if [ -d $1 ] ; then
-		rmdir $1
+	if [ "$1" != "/" ] && [ -d $1 ] ; then
+		echo "Please, remove dir $1"
 	fi
 }
-if [ "$USER" != "root" ] ; then
-	echo "This script need to be run as root and is run as $USER"
-	exit 1;
+if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
+    echo "This script need to be run as root and is run as $USER uid $UID euid $EUID"
+    exit 1;
 fi
 VPLJAIL_INSTALL_DIR=/etc/vpl
-if [ -d $VPLJAIL_INSTALL_DIR ] ; then
+if [ ! -d $VPLJAIL_INSTALL_DIR ] ; then
 	echo "VPL jail installation dir '$VPLJAIL_INSTALL_DIR' not found"
 	exit 1
 fi
@@ -31,28 +50,21 @@ service vpl-jail-system stop
 CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf"
 #Load config file
 if [ -f "$CONFIG_FILE" ]; then
-	. "$CONFIG_FILE"
+	read_config_var "$CONFIG_FILE" JAILPATH /jail
+	read_config_var "$CONFIG_FILE" CONTROLPATH /var/vpl-jail-system
 	#Check $JAILPATH not been "/"
 	if [ -f "$JAILPATH$CONFIG_FILE" ] ; then
 		echo "vpl-jail-system jail path error '$JAILPATH'"
 	else
 		#Remove safe dir
-		remove_dir $JAILPATH/bin	
-		remove_dir $JAILPATH/usr	
-		remove_dir $JAILPATH/lib	
-		remove_dir $JAILPATH/lib64	
-		remove_dir $JAILPATH/tmp	
-		remove_dir $JAILPATH/home	
-		remove_dir $JAILPATH/var/lib	
-		remove_dir $JAILPATH/var
-		#Ask user to remove unsafe dir
-		echo "please, remove manualy '$JAILPATH' directory"
+		remove_dir $JAILPATH
+		remove_dir $CONTROLPATH
 	fi
 else
 	echo "vpl-jail-system config file not found: $CONFIG_FILE"
 fi
-rm $VPLJAIL_INSTALL_DIR/vpl-xmlrpc-jail
-rm $VPLJAIL_INSTALL_DIR/vpl-xmlrpc-jail.conf
+rm $VPLJAIL_INSTALL_DIR/vpl-jail-server
+rm $VPLJAIL_INSTALL_DIR/vpl-jail-system.conf
 rmdir $VPLJAIL_INSTALL_DIR
 if [ "$LSYSTEM" = "1" ] ;
 then

@@ -9,8 +9,8 @@ LOGFILE=installation.log
 date >$LOGFILE
 exec &> >(tee $LOGFILE)
 
-if [ "$USER" != "root" ] ; then
-    echo "This script need to be run as root and is run as $USER"
+if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
+    echo "This script need to be run as root and is run as $USER uid $UID euid $EUID"
     exit 1;
 fi
 #Detect system
@@ -214,7 +214,9 @@ else
 	vpl_install "Fonts" xfonts-100dpi
 	vpl_install "Window manager" openbox
 	vpl_install "Configuration DB system" gconf2
-	gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
+	if [ "$(command -v gconftool-2)" != "" ] ; then
+		gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
+	fi
 	vpl_install "Web browser" firefox firefox-esr
 	vpl_install "wget" wget
 	vpl_install "curl" curl
@@ -236,7 +238,22 @@ fi
 #Copy daemon 
 cp src/vpl-jail-server $VPLJAIL_INSTALL_DIR
 #Copy configuration file
-cp -i vpl-jail-system.conf $VPLJAIL_INSTALL_DIR
+VPL_CONFIGFILE=$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf
+if [ -f $VPL_CONFIGFILE ] ; then
+	echo "Replace old configuration file $VPL_CONFIGFILE with a fresh one?"
+	read A
+	if [ "$A" == "y" ] ; then
+		cp vpl-jail-system.conf $VPL_CONFIGFILE
+		echo "Configuration file replaced"
+	fi
+else
+	cp vpl-jail-system.conf $VPL_CONFIGFILE
+	if [ "$LSYSTEM" == "1"  ] ; then
+		echo "" >> $VPL_CONFIGFILE
+		echo "ENVPATH=/usr/bin:/bin" >> $VPL_CONFIGFILE
+		echo "Configuration file changed for CentOS. Added ENVPATH"
+	fi
+fi
 chmod 600 $VPLJAIL_INSTALL_DIR/vpl-jail-system.conf
 #Copy launch scripts
 cp vpl_*.sh /etc/vpl
@@ -333,6 +350,7 @@ else
         vpl_install "Python interpreter" python
         vpl_install "Python pydb" pydb
         vpl_install "Python pudb" python-pudb
+        vpl_install "Pythom Thonny" thonny
         vpl_install "Python tk" python-tk
         vpl_install "Python3" python3
         vpl_install "Python3 tk" python3-tk

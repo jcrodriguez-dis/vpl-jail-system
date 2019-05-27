@@ -167,7 +167,7 @@ set_other() {
 	if [ -d $1 ] ; then
 		create_check_dir "$JAILPATH$1" $(stat -a %a $1)
 		mount --bind $1 "$JAILPATH$1"
-		mount -o remount,nosuid,bind "$JAILPATH$1"
+		mount -o remount${NOSUID},bind "$JAILPATH$1"
 	fi
 }
 
@@ -260,10 +260,15 @@ read_config() {
 		read_config_var "$CONFIG_FILE" CONTROLPATH /var/vpl-jail-system
 		read_config_var "$CONFIG_FILE" PORT 80 SECURE_PORT 443
 		read_config_var "$CONFIG_FILE" FIREWALL 0
+		read_config_var "$CONFIG_FILE" ALLOWSUID false
 		read_config_var "$CONFIG_FILE" HOMESIZE 30%
 		read_config_var "$CONFIG_FILE" SHMSIZE 30%
 		read_config_var "$CONFIG_FILE" RUNSIZE 10%
-		read_config_var "$CONFIG_FILE" RUNLOCKSIZE 2%		
+		read_config_var "$CONFIG_FILE" RUNLOCKSIZE 2%
+		NOSUID=,nosuid
+		if [ "$ALLOWSUID" == "true" ] ; then
+			NOSUID=
+		fi
 	else
 		log_failure_msg $"vpl-jail-system config file not found: $CONFIG_FILE"
 		exit 1
@@ -286,7 +291,7 @@ start_vpl() {
 		rm -R "$JAIL_LIVE/*"
 		create_check_dir "$JAIL_WORK" 0755
 		rm -R "$JAIL_WORK/*"
-		mount -t overlay overlay -olowerdir=/,upperdir=$JAIL_LIVE,workdir=$JAIL_WORK,nosuid "$JAILPATH"
+		mount -t overlay overlay -olowerdir=/,upperdir=$JAIL_LIVE,workdir=$JAIL_WORK${NOSUID} "$JAILPATH"
 		if [ "$?" != "0" ] ; then
 			log_failure_msg $"Error mountig jail dir"
 			exit 1
