@@ -217,8 +217,12 @@ class Daemon{
 		}
 		const int bad=POLLERR|POLLNVAL;
 		int res=poll(devices,ndev,100);
-		if(res==-1)
-			throw "Error poll listener socket"; //Error
+		if(res==-1) {
+			if (errno == EINTR) {
+				return;
+			}
+			throw string("Error poll sockets in accept: ") + strerror(errno);
+		}
 		if(res==0) return; //No request
 		if(devices[0].revents & POLLIN){ //is http or ws
 			launch(listenSocket,false);
@@ -244,7 +248,7 @@ class Daemon{
 			local.sin_addr.s_addr = INADDR_ANY;
 		local.sin_port = htons(port);
 		if (bind(listenSocket, (struct sockaddr *) &local, sizeof(local)) == -1)
-			throw "bind() error";
+			throw string("bind() error: ") + strerror(errno);
 		if (listen(listenSocket, 100) == -1) //100 queue size
 			throw "listen() error";
 		syslog(LOG_INFO,"Listen at %s:%d",inet_ntoa(local.sin_addr), port);
