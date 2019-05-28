@@ -201,6 +201,9 @@ if [ "$LSYSTEM" == "1" ] ; then
 	vpl_install "VNC server" tigervnc-server
 	vpl_install "Web browser" firefox
 else
+	if [ "$(command -v add-apt-repository)" != "" ] ; then
+		add-apt-repository universe &> /dev/null
+	fi
 	vpl_install "make" make
 	vpl_install "LSB" lsb lsb-core lsb-compat
 	vpl_install "C++ compiler" g++
