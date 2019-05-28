@@ -104,7 +104,7 @@ void processMonitor::selectPrisoner(){
 		prisoner = configuration->getMinPrisioner()+Util::random()%range;
 		setControlPath();
 		string controlPath=getControlPath();
-		//TODO check existence of old home dir nad remove it
+		//TODO check existence of old home dir and remove it
 		if(mkdir(controlPath.c_str(),umask)==0){
 			homePath=prisonerHomePath();
 			if(mkdir(homePath.c_str(),umask)==0){
