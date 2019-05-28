@@ -292,6 +292,8 @@ bool Jail::isValidIPforRequest(){
  */
 Jail::Jail(string IP){
 	this->IP = IP;
+	this->newpid = -1;
+	this->redirectorpid = -1;
 	configuration = Configuration::getConfiguration();
 }
 
