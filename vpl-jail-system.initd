@@ -49,10 +49,10 @@ read_config_var(){
 	             | tail -n 1 \
 	             | sed -e "s/^[ \\t]*$1[ \\t]*=[ \\t]*\\(.*\\)\$/\\1/I")
 	    if [ "$RES" == "" ] ; then
-	    	echo "Param read from config $1=$2" >> $LOGFILE
+	    	echo "Param using default $1=$2" >> $LOGFILE
 	    	export $1=$2
 	    else
-	    	echo "Param using default $1=$RES" >> $LOGFILE
+	    	echo "Param read from config $1=$RES" >> $LOGFILE
 	    	export $1=$RES
 	    fi
 		shift
@@ -124,7 +124,9 @@ set_tmpdir() {
 	fi
 	unset_tmpdir $1
 	create_check_dir "$JAILPATH/$1" $mask
-	mount -t tmpfs -osize="$2" tmpfs "$JAILPATH/$1"
+	if [ "$USETMPFS" != "false" ] ; then 
+		mount -t tmpfs -osize="$2" tmpfs "$JAILPATH/$1"
+	fi
 }
 
 unset_tmpdir() {
@@ -233,8 +235,7 @@ read_config() {
 		read_config_var "$CONFIG_FILE" ALLOWSUID false
 		read_config_var "$CONFIG_FILE" HOMESIZE 30%
 		read_config_var "$CONFIG_FILE" SHMSIZE 30%
-		read_config_var "$CONFIG_FILE" RUNSIZE 10%
-		read_config_var "$CONFIG_FILE" RUNLOCKSIZE 2%
+		read_config_var "$CONFIG_FILE" USETMPFS true
 		NOSUID=,nosuid
 		if [ "$ALLOWSUID" == "true" ] ; then
 			NOSUID=
