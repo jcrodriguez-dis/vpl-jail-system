@@ -243,7 +243,7 @@ cp src/vpl-jail-server $VPLJAIL_INSTALL_DIR
 #Copy configuration file
 VPL_CONFIGFILE=$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf
 if [ -f $VPL_CONFIGFILE ] ; then
-	echo "Replace old configuration file $VPL_CONFIGFILE with a fresh one?"
+	echo "Replace current configuration file $VPL_CONFIGFILE with a fresh one?"
 	read A
 	if [ "$A" == "y" ] ; then
 		cp vpl-jail-system.conf $VPL_CONFIGFILE
@@ -393,7 +393,7 @@ else
     fi
     if [ -f /etc/init.d/apache2 ] ; then
     	echo "If you are planning to use apache2 or other service in this system,"
-    	echo "beware that you must use differents port that in vpl-jail-system"
+    	echo "notice that you must use different ports that in vpl-jail-system"
     	echo "It seems that you have apache2 in your system."
 	    echo -n "Remove apache2 ? (y/n) "
     	read A
