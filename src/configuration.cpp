@@ -21,11 +21,13 @@ string Configuration::generateCleanPATH(string jailPath, string dirtyPATH){
 		}else{
 			dir=dirtyPATH.substr(pos);
 		}
-		if(Util::dirExists(jailPath+dir)){
+		if(Util::dirExistsFollowingSymLink(jailPath+dir)){
 			if(cleanPATH.size()>0){
 				cleanPATH+=':';
 			}
 			cleanPATH+=dir;
+		} else {
+			syslog(LOG_INFO, "Path removed: %s", dir.c_str());
 		}
 		if(found == string::npos) return cleanPATH;
 		pos=found+1;
@@ -112,7 +114,7 @@ Configuration::Configuration(){
 	configPath="/etc/vpl/vpl-jail-system.conf";
 	checkConfigFile(configPath,"Config file");
 	readConfigFile();
-	cleanPATH=generateCleanPATH(getJailPath(),cleanPATH);
+//cleanPATH=generateCleanPATH(getJailPath(),cleanPATH);
 }
 
 
