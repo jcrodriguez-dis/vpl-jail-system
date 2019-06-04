@@ -116,8 +116,12 @@ void Jail::commandGetResult(string adminticket,string &compilation,string &execu
 	interactive=pm.isInteractive();
 }
 bool Jail::commandRunning(string adminticket){
-	processMonitor pm(adminticket);
-	return pm.isRunnig();
+	try{
+		processMonitor pm(adminticket);
+		return pm.isRunnig();
+	}catch(...){
+		return false;
+	}
 }
 void Jail::commandStop(string adminticket){
 	pid_t pid=fork();
@@ -373,7 +377,6 @@ void Jail::process(Socket *socket){
 			}else if(request=="running"){
 				string adminticket;
 				adminticket=parsedata["adminticket"]->getString();
-				commandRunning(adminticket);
 				server.send200(RPC::runningResponse(commandRunning(adminticket)));
 			}else if(request=="stop"){
 				string adminticket;
