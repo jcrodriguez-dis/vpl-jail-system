@@ -18,21 +18,20 @@ void ConfigurationFile::parseConfigLine(ConfigData &data,const string &line){
 		init=true;
 	}
 	regmatch_t match[3];
-	int nomatch=regexec(&reg, line.c_str(),3, match, 0);
-	if(nomatch == 0){
-		string param=line.substr(match[1].rm_so,match[1].rm_eo-match[1].rm_so);
-		string value=line.substr(match[2].rm_so,match[2].rm_eo-match[2].rm_so);
-		param = Util::toUppercase(param);
-		Util::trim(value);
-		if(data.find(param) != data.end())
-			data[param]+=" "+value;
-		else
-			data[param]=value;
-	}else{
-		nomatch=regexec(&comment, line.c_str(),3, match, 0);
-		if(nomatch != 0)
+	int nomatch=regexec(&comment, line.c_str(),3, match, 0);
+	if(nomatch != 0){
+		nomatch=regexec(&reg, line.c_str(),3, match, 0);
+		if (nomatch == 0) {
+			string param=line.substr(match[1].rm_so,match[1].rm_eo-match[1].rm_so);
+			string value=line.substr(match[2].rm_so,match[2].rm_eo-match[2].rm_so);
+			param = Util::toUppercase(param);
+			Util::trim(value);
+			data[param] = value;
+			syslog(LOG_INFO,"Read config param %s=%s", param.c_str(), value.c_str());
+		} else {
 			throw HttpException(internalServerErrorCode
 					,"Incorrect config file: "+line);
+		}
 	}
 }
 
