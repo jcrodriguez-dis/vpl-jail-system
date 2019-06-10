@@ -53,7 +53,7 @@ class Base64{
 		for(int i=0;i<256;i++)
 			C642int[i]=-1;
 		for (int i = 0; i < l; i++)
-			C642int[charSet[i]] = i<<2;
+			C642int[ (int) charSet[i]] = i<<2;
 	}
 	static bool is64(char c){
 		int v=*((unsigned char *)&c);
@@ -82,11 +82,12 @@ class Base64{
 		int ibyte=pos/8;
 		int ides=pos%8;
 		int dc=decodeChar(c);
-		if(ibyte>=data.size())return;
+		int size = (int) data.size();
+		if(ibyte>=size)return;
 		//Sorry for to be so raw
 		unsigned char *rawdata=(unsigned char *)data.c_str();
 		rawdata[ibyte] |=(unsigned char)(dc>>ides);
-		if(ides>2 && ibyte+1 < data.size()){
+		if(ides>2 && ibyte+1 < size){
 			rawdata[ibyte+1] |= (unsigned char)(dc<<(8-ides));
 		}
 	}
@@ -207,12 +208,21 @@ public:
 	}
 
 	/**
-	 * Check if directory exists
+	 * Check if directory exists, no symbolic links
 	 */
 	static bool dirExists(const string &fileName){
 		struct stat info;
-		return lstat(fileName.c_str(),&info)==0
-				&& S_ISDIR(info.st_mode);
+		int res = lstat(fileName.c_str(),&info);
+		return res==0 && S_ISDIR(info.st_mode);
+	}
+
+	/**
+	 * Check if directory exists, follow symbolic links
+	 */
+	static bool dirExistsFollowingSymLink(const string &fileName){
+		struct stat info;
+		int res = stat(fileName.c_str(),&info);
+		return res==0 && S_ISDIR(info.st_mode);
 	}
 
 	/**
@@ -234,7 +244,7 @@ public:
 	/**
 	 * return an string as long int
 	 */
-	static int atol(const string &s){
+	static long int atol(const string &s){
 		return ::atol(s.c_str());
 	}
 
