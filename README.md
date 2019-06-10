@@ -44,10 +44,12 @@ Install a Linux O.S. as clean as possible. If you have enough resources you can 
 VPL-Jail-System is distributed only as source files. You must get the source package from https://vp.dis.ulpgc.es eg. using
 ```shell
 wget https://vpl.dis.ulpgc.es/releases/vpl-jail-system-[version].tar.gz
+```
 
 or from the github repository, generating the package with
 ```shell
 make distcheck
+```
 
 ## Running the installer
 
@@ -56,6 +58,7 @@ After getting the package you must decompress it and run the installer.
 tar xvf vpl-jail-system-[version].tar.gz
 cd vpl-jail-system-[version]
 ./install-vpl-sh
+```
 
 The "./install-vpl-sh" must be run as root.
 
@@ -78,8 +81,9 @@ Run uninstall-sh of the current version.
 After installing the VPL-Jail-Service, the service will be started with a default configuration. If you want to change the configuration you must edit the file */etc/vpl/vpl-jail-system.conf*.
 
 After configuration changes you must restart (as user root) the service to use the new configuration values.
-'''shell
+```shell
 service vpl-jail-system restart
+```
 
 ## Main configuration parameters
 - PORT. Socket port number to listen for http and ws connections . Default value 80
