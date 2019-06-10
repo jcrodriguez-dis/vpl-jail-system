@@ -6,7 +6,6 @@ The VPL-Jail-System serves an execution sandbox for the VPL Moodle plugin. This 
 
 For more details about VPL, visit the [VPL home page](http://vpl.dis.ulpgc.es) or
 the [VPL plugin page at Moodle](http://www.moodle.org/plugin/mod_vpl).
-
 # Requirements
 The of VPL-Jail-System is an open software execution system and require a specific environment. 
 
@@ -112,3 +111,18 @@ The URL of the service in the general module configuration or in the local execu
 http://server:PORT/URLPATH or https://server:SECURE_PORT/URLPATH
 
 :PORT and :SECURE_PORT can be omitted if using the standard ports.
+
+# Changes from the 2.2 to 2.3 version
+
+The main new of the 2.3 version is the change of file system used to replicate root directory on jail. This version include some minor fixes and is compatible and interchangeable with the previous one.
+
+The replication of the root file system is done with overlayfs, allowing to adapt the replica to the needs of the VPL-Jail-System easily and safe. To accelerate the execution and limit the file system changes, the users' home directory has been mounted as a tmpfs. Also the possibility of mounting the replica allowing SETUID has been added.
+
+The use of the tmpfs removes the need of the vncaccel.sh script.
+
+The new parameters to control this new features are:
+- USETMPFS. This switch allow the use of tmpfs for "/home" and the "/dev/shm" directories. Changing this switch to "false" can degrade the performance of the jail system. To deactivate this option use USETMPFS=false. The default value is USETMPFS=true
+- HOMESIZE. This option set the size of the "/home" directory the default value is 30% of the system memory. This option is applicable if using tmpfs file system for the "/home" directory.
+- SHMSIZE. This option set the size of the "/dev/shm" directory the default value is 30% of the system memory. This option is applicable if using tmpfs file system for the "/dev/shm" directory .
+- ALLOWSUID. This switch allow the execution of programs with a suid bit inside the jail. This may be a security threat, use at your own risk. To activate this option, set ALLOWSUID=true.
+
