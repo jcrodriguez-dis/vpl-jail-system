@@ -18,6 +18,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <pty.h>
 #include "jail.h"
 #include "redirector.h"
 #include "httpServer.h"
@@ -141,12 +142,13 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 	webSocket ws(s);
 	processState state=prestarting;
 	time_t timeout=pm.getStartTime()+pm.getMaxTime();
-	time_t startTime,lastMessageTime;
+	time_t startTime = 0;
+	time_t lastMessageTime = 0;
 	time_t lastTime=pm.getStartTime();
 	string lastMessage;
 	while(state != stopped){
 		time_t now = time(NULL);
-		if(lastMessage.size()>0 && now != lastMessageTime){
+		if( ! lastMessage.empty() && now != lastMessageTime){
 			ws.send(lastMessage+": "+Util::itos(now-startTime)+" seg");
 			lastMessageTime = now;
 		}
@@ -154,6 +156,8 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 		if(newstate!=state){
 			state=newstate;
 			switch(state){
+			case prestarting:
+				break;
 			case starting:
 				syslog(LOG_DEBUG,"Monitor starting");
 				startTime = now;
@@ -283,7 +287,8 @@ void Jail::commandExecute(string executeticket,Socket *s){
 bool Jail::isValidIPforRequest(){
 	const vector<string> &dirs=configuration->getTaskOnlyFrom();
 	if(dirs.size()==0) return true;
-	for(int i = 0; i< dirs.size(); i++){
+	int l = (int) dirs.size();
+	for(int i = 0; i< l; i++){
 		if(IP.find(dirs[i]) == 0)
 			return true;
 	}
@@ -561,7 +566,6 @@ string Jail::run(processMonitor &pm,string name, int othermaxtime){
 	syslog(LOG_INFO, "child pid %d",newpid);
 	Redirector redirector;
 	redirector.start(fdmaster);
-	const long int waittime= 10000;
 	time_t startTime=time(NULL);
 	time_t lastTime=startTime;
 	int stopSignal=SIGTERM;
@@ -673,7 +677,6 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 	Redirector redirector;
 	syslog(LOG_INFO, "Redirector start terminal control");
 	redirector.start(fdmaster,&ws);
-	const long int waittime= 10000;
 	time_t startTime=time(NULL);
 	time_t lastTime=startTime;
 	bool noMonitor=false;
@@ -744,7 +747,6 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 	Redirector redirector;
 	syslog(LOG_INFO, "Redirector start vncserver control");
 	redirector.start(&ws,VNCServerPort);
-	const long int waittime= 10000;
 	time_t startTime=time(NULL);
 	time_t lastTime=startTime;
 	bool noMonitor=false;
