@@ -145,6 +145,8 @@ void Redirector::advanceOnline(){
 	const int polltimeout= 100; //  0.1 sec 
 	States oldstate=state;
 	switch(state){
+	case connecting:
+		break;
 	case begin:{
 		if(fdps<0) {
 			state=error; //fd pseudo terminal error
@@ -243,7 +245,14 @@ void Redirector::advanceIndirect(){
 			break;
 		}
 		int on=1;
-		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+		if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ) {
+			syslog(LOG_ERR,"setsockopt(SO_REUSEADDR) failed: %m");
+		}
+		#ifdef SO_REUSEPORT
+	    if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
+			syslog(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
+	    }
+		#endif
 		//fdblock(sock,false);
 		state=connecting;
 	}
@@ -346,7 +355,7 @@ void Redirector::advanceIndirect(){
  * return if output buffer is full
  */
 bool Redirector::isOutputBufferFull(){
-	return netbuf.size()>=bufferSizeLimit;
+	return (int) netbuf.size() >= bufferSizeLimit;
 }
 
 /**
@@ -355,21 +364,21 @@ bool Redirector::isOutputBufferFull(){
  * Cut string if size limit reached
  */
 void Redirector::addOutput(const string &toAdd){
-	if(toAdd.size()==0) return;
+	if(toAdd.empty()) return;
 	noOutput = false;
 	//Control netbuf size limit
-	if(netbuf.size()+toAdd.size()>2*bufferSizeLimit){ //Buffer too large
-		const char *text="\n=============== output cut to 50Kb =============\n";
-		//take begin and end of netbuf+toAdd to truncate to 50Kb
+	if((int) (netbuf.size()+toAdd.size()) > 2*bufferSizeLimit){ //Buffer too large
+		const char *text="\n=============== output cut to 1Mb =============\n";
+		//take begin and end of netbuf+toAdd to truncate to 1MB
 		string overflow=netbuf+toAdd;
 		size_t ofsize=overflow.size();
 		netbuf=overflow.substr(0,bufferSizeLimit/2)
 						+text
 						+overflow.substr(ofsize-bufferSizeLimit/2,bufferSizeLimit/2);
-		syslog(LOG_INFO,"Program output has been cut to 50Kb");
+		syslog(LOG_INFO,"Program output has been cut to 1MB");
 		static bool noLimited=true;
 		if(noLimited){
-			addMessage("\nJail: program output has been limited to 50Kb\n");
+			addMessage("\nJail: program output has been limited to 1MB\n");
 			noLimited=false;
 		}
 	}else{
