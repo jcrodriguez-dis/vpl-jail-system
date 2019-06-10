@@ -45,7 +45,7 @@ else
 	fi
 fi
 function vpl_install {
-	local found=1
+	local found=0
 	local checked=""
 	echo -n "Installing $1: "
 	shift
@@ -56,17 +56,17 @@ function vpl_install {
 	   	   echo -n $1
 	       vpl_install_base $1
 	   	   if [ $? -eq 0 ] ; then
+	   	   		found=1
 	   	   		echo " [OK]"
 	   	   else
 	   	   		echo " [ERROR]"
 	   	   fi
-	       found=0
 	       break
    	   fi
        shift
    done
-   if [ $found -eq 1 ] ; then
-   	   echo "[Package not found. Checked $checked"
+   if [ $found -eq 0 ] ; then
+   	   echo "[Package not found. Checked$checked]"
    fi
 }
 
@@ -310,7 +310,7 @@ if [ "$LSYSTEM" = "1" ] ; then
         vpl_install "Valgrind tool" valgrind
     fi
     echo "IMPORTANT: Please, set properly the ENVPATH in the config file /etc/vpl/vpl-jail-system.conf" 
-    echo "           e.g. \"ENVPATH=/usr/bin:/bin\" and restart the service"
+    echo "           e.g. \"ENVPATH=/usr/bin:/bin:/usr/sbin\" and restart the service"
 else
     update-rc.d -f vpl-jail-system remove >>$LOGFILE
     update-rc.d vpl-jail-system defaults >>$LOGFILE
