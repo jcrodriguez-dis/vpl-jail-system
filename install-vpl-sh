@@ -9,8 +9,8 @@ LOGFILE=installation.log
 date >$LOGFILE
 exec &> >(tee $LOGFILE)
 
-if [ "$USER" != "root" ] ; then
-    echo "This script need to be run as root and is run as $USER"
+if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
+    echo "This script need to be run as root and is run as $USER uid $UID euid $EUID"
     exit 1;
 fi
 #Detect system
@@ -18,7 +18,12 @@ if [ -f /sbin/chkconfig  ] && [ "$(command -v yum)" != "" ] ; then
 	echo "Detected RedHat or similar distribution (using chkconfig)" 
     function vpl_install_base {
         yum -y install $1 >>$LOGFILE
+        return $?
     }
+    function vpl_install_check {
+        yum list $1 &> /dev/null
+        return $?
+	}
     LSYSTEM="1"
 else
 	if [ -f /usr/sbin/update-rc.d ] && [ "$(command -v apt-get)" != "" ] ; then
@@ -27,6 +32,11 @@ else
 		apt-get update >>$LOGFILE
 	    function vpl_install_base {
             apt-get -q -y --allow-unauthenticated install $1 >>$LOGFILE
+            return $?
+	    }
+	    function vpl_install_check {
+            apt-cache pkgnames $1 | grep -q -x -F $1
+            return $?
 	    }
     	LSYSTEM="2"
     else
@@ -35,14 +45,62 @@ else
 	fi
 fi
 function vpl_install {
-   echo "Installing $1:"
-   shift
-   while [ "$#" != "0" ] ; do
-   	   echo "     $1"
-       vpl_install_base $1
+	local found=0
+	local checked=""
+	echo -n "Installing $1: "
+	shift
+	while [ "$#" != "0" ] ; do
+		checked="$checked $1"
+   		vpl_install_check $1
+		if [ $? -eq 0 ] ; then
+	   	   echo -n $1
+	       vpl_install_base $1
+	   	   if [ $? -eq 0 ] ; then
+	   	   		found=1
+	   	   		echo " [OK]"
+	   	   else
+	   	   		echo " [ERROR]"
+	   	   fi
+	       break
+   	   fi
        shift
    done
+   if [ $found -eq 0 ] ; then
+   	   echo "[Package not found. Checked$checked]"
+   fi
 }
+
+function vpl_install_npm_check {
+    vpl_install_check npm
+	if [ $? -eq 0 ] ; then
+		vpl_install_base npm
+	fi
+}
+
+function vpl_install_npm {
+    vpl_install_check npm
+	if [ $? -eq 0 ] ; then
+		vpl_install_base npm
+	fi
+	local found=1
+	local checked=""
+	echo -n "Installing with npm $1: "
+	shift
+	while [ "$#" != "0" ] ; do
+	    checked="$checked $1"
+   	    npm install -g $1 &> /dev/null
+   	    if [ $? -eq 0 ] ; then
+   	   	    echo " [OK]"
+	        found=0
+   	   	    break
+   	    fi
+        shift
+   done
+   if [ $found -eq 1 ] ; then
+   	   echo "[Package npm not found. Checked $checked"
+   fi
+}
+
 
 function vpl_installq {
    echo -n "Do you want to install $1 (y/n) "
@@ -53,29 +111,75 @@ function vpl_installq {
    fi
 }
 
+function vpl_install_jgrasp {
+	local URLBASE="https://www.jgrasp.org/dl4g/jgrasp/"
+	local VERSION="205_04"
+	local FILENAME="jgrasp205_04.zip"
+	local CDIR=""
+	while true ; do
+		echo -n "Version number of JGrasp to install e.g. 2.0.5_04 (0 to exit)"
+		read VERSION
+		if [ "$VERSION" == "0" ] ; then
+			break
+		fi 
+		VERSION=$(echo $VERSION | sed 's/\.//g')
+		FILENAME="jgrasp$VERSION.zip"
+		wget -q $URLBASE$FILENAME
+		if [ "$?" == "0" -a -f "$FILENAME" ] ; then
+			unzip $FILENAME > /dev/null
+			if [ -d "jgrasp" ] ; then
+				rm -R /usr/local/jgrasp 2> /dev/null
+				rm /usr/bin/jgrasp 2> /dev/null
+				mv jgrasp /usr/local/jgrasp
+				ln -s /usr/local/jgrasp/bin/jgrasp /usr/bin/jgrasp
+				CDIR=$(pwd)
+				cd /usr/local/jgrasp/src
+				./configure > /dev/null
+				./Make.sh
+				if [ "$?" == "0" ] ; then
+					cd $CDIR
+					break
+				else
+					cd $CDIR
+					echo "Error compiling code. Try again"
+				fi
+			else
+				echo "Error uncompressing package, jgrasp dir not found. Try again"
+			fi
+		else
+			echo "Version not found. Try gain."
+		fi
+	done
+}
+
 function vpl_generate_selfsigned_certificate {
 	local A=""
-	echo "Generating self-signed SSL certificate"
+	local HNAMEW=$(hostname --long| sed 's/^[^\.]*/\*/g')
+	local HNAME=$(hostname --long)
+	local INAME
+	echo "Generating self-signed SSL certificate for $HNAME machine"
 	#Get host name to generate the certificate
-	echo -n "Do you want a certificate with wildcard for a set of servers (eg. *.s.com)? (y/n)"
+	echo -n "Do you want a certificate with wildcard for a set of servers ($HNAMEW)? (y/n)"
 	read A
 	if [ "$A" == "y" ] ; then
-		INAME=$(hostname --long| sed 's/^[^\.]*/\*/g')
+		INAME=$HNAMEW
 	else
-		INAME=$(hostname --long)
+		INAME=$HNAME
+	fi
+	if [ "$INAME" = "" ] ; then
+		INAME=localhost
 	fi
 	#Generate key
 	openssl genrsa -passout pass:12345678 -des3 -out key.pem 1024
 	#Generate certificate for this server
-	local SUBJOPT="-subj"
-	local SUBJ="/C=ES/ST=State/L=Location/O=VPL/OU=Execution server/CN=$INAME"
 	echo -n "Do you want to customize the certificate info? (y/n)"
 	read A
 	if [ "$A" == "y" ] ; then
-		SUBJOPT=""
-		CERTSUBJ=""	
+		openssl req -new -key key.pem -out certini.pem -passin pass:12345678
+	else
+		local SUBJ="/C=ES/ST=State/L=Location/O=VPL/OU=Execution server/CN=$INAME"
+		openssl req -new -subj "$SUBJ" -key key.pem -out certini.pem -passin pass:12345678
 	fi
-	openssl req -new $SUBJOPT "$SUBJ" -key key.pem -out certini.pem -passin pass:12345678
 	#Remove key password
 	cp key.pem keyini.pem
 	openssl rsa -in keyini.pem -out key.pem -passin pass:12345678
@@ -86,22 +190,40 @@ echo "Installation log file => $LOGFILE"
 echo "Preparing the installation"
 if [ "$LSYSTEM" == "1" ] ; then
 	vpl_install "LSB core" redhat-lsb-core
-	vpl_install "C++ compiler" make gcc gcc-c++
-	vpl_install "SSL library" openssl openssl-devel
+	vpl_install "make" make
+	vpl_install "C compiler" gcc
+	vpl_install "C++ compiler" gcc-c++
+	vpl_install "SSL library" openssl
+	vpl_install "SSL library" openssl-devel
 	vpl_install "Firewall" iptables
-	vpl_install "Window manager" metacity xterm
+	vpl_install "Window manager" metacity
+	vpl_install "xterm" xterm
 	vpl_install "VNC server" tigervnc-server
 	vpl_install "Web browser" firefox
 else
-	vpl_install "C++ compiler" make g++
-	vpl_install "SSL library" openssl libssl-dev
+	if [ "$(command -v add-apt-repository)" != "" ] ; then
+		add-apt-repository universe &> /dev/null
+	fi
+	vpl_install "make" make
+	vpl_install "LSB" lsb lsb-core lsb-compat
+	vpl_install "C++ compiler" g++
+	vpl_install "SSL library" openssl
+	vpl_install "SSL library" libssl-dev
 	vpl_install "Firewall" iptables
 	vpl_install "X system" xorg
+	vpl_install "dbus-x11" dbus-x11
 	vpl_install "VNC server" tightvncserver
-	vpl_install "Window manager" xfonts-75dpi xfonts-100dpi openbox
+	vpl_install "Fonts" xfonts-75dpi
+	vpl_install "Fonts" xfonts-100dpi
+	vpl_install "Window manager" openbox
 	vpl_install "Configuration DB system" gconf2
-	gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
-	vpl_install "Web browser" firefox
+	if [ "$(command -v gconftool-2)" != "" ] ; then
+		gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
+	fi
+	vpl_install "Web browser" firefox firefox-esr
+	vpl_install "wget" wget
+	vpl_install "curl" curl
+	vpl_install "net-tools" net-tools
 fi
 echo "Checking installed software"
 ./configure >>$LOGFILE
@@ -119,7 +241,22 @@ fi
 #Copy daemon 
 cp src/vpl-jail-server $VPLJAIL_INSTALL_DIR
 #Copy configuration file
-cp -i vpl-jail-system.conf $VPLJAIL_INSTALL_DIR
+VPL_CONFIGFILE=$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf
+if [ -f $VPL_CONFIGFILE ] ; then
+	echo "Replace current configuration file $VPL_CONFIGFILE with a fresh one?"
+	read A
+	if [ "$A" == "y" ] ; then
+		cp vpl-jail-system.conf $VPL_CONFIGFILE
+		echo "Configuration file replaced"
+	fi
+else
+	cp vpl-jail-system.conf $VPL_CONFIGFILE
+	if [ "$LSYSTEM" == "1"  ] ; then
+		echo "" >> $VPL_CONFIGFILE
+		echo "ENVPATH=/usr/bin:/bin" >> $VPL_CONFIGFILE
+		echo "Configuration file changed for CentOS. Added ENVPATH"
+	fi
+fi
 chmod 600 $VPLJAIL_INSTALL_DIR/vpl-jail-system.conf
 #Copy launch scripts
 cp vpl_*.sh /etc/vpl
@@ -148,7 +285,7 @@ if [ ! -f $VPLJAIL_INSTALL_DIR/cert.pem ] ; then
 		rm key.pem keyini.pem certini.pem cert.pem
 	fi
 else
-	echo "Found SSL certificate => Don't create new one"
+	echo "Found SSL certificate => Don't create a new one"
 fi
 if [ "$LSYSTEM" = "1" ] ; then
 	#Add service
@@ -159,29 +296,24 @@ if [ "$LSYSTEM" = "1" ] ; then
         vpl_install "Ada compiler (GNU)" gcc-gnat
         vpl_install "Assembler" nasm
         vpl_install "C compiler (GNU)" gcc
-        #vpl_install "C# development framework (mono)" mono-complete monodevelop monodevelop-debugger-gdb
-        #vpl_install "DDD graphical front end debugger (GNU)" ddd
         vpl_install "Fortran compiler (GNU)" gcc-gfortran
         vpl_install "General purpose debugger (GNU)" gdb
-        #vpl_install "Haskell 98 interpreter" hugs
-        vpl_install "Java (OpenJDK7)" java-1.7.0-openjdk-devel
-        vpl_install "Junit framework" junit junit4
-        #vpl_install "Octave (GNU)" octave
-        #vpl_install "Pascal compiler" fp-compiler
+        vpl_install "Java (OpenJDK)" java-1.8.0-openjdk-devel java-1.7.0-openjdk-devel
+        vpl_install "Junit framework" junit
         vpl_install "Perl interpreter" perl
         vpl_install "PHP interpreter" php-cli
         vpl_install "Prolog" pl
         vpl_install "Python interpreter" python
         vpl_install "Ruby interpreter" ruby
-        #vpl_install "Scala programming language" scala
-        #vpl_install "Scheme interpreter" plt-scheme
         vpl_install "SQL interpreter" sqlite
         vpl_install "TCL interpreter" tcl
         vpl_install "Valgrind tool" valgrind
     fi
+    echo "IMPORTANT: Please, set properly the ENVPATH in the config file /etc/vpl/vpl-jail-system.conf" 
+    echo "           e.g. \"ENVPATH=/usr/bin:/bin:/usr/sbin\" and restart the service"
 else
     update-rc.d -f vpl-jail-system remove >>$LOGFILE
-    update-rc.d vpl-jail-system start 50 2 3 4 5 . stop 50 0 1 6 . >>$LOGFILE
+    update-rc.d vpl-jail-system defaults >>$LOGFILE
     echo "Do you want to install development software?"
     echo "  (Ada, Assambler, C, C++, C#, DDD, Fortran, gdb, Haskell, Java, "
     echo "   JUnit, Node.js, Octave, Pascal, Perl, PHP, Python, Ruby, Scala,"
@@ -198,23 +330,37 @@ else
         vpl_install "Ada compiler (GNU)" gnat
         vpl_install "Assembler" nasm
         vpl_install "C compiler (GNU)" gcc
-        vpl_install "C# development framework (mono)" mono-complete monodevelop monodevelop-debugger-gdb
+        vpl_install "C# development framework (mono)" mono-complete
         vpl_install "DDD graphical front end debugger (GNU)" ddd
         vpl_install "Fortran compiler (GNU)" gfortran
         vpl_install "General purpose debugger (GNU)" gdb
-        vpl_install "Haskell 98 interpreter" hugs
-        vpl_install "Java (OpenJDK7)" openjdk-7-jdk checkstyle
-        vpl_install "Junit framework" junit junit4
-        vpl_install "JavaScript Node.js" nodejs
+        vpl_install "Haskell" hgc hugs
+        vpl_install "Java (OpenJDK)" default-jdk openjdk-7-jdk
+        vpl_install "JavaFX" openjfx
+        vpl_install "Java Checkstyle" checkstyle
+        vpl_install "Junit framework" junit4 junit
+        vpl_install "JavaScript (Nodejs)" nodejs
+        vpl_install "JavaScript (Nodejs-legacy)" nodejs-legacy
+        vpl_install_npm "TypeScript" typescript
+        vpl_install_npm "Sass" sass
         vpl_install "Octave (GNU)" octave
         vpl_install "Pascal compiler" fp-compiler
         vpl_install "Perl interpreter" perl
-        vpl_install "PHP interpreter" php5-cli php5-sqlite
+        vpl_install "PHP interpreter" php-cli php5-cli
+        vpl_install "PHP readline" php-readline
+        vpl_install "Sqlite for PHP" php-sqlite3 php5-sqlite
         vpl_install "Prolog" swi-prolog
-        vpl_install "Python interpreter" python pydb python-tk
+        vpl_install "Python interpreter" python
+        vpl_install "Python pydb" pydb
+        vpl_install "Python pudb" python-pudb
+        vpl_install "Pythom Thonny" thonny
+        vpl_install "Python tk" python-tk
+        vpl_install "Python3" python3
+        vpl_install "Python3 tk" python3-tk
+        vpl_install "Python3 pudb" python3-pudb
         vpl_install "Ruby interpreter" ruby
         vpl_install "Scala programming language" scala
-        vpl_install "Scheme interpreter" plt-scheme
+        vpl_install "Scheme interpreter" plt-scheme racket
         vpl_install "SQL interpreter" sqlite3
         vpl_install "TCL interpreter" tcl
         vpl_install "Valgrind tool" valgrind
@@ -222,24 +368,32 @@ else
     if [ "$A2" != "n" ] ; then
     	echo "This installation may take a long time"
     	vpl_install "Clisp" clisp
-        vpl_install "Clojure" clojure1.4
+        vpl_install "Clojure" clojure clojure1.6 clojure1.4
         vpl_install "Cobol" open-cobol
         vpl_install "CoffeeScript" coffeescript
         vpl_install "D compiler (GNU)" gdc
         vpl_install "Erlang" erlang
         vpl_install "Go programming language compiler" golang
         vpl_install "Haxe programming language" haxe
-        vpl_install "JQuery JavaScript Lib" libjs-jquery libjs-jquery-ui 
+        vpl_install "JQuery JavaScript Lib" libjs-jquery
+        vpl_install "JQuery-UI JavaScript Lib" libjs-jquery-ui 
         vpl_install "Lua compiler 5.1" lua5.1
         vpl_install "R statistical computation and graphics system (GNU)" r-base
         vpl_install "XQuery interpreter" galax
-        #vpl_install "Expect tool" expect
+        vpl_install "Verilog compiler" iverilog
         vpl_install "VHDL compiler" freehdl
+        vpl_install "libtool required for VHDL" libtool-bin
         #vpl_install "Groovy programming language" groovy
+    fi
+    echo "Do you want to try to install JGrasp?"
+    echo -n "(y/n)"
+    read A3
+    if [ "$A3" != "n" ] ; then
+    	vpl_install_jgrasp
     fi
     if [ -f /etc/init.d/apache2 ] ; then
     	echo "If you are planning to use apache2 or other service in this system,"
-    	echo "beware that you must use differents port that in vpl-jail-system"
+    	echo "notice that you must use different ports that in vpl-jail-system"
     	echo "It seems that you have apache2 in your system."
 	    echo -n "Remove apache2 ? (y/n) "
     	read A
@@ -251,5 +405,6 @@ else
     	fi
     fi
 fi
+echo "Starting the service (vpl-jail-system)"
 service vpl-jail-system start
 

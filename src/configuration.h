@@ -17,6 +17,7 @@ private:
 	static Configuration* singlenton;
 	ExecutionLimits jailLimits;
 	string jailPath;   //Path to jail file system
+	string cleanPATH; //Path environment variable cleaned
 	string configPath; //Path to configuration file
 	string controlPath; //Path to the control directory
 	uid_t  minPrisoner, maxPrisoner; //uid prisoner selection limits
@@ -24,6 +25,7 @@ private:
 	string interface; //Interface to serve default all
 	string URLPath; //URL path to accept tasks
 	int port, sport; //Server ports
+	int logLevel; //Log level 0 to 8, 0 = no log, 8 += do not remove home dir.
 	regex_t reg;
 	void checkConfigFile(string fileName, string men);
 	void readConfigFile();
@@ -33,8 +35,10 @@ public:
 		if(singlenton == NULL) singlenton= new Configuration();
 		return singlenton;
 	}
+	static string generateCleanPATH(string jailPath, string dirtyPATH);
 	ExecutionLimits getLimits(){ return jailLimits;}
 	string getJailPath(){ return jailPath;}
+	string getCleanPATH(){ return cleanPATH;}
 	string getControlPath(){ return controlPath;}
 	size_t getMinPrisioner(){ return minPrisoner;}
 	size_t getMaxPrisioner(){ return maxPrisoner;}
@@ -43,6 +47,7 @@ public:
 	string getURLPath(){ return URLPath;}
 	int getPort(){ return port;}
 	int getSecurePort(){ return sport;}
+	int getLogLevel(){ return logLevel;}
 };
 #endif
 

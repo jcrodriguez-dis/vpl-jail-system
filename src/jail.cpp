@@ -12,11 +12,13 @@
 #include <limits>
 #include <cstring>
 #include <algorithm>
+#include <exception>
 #include <sys/types.h>
 #include <dirent.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <pty.h>
 #include "jail.h"
 #include "redirector.h"
 #include "httpServer.h"
@@ -46,10 +48,23 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 		syslog(LOG_INFO,"parse files %lu",(long unsigned int)parsedata.size());
 		mapstruct files=RPC::getFiles(parsedata["files"]);
 		mapstruct filestodelete=RPC::getFiles(parsedata["filestodelete"]);
+		mapstruct fileencoding;
+		if ( parsedata.find("fileencoding") != parsedata.end() ) {
+			fileencoding = RPC::getFiles(parsedata["fileencoding"]);
+		}
 		string script=parsedata["execute"]->getString();
-		//Retrieve files to execution dir and options
+		//Retrieve files to execution dir and options, decode data if needed
 		for(mapstruct::iterator i=files.begin(); i!=files.end(); i++){
-			string name=i->first,data=i->second->getString();
+			string name=i->first;
+			string data=i->second->getString();
+			if ( fileencoding.find(name) != fileencoding.end()
+				 && fileencoding[name]->getInt() == 1 ) {
+				syslog(LOG_INFO,"Decoding file %s from b64",name.c_str());
+				data = Base64::decode(data);
+				if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
+					name = name.substr(0, name.length() - 4);
+				}
+			}
 			syslog(LOG_INFO,"Write file %s data size %lu",name.c_str(),(long unsigned int)data.size());
 			pm.writeFile(name,data);
 		}
@@ -81,7 +96,12 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 			if(!interactive && pm.FileExists(VPL_EXECUTION)){
 				pm.setRunner();
 				syslog(LOG_INFO,"Non interactive execution");
-				string executionOutput=run(pm,VPL_EXECUTION);
+				string program;
+				if(pm.installScript(".vpl_launcher.sh","vpl_batch_launcher.sh"))
+					program=".vpl_launcher.sh";
+				else
+					program=VPL_EXECUTION;
+				string executionOutput=run(pm,program);
 				syslog(LOG_INFO,"Write execution result");
 				pm.setExecutionOutput(executionOutput,true);
 			}
@@ -97,8 +117,12 @@ void Jail::commandGetResult(string adminticket,string &compilation,string &execu
 	interactive=pm.isInteractive();
 }
 bool Jail::commandRunning(string adminticket){
-	processMonitor pm(adminticket);
-	return pm.isRunnig();
+	try{
+		processMonitor pm(adminticket);
+		return pm.isRunnig();
+	}catch(...){
+		return false;
+	}
 }
 void Jail::commandStop(string adminticket){
 	pid_t pid=fork();
@@ -118,12 +142,13 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 	webSocket ws(s);
 	processState state=prestarting;
 	time_t timeout=pm.getStartTime()+pm.getMaxTime();
-	time_t startTime,lastMessageTime;
+	time_t startTime = 0;
+	time_t lastMessageTime = 0;
 	time_t lastTime=pm.getStartTime();
 	string lastMessage;
 	while(state != stopped){
 		time_t now = time(NULL);
-		if(lastMessage.size()>0 && now != lastMessageTime){
+		if( ! lastMessage.empty() && now != lastMessageTime){
 			ws.send(lastMessage+": "+Util::itos(now-startTime)+" seg");
 			lastMessageTime = now;
 		}
@@ -131,6 +156,8 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 		if(newstate!=state){
 			state=newstate;
 			switch(state){
+			case prestarting:
+				break;
 			case starting:
 				syslog(LOG_DEBUG,"Monitor starting");
 				startTime = now;
@@ -260,7 +287,8 @@ void Jail::commandExecute(string executeticket,Socket *s){
 bool Jail::isValidIPforRequest(){
 	const vector<string> &dirs=configuration->getTaskOnlyFrom();
 	if(dirs.size()==0) return true;
-	for(int i = 0; i< dirs.size(); i++){
+	int l = (int) dirs.size();
+	for(int i = 0; i< l; i++){
 		if(IP.find(dirs[i]) == 0)
 			return true;
 	}
@@ -273,6 +301,8 @@ bool Jail::isValidIPforRequest(){
  */
 Jail::Jail(string IP){
 	this->IP = IP;
+	this->newpid = -1;
+	this->redirectorpid = -1;
 	configuration = Configuration::getConfiguration();
 }
 
@@ -313,7 +343,7 @@ void Jail::process(Socket *socket){
 					server.sendCode(notFoundCode,"");
 					_exit(static_cast<int>(neutral));
 				}else{
-					throw HttpException(notFoundCode,"Url path not found");
+					throw HttpException(notFoundCode,"Url path not found '"+socket->getURLPath()+"'");
 				}
 			}
 			if(httpMethod != "POST"){
@@ -352,7 +382,6 @@ void Jail::process(Socket *socket){
 			}else if(request=="running"){
 				string adminticket;
 				adminticket=parsedata["adminticket"]->getString();
-				commandRunning(adminticket);
 				server.send200(RPC::runningResponse(commandRunning(adminticket)));
 			}else if(request=="stop"){
 				string adminticket;
@@ -387,6 +416,10 @@ void Jail::process(Socket *socket){
 	catch(HttpException &exception){
 		syslog(LOG_ERR,"%s:%s",IP.c_str(),exception.getLog().c_str());
 		server.sendCode(exception.getCode(),exception.getMessage());
+	}
+	catch(std::exception &e){
+		syslog(LOG_ERR,"%s:Unexpected exception %s on %s:%d",IP.c_str(), e.what(),__FILE__,__LINE__);
+		server.sendCode(internalServerErrorCode,"Unknown error");
 	}
 	catch(string &exception){
 		syslog(LOG_ERR,"%s:%s",IP.c_str(),exception.c_str());
@@ -440,9 +473,9 @@ void Jail::transferExecution(processMonitor &pm, string fileName){
 	string uid=Util::itos(pm.getPrisonerID());
 	string HOME="HOME=/home/p"+uid;
 	env[nenv++]=(char *)HOME.c_str();
-	string PATH="PATH="+Util::getEnv("PATH");
+	string PATH="PATH="+configuration->getCleanPATH();
 	env[nenv++]=(char *)PATH.c_str();
-	env[nenv++]=(char *)"TERM=xterm";
+	env[nenv++]=(char *)"TERM=dumb";
 	string UID="UID="+uid;
 	env[nenv++]=(char *)UID.c_str();
 	string USER="USER=p"+uid;
@@ -514,6 +547,7 @@ string Jail::run(processMonitor &pm,string name, int othermaxtime){
 			goJail();
 			setLimits(pm);
 			pm.becomePrisoner();
+			setsid();
 			transferExecution(pm,name);
 		}catch(const char *s){
 			syslog(LOG_ERR,"Error running: %s",s);
@@ -532,7 +566,6 @@ string Jail::run(processMonitor &pm,string name, int othermaxtime){
 	syslog(LOG_INFO, "child pid %d",newpid);
 	Redirector redirector;
 	redirector.start(fdmaster);
-	const long int waittime= 10000;
 	time_t startTime=time(NULL);
 	time_t lastTime=startTime;
 	int stopSignal=SIGTERM;
@@ -644,7 +677,6 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 	Redirector redirector;
 	syslog(LOG_INFO, "Redirector start terminal control");
 	redirector.start(fdmaster,&ws);
-	const long int waittime= 10000;
 	time_t startTime=time(NULL);
 	time_t lastTime=startTime;
 	bool noMonitor=false;
@@ -715,7 +747,6 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 	Redirector redirector;
 	syslog(LOG_INFO, "Redirector start vncserver control");
 	redirector.start(&ws,VNCServerPort);
-	const long int waittime= 10000;
 	time_t startTime=time(NULL);
 	time_t lastTime=startTime;
 	bool noMonitor=false;

@@ -134,16 +134,16 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 		}
 		return ret;
 	}
-	if(header.size()==0)
+	if(header.empty())
 		sizeToReceive = JAIL_HEADERS_SIZE_LIMIT;
-	if(sizeToReceive){
-		syslog(LOG_INFO,"Receiving until %d bytes",sizeToReceive);
+	if(sizeToReceive > 0){
+		syslog(LOG_INFO,"Receiving until %d bytes", sizeToReceive);
 	}
 	//If already read, return data
-	if(sizeToReceive>0 && readBuffer.size()>=sizeToReceive
-			&& header.size()!=0){
-		string ret = readBuffer.substr(0,sizeToReceive);
-		readBuffer.erase(0,sizeToReceive);
+	if( sizeToReceive > 0 && (int) readBuffer.size() >= sizeToReceive
+			&& ! header.empty()){
+		string ret = readBuffer.substr(0, sizeToReceive);
+		readBuffer.erase(0, sizeToReceive);
 		return ret;
 	}
 	struct pollfd devices[1];
@@ -156,33 +156,33 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 	time_t timeLimit=time(NULL)+JAIL_SOCKET_TIMEOUT;
 	time_t fullTimeLimit=time(NULL)+JAIL_SOCKET_REQUESTTIMEOUT;
 	while(true){
-		int res=poll(devices,1,wait);
-		if(res==-1) {
+		int res = poll(devices,1,wait);
+		if(res == -1) {
 			syslog(LOG_INFO,"poll fail reading %m");
 			throw HttpException(internalServerErrorCode
 					,"Error poll reading data"); //Error
 		}
 		time_t currentTime=time(NULL);
 		if(currentTime>timeLimit || currentTime>fullTimeLimit){
-			if(sizeToReceive==0){
+			if(sizeToReceive == 0){
 				syslog(LOG_DEBUG,"Socket read timeout, closed connection?");
 				return "";
 			}else
 				throw HttpException(requestTimeoutCode
 						,"Socket read timeout");
 		}
-		if(res==0 && sizeToReceive==0) break; //Nothing to read
-		if(res==0) continue; //Nothing to do
+		if(res == 0 && sizeToReceive == 0) break; //Nothing to read
+		if(res == 0) continue; //Nothing to do
 		syslog(LOG_DEBUG,"poll return: %d",res);
 		if(devices[0].revents & POLLIN){ //Read from net
-			int sizeRead=netRead(buf,MAX);
-			if(sizeRead >0) {
+			int sizeRead = netRead(buf,MAX);
+			if(sizeRead > 0) {
 				string sread(buf,sizeRead);
-				if(sread.size()!=sizeRead){
+				if( (int) sread.size() != sizeRead){
 					syslog(LOG_ERR,"read net decode error");
 				}
 				readBuffer += sread;
-				if(header.size()==0){
+				if(header.empty()){
 					size_t pos;
 					if((pos=readBuffer.find("\r\n\r\n")) != string::npos){
 						header=readBuffer.substr(0,pos+4);
@@ -193,10 +193,10 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 					}else if(readBuffer.size()>JAIL_HEADERS_SIZE_LIMIT){
 						throw HttpException(requestEntityTooLargeCode,"Http headers too large");
 					}
-				}else if(sizeToReceive==0 || readBuffer.size()>=sizeToReceive){ //Receive complete
+				}else if(sizeToReceive == 0 || (int) readBuffer.size() >= sizeToReceive){ //Receive complete
 					break;
 				}
-				timeLimit=currentTime+JAIL_SOCKET_TIMEOUT; //Reset timeout
+				timeLimit = currentTime+JAIL_SOCKET_TIMEOUT; //Reset timeout
 			}
 			else if(sizeRead<0){
 				throw HttpException(badRequestCode
@@ -231,12 +231,12 @@ void Socket::send(const string &data, bool async){
 	writeBuffer += data;
 	size_t size=writeBuffer.size();
 	const unsigned char *s=(const unsigned char *)writeBuffer.data();
-	syslog(LOG_INFO,"Sending %lu",(long unsigned int)size);
+	syslog(LOG_INFO,"Sending %lu to fd %u",(long unsigned int)size,socket);
 	size_t offset=0;
 	struct pollfd devices[1];
 	devices[0].fd=socket;
 	devices[0].events=POLLOUT;
-	const int wait=1; // 1 milisec
+	const int wait=10; // 10 milisec
 	const int bad=POLLERR|POLLHUP|POLLNVAL;
 	time_t timeLimit=time(NULL)+JAIL_SOCKET_TIMEOUT;
 	time_t fullTimeLimit=time(NULL)+JAIL_SOCKET_REQUESTTIMEOUT;

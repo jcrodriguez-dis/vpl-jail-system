@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.65])
-AC_INIT([vpl jail system], [2.1.1])
+AC_INIT([vpl jail system], [2.3.0.4])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
@@ -14,7 +14,7 @@ AC_PROG_CC
 # Checks for libraries.
 AC_CHECK_LIB([util], [forkpty],)
 AC_CHECK_LIB([crypto], [SHA1],)
-AC_CHECK_LIB([ssl], [SSL_library_init],)
+AC_CHECK_LIB([ssl], [SSL_CTX_new],)
 
 # Checks for header files.
 AC_HEADER_DIRENT

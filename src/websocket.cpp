@@ -58,12 +58,12 @@ int webSocket::frameSize(const string &data
 	mask_size=0;
 	payload_size=0;
 	const unsigned char *rawdata=(const unsigned char *)data.data();
-	if(data.size() <
+	if((int) data.size() <
 			control_size+mask_size+payload_size) return -1;
 	//Is masked frame (must be musked)
 	mask_size=(rawdata[1]&0x80) ? 4:0;
 	payload_size=rawdata[1]&0x7f;
-	if(data.size() <
+	if((int) data.size() <
 			control_size+mask_size+payload_size) return -1;
 	if(payload_size == 126){
 		control_size +=2; //for len extension
@@ -82,14 +82,14 @@ bool webSocket::isFrameComplete(const string &data){
 	int control_size,mask_size,payload_size;
 	int fSize=frameSize(data,control_size,mask_size,payload_size);
 	if(fSize == -1) return false;
-	return data.size() >= fSize;
+	return (int) data.size() >= fSize;
 }
 
 string webSocket::decodeFrame(string &data, FrameType &ft){
 	int control_size,mask_size,payload_size;
 	int fSize=frameSize(data,control_size,mask_size,payload_size);
 	//syslog(LOG_DEBUG,"Decoding frame %d=%d+%d+%d",fSize,control_size,mask_size,payload_size);
-	if(fSize==-1 || data.size()<fSize){
+	if(fSize==-1 || (int) data.size() < fSize){
 		ft=ERROR_FRAME;
 		return "Frame size too large";
 	}
@@ -130,7 +130,6 @@ string webSocket::encodeFrame(const string &rdata,FrameType ft){
 		ft = TEXT_FRAME;
 	}
 	int payload_size=data.size();
-	const unsigned char *rawdata=(const unsigned char *)data.data();
 	if(payload_size > 125)
 		control_size+=2;
 	if(payload_size > 0xFFFF)

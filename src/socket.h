@@ -49,6 +49,7 @@ class SSLBase{
 			syslog(LOG_ERR,"SSL_CTX_check_private_key() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
+		SSL_CTX_set_options(context,SSL_OP_NO_SSLv3);
 		SSL_CTX_set_mode(context,SSL_MODE_ENABLE_PARTIAL_WRITE|
 								SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 	}
@@ -111,7 +112,7 @@ public:
 	bool isWriteBuffered() { return writeBuffer.size()>0;}
 	virtual bool isSecure() { return false;}
 	bool isClosed(){return closed;}
-	void close(){if(!closed) shutdown(socket,SHUT_WR);closed=true;}
+	void close(){if(!closed) shutdown(socket,SHUT_RDWR);closed=true;}
 	bool wait(const int msec=50); //Wait for a socket change until milisec time
 	void send(const string &data, bool async=false);
 	string receive(int sizeToReceive=0);
@@ -125,7 +126,6 @@ class SSLRetry{
 public:
 	SSLRetry(int socket, const SSL *s, string action){
 		devices[0].fd=socket;
-		devices[0].events=POLLIN|POLLOUT;
 		ssl=s;
 		message="Error in SSL "+action+" ";
 		currentTime=time(NULL);
@@ -138,12 +138,26 @@ public:
 		switch(code){
 			case SSL_ERROR_NONE: return true;
 			case SSL_ERROR_ZERO_RETURN: return true;
-			case SSL_ERROR_WANT_READ: break;
-			case SSL_ERROR_WANT_WRITE: break;
-			case SSL_ERROR_WANT_CONNECT: break;
-			case SSL_ERROR_WANT_ACCEPT: break;
+			case SSL_ERROR_WANT_READ:
+				devices[0].events=POLLIN;
+				break;
+			case SSL_ERROR_WANT_WRITE:
+				devices[0].events=POLLOUT;
+				break;
+			case SSL_ERROR_WANT_CONNECT:
+				if(scode == NULL){
+					scode="SSL_ERROR_WANT_CONNECT ";
+				}
+				/* no break */
+			case SSL_ERROR_WANT_ACCEPT:
+				if(scode == NULL){
+					scode="SSL_ERROR_WANT_ACCEPT ";
+				}
+				/* no break */
 			case SSL_ERROR_SYSCALL:
-				scode="SSL_ERROR_SYSCALL ";
+				if(scode == NULL){
+					scode="SSL_ERROR_SYSCALL ";
+				}
 				if(ret == 0){
 					syslog(LOG_INFO,"SSL socket closed unexpected ret==0: %s %s",message.c_str(),scode);
 					return true;
@@ -161,18 +175,15 @@ public:
 				throw HttpException(internalServerErrorCode
 						,message+scode+SSLBase::getError()); //Error
 		}
-		usleep(10000);//avoids high load in endless loops
 		ERR_clear_error();
-		time_t wait=timeLimit-currentTime;
+		time_t wait=(timeLimit-currentTime)*1000;
 		int res=poll(devices,1,wait);
 		if(res==-1) {
-			throw HttpException(internalServerErrorCode
-					,"Error poll "+message); //Error
+			throw HttpException(internalServerErrorCode, message+ ": poll error"); //Error
 		}
 		currentTime=time(NULL);
 		if(currentTime>timeLimit || res==0){
-			throw HttpException(requestTimeoutCode
-					,"Socket read timeout");
+			throw HttpException(requestTimeoutCode, message+": timeout");
 		}
 		return false;
 	}
@@ -206,7 +217,7 @@ public:
 		while(true){
 			int ret= SSL_accept(ssl);
 			if(retry.end(ret)) break;
-		}	
+		}
 	}
 	~SSLSocket(){
 		SSL_free(ssl);

@@ -6,8 +6,7 @@
 		rm .vpl_set_locale_error
 		export LC_ALL=en_US.utf8
 	fi
-	export TERM=xterm
-	stty sane iutf8 erase ^?
+	export TERM=dumb
 } &>/dev/null
 ./vpl_execution
 exit

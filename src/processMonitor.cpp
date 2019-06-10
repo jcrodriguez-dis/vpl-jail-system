@@ -104,7 +104,6 @@ void processMonitor::selectPrisoner(){
 		prisoner = configuration->getMinPrisioner()+Util::random()%range;
 		setControlPath();
 		string controlPath=getControlPath();
-		//TODO check existence of old home dir nad remove it
 		if(mkdir(controlPath.c_str(),umask)==0){
 			homePath=prisonerHomePath();
 			if(mkdir(homePath.c_str(),umask)==0){
@@ -382,7 +381,6 @@ void processMonitor::limitResultSize(string &r){
 void processMonitor::getResult(string &compilation, string &execution, bool &executed){
 	if(security != admin)
 		throw HttpException(internalServerErrorCode,"Security: requiere admin ticket for request");
-	processState state=getState(); //May be a problem with next acction
 	if(isInteractive())
 		throw HttpException(internalServerErrorCode,"Security: process in bad state");
 	{
@@ -455,9 +453,13 @@ int processMonitor::removeDir(string dir, bool force){
  * remove prisoner home directory and /tmp prisoner files
  */
 void processMonitor::removePrisonerHome(){
-	syslog(LOG_INFO,"Remove prisoner home (%d)",prisoner);
-	Util::removeDir(configuration->getJailPath()+"/tmp",getPrisonerID(),false); //Only prisoner files and dirs
-	Util::removeDir(prisonerHomePath(),getPrisonerID(),true); //All files and dir
+	if ( configuration->getLogLevel() != 8 ) {
+		syslog(LOG_INFO,"Remove prisoner home (%d)",prisoner);
+		Util::removeDir(configuration->getJailPath()+"/tmp",getPrisonerID(),false); //Only prisoner files and dirs
+		Util::removeDir(prisonerHomePath(),getPrisonerID(),true); //All files and dir
+	} else {
+		syslog(LOG_INFO,"Loglevel = 8 => do not remove prisoner home (%d)",prisoner);
+	}
 }
 
 /**
@@ -486,7 +488,7 @@ void processMonitor::cleanMonitor(){
 
 bool processMonitor::isOutOfMemory(){
 	if(executionLimits.maxmemory==0) return false;
-	return executionLimits.maxmemory<getMemoryUsed();
+	return (uint64_t) executionLimits.maxmemory < getMemoryUsed();
 }
 
 string processMonitor::getMemoryLimit(){
@@ -496,7 +498,6 @@ string processMonitor::getMemoryLimit(){
 
 uint64_t processMonitor::getMemoryUsed(){
 	string dir="/proc";
-	struct stat filestat;
 	dirent *ent;
 	DIR *dirfd=opendir(dir.c_str());
 	if(dirfd==NULL){
@@ -521,7 +522,7 @@ uint64_t processMonitor::getMemoryUsed(){
 		int nomatch=regexec(&reg_uid, status.c_str(),3, match, 0);
 		if(nomatch==0){
 			string UIDF=status.substr(match[1].rm_so,match[1].rm_eo-match[1].rm_so);
-			if(Util::atoi(UIDF) == prisoner){
+			if(Util::atoi(UIDF) == (int) prisoner){
 				nomatch=regexec(&reg_mem, status.c_str(),3, match, 0);
 				if(nomatch==0){
 					string MEM=status.substr(match[1].rm_so,match[1].rm_eo-match[1].rm_so);

@@ -140,7 +140,6 @@ class Daemon{
 			}
 			statistics.requests++;
 			if(WIFSIGNALED(status)){
-				int signal = WTERMSIG(status);
 				processChildEnd(wret,internalError);
 			}else if(WIFEXITED(status)){
 				processChildEnd(wret, static_cast<ExitStatus>(WEXITSTATUS(status)));
@@ -192,9 +191,9 @@ class Daemon{
 				socket= new SSLSocket(actualSocket);
 			else
 				socket= new Socket(actualSocket);
-			auto_ptr<Socket> auto_destroy(socket);
 			Jail jail(IP);
 			jail.process(socket);
+			delete socket;
 			usleep(10000);//Wait for father process child
 			_exit(EXIT_SUCCESS);
 		}
@@ -215,10 +214,13 @@ class Daemon{
 			devices[1].events=POLLIN;
 			ndev++;
 		}
-		const int bad=POLLERR|POLLNVAL;
 		int res=poll(devices,ndev,100);
-		if(res==-1)
-			throw "Error poll listener socket"; //Error
+		if(res==-1) {
+			if (errno == EINTR) {
+				return;
+			}
+			throw string("Error poll sockets in accept: ") + strerror(errno);
+		}
 		if(res==0) return; //No request
 		if(devices[0].revents & POLLIN){ //is http or ws
 			launch(listenSocket,false);
@@ -235,6 +237,15 @@ class Daemon{
 		listenSocket = socket(AF_INET, SOCK_STREAM, 0);
 		if (listenSocket == -1)
 			throw "socket() error";
+		int on=1;
+		if(setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ) {
+			syslog(LOG_ERR,"setsockopt(SO_REUSEADDR) failed: %m");
+		}
+		#ifdef SO_REUSEPORT
+	    if (setsockopt(listenSocket, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
+			syslog(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
+	    }
+		#endif
 		struct sockaddr_in local;
 		memset(&local, 0, sizeof(local));
 		local.sin_family = AF_INET;
@@ -244,7 +255,7 @@ class Daemon{
 			local.sin_addr.s_addr = INADDR_ANY;
 		local.sin_port = htons(port);
 		if (bind(listenSocket, (struct sockaddr *) &local, sizeof(local)) == -1)
-			throw "bind() error";
+			throw string("bind() error: ") + strerror(errno);
 		if (listen(listenSocket, 100) == -1) //100 queue size
 			throw "listen() error";
 		syslog(LOG_INFO,"Listen at %s:%d",inet_ntoa(local.sin_addr), port);
@@ -253,6 +264,14 @@ class Daemon{
 			secureListenSocket = socket(AF_INET, SOCK_STREAM, 0);
 			if (secureListenSocket == -1)
 				throw "socket() error";
+			if(setsockopt(secureListenSocket, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ) {
+				syslog(LOG_ERR,"setsockopt(SO_REUSEADDR) failed: %m");
+			}
+			#ifdef SO_REUSEPORT
+		    if (setsockopt(secureListenSocket, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
+				syslog(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
+		    }
+			#endif
 			local.sin_port = htons(sport);
 			if (bind(secureListenSocket, (struct sockaddr *) &local, sizeof(local)) == -1)
 				throw "bind() secure port error";
