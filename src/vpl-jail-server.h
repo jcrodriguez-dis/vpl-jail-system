@@ -140,7 +140,6 @@ class Daemon{
 			}
 			statistics.requests++;
 			if(WIFSIGNALED(status)){
-				int signal = WTERMSIG(status);
 				processChildEnd(wret,internalError);
 			}else if(WIFEXITED(status)){
 				processChildEnd(wret, static_cast<ExitStatus>(WEXITSTATUS(status)));
@@ -215,7 +214,6 @@ class Daemon{
 			devices[1].events=POLLIN;
 			ndev++;
 		}
-		const int bad=POLLERR|POLLNVAL;
 		int res=poll(devices,ndev,100);
 		if(res==-1) {
 			if (errno == EINTR) {
