@@ -64,8 +64,8 @@ The "./install-vpl-sh" must be run as root.
 Follow the instructions and wait for the necessary downloads. The installation script will try to install the development software commonly used, but you may need to install some other by hand.
 
 The installer will ask you about:
-- If you want that the installer create a self-signed SSL certificate
-- (updating) If you want to replace the configuration file with a fresh one
+- If you want that the installer create a self-signed SSL certificate.
+- (updating) If you want to replace the configuration file with a fresh one.
 - If you want to install different compilers and interpreters.
 
 
@@ -85,10 +85,10 @@ service vpl-jail-system restart
 ```
 
 ## Main configuration parameters
-- PORT. Socket port number to listen for http and ws connections . Default value 80
-- SECURE_PORT. Socket port number to listen for https and wss connections . Default value 443
-- URLPATH. Act as a password, if no matches with the path of the URL request then it's rejected. default value "/"
-- LOGLEVEL. This value goes from 0 to 8. Use 0 for minimum log and 8 for maximum log. Level 8 does't removes the prisoners' home directory. IMPORTANT: Do not uses high loglevel in production servers, you may get low performance. Default level 0
+- PORT. Socket port number to listen for http and ws connections. The default value is 80
+- SECURE_PORT. Socket port number to listen for https and wss connections. Default value 443
+- URLPATH. Act as a password, if no matches with the path of the URL request then it's rejected. The default value is "/".
+- LOGLEVEL. This value goes from 0 to 8. Use 0 for minimum log and 8 for maximum log. Level 8 does't removes the prisoners' home directory. IMPORTANT: Do not uses high loglevel in production servers, you may get low performance. The default value is 0.
 
 # Checking
 
@@ -96,9 +96,7 @@ You can check the availability of your execution server using the URL
 
 http://server:PORT/OK and https://server:SECURE_PORT/OK
 
-where server is the name of your execution server
-
-The system must return a page with OK
+where server is the name of your execution server. The system must return a page with OK
 
 # Troubleshooting
 
@@ -118,11 +116,11 @@ The main new of the 2.3 version is the change of file system used to replicate r
 
 The replication of the root file system is done with overlayfs, allowing to adapt the replica to the needs of the VPL-Jail-System easily and safe. To accelerate the execution and limit the file system changes, the users' home directory has been mounted as a tmpfs. Also the possibility of mounting the replica allowing SETUID has been added.
 
-The use of the tmpfs removes the need of the vncaccel.sh script.
+The use of the tmpfs removes the need of the "vncaccel.sh" script.
 
 The new parameters to control this new features are:
-- USETMPFS. This switch allow the use of tmpfs for "/home" and the "/dev/shm" directories. Changing this switch to "false" can degrade the performance of the jail system. To deactivate this option use USETMPFS=false. The default value is USETMPFS=true
-- HOMESIZE. This option set the size of the "/home" directory the default value is 30% of the system memory. This option is applicable if using tmpfs file system for the "/home" directory.
-- SHMSIZE. This option set the size of the "/dev/shm" directory the default value is 30% of the system memory. This option is applicable if using tmpfs file system for the "/dev/shm" directory .
+- USETMPFS. This switch allow the use of tmpfs for "/home" and the "/dev/shm" directories. Changing this switch to "false" can degrade the performance of the jail system. To deactivate this option use USETMPFS=false. The default value is USETMPFS=true.
+- HOMESIZE. This option set the size of the "/home" directory. The default value is 30% of the system memory. This option is applicable if using tmpfs file system for the "/home" directory.
+- SHMSIZE. This option set the size of the "/dev/shm" directory. The default value is 30% of the system memory. This option is applicable if using tmpfs file system for the "/dev/shm" directory.
 - ALLOWSUID. This switch allow the execution of programs with a suid bit inside the jail. This may be a security threat, use at your own risk. To activate this option, set ALLOWSUID=true.
 
