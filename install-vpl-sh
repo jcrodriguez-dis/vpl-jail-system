@@ -217,6 +217,7 @@ else
 	vpl_install "Fonts" xfonts-100dpi
 	vpl_install "Window manager" openbox
 	vpl_install "Configuration DB system" gconf2
+	vpl_install "xterm" xterm
 	if [ "$(command -v gconftool-2)" != "" ] ; then
 		gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
 	fi
@@ -335,7 +336,12 @@ else
         vpl_install "Fortran compiler (GNU)" gfortran
         vpl_install "General purpose debugger (GNU)" gdb
         vpl_install "Haskell" hgc hugs
-        vpl_install "Java (OpenJDK)" default-jdk openjdk-7-jdk
+        vpl_install "Java runtime" default-jre openjdk-11-jre openjdk-8-jre openjdk-7-jre
+        vpl_install "Java jdk" default-jdk openjdk-11-jdk openjdk-8-jdk openjdk-7-jdk
+        if [ "$(command -v update-alternatives)" != "" ] ; then
+			update-alternatives --auto java
+			update-alternatives --auto javac
+		fi
         vpl_install "JavaFX" openjfx
         vpl_install "Java Checkstyle" checkstyle
         vpl_install "Junit framework" junit4 junit
