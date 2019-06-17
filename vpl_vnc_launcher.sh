@@ -44,7 +44,13 @@ fi
 chmod +x $HOME/vpl_wexecution
 $HOME/vpl_wexecution &> .std_output
 if [ -s .std_output ] ; then
-	xterm -T "std output" -bg white -fg red -e less .std_output
+	if [ "$(command -v xterm)" != "" ] ; then
+		xterm -T "std output" -bg white -fg red -e less .std_output
+	else
+		if [ "$(command -v x-terminal-emulator)" != "" ] ; then
+			x-terminal-emulator -e less .std_output
+		fi
+	fi
 fi
 VNCDISPLAY=$(ls $HOME/.vnc/*.log | sed -e "s/[^:]*://" -e "s/\.log$//")
 vncserver -kill :$VNCDISPLAY
