@@ -19,6 +19,7 @@ Ubuntu | 18.04 64b     | Compatible
 Ubuntu | 16.04 32b/64b | Compatible
 Debian | 9 32b/64b     | Compatible
 CentOS | 7 64b         | GUI programs not available
+CentOS | 6             | Not functional
 
 But you may need to modify the installation script or do the installation by hand.
 
