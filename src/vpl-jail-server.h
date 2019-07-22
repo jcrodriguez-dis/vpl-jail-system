@@ -283,13 +283,22 @@ class Daemon{
 	}
 	void demonize(){
 		pid_t child_pid = fork();
-		if(child_pid < 0) exit(EXIT_FAILURE);
+		if(child_pid < 0) {
+			syslog(LOG_EMERG,"demonize() => fork() fail (child_pid < 0)");
+			exit(EXIT_FAILURE);
+		}
 		if(child_pid > 0) _exit(EXIT_SUCCESS); //gradparent exit
-		if(setsid() < 0) exit(EXIT_FAILURE);
+		if(setsid() < 0) {
+			syslog(LOG_EMERG,"demonize() => (setsid() < 0)");
+			exit(EXIT_FAILURE);
+		}
 		pid_t grandchild_pid = fork();
-		if(grandchild_pid < 0) exit(EXIT_FAILURE);
+		if(grandchild_pid < 0) {
+			syslog(LOG_EMERG,"demonize() => fork() fail (grandchild_pid < 0)");
+			exit(EXIT_FAILURE);
+		}
 		if(grandchild_pid > 0) _exit(EXIT_SUCCESS); //parent exit
-		FILE *fd=fopen("/var/run/vpl-jail-server.pid","w");
+		FILE *fd=fopen("/run/vpl-jail-server.pid","w");
 		fprintf(fd,"%d",(int)getpid());
 		fclose(fd);
 	}
