@@ -13,9 +13,9 @@ if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
     echo "This script need to be run as root and is run as $USER uid $UID euid $EUID"
     exit 1;
 fi
-#Detect system
-if [ -f /sbin/chkconfig  ] && [ "$(command -v yum)" != "" ] ; then
-	echo "Detected RedHat or similar distribution (using chkconfig)" 
+# Detect package manager (YUM/APT)
+if [ "$(command -v yum)" != "" ] ; then
+	echo "Using YUM package manager" 
     function vpl_install_base {
         yum -y install $1 >>$LOGFILE
         return $?
@@ -24,10 +24,10 @@ if [ -f /sbin/chkconfig  ] && [ "$(command -v yum)" != "" ] ; then
         yum list $1 &> /dev/null
         return $?
 	}
-    LSYSTEM="1"
+    PMTYPE="1"
 else
-	if [ -f /usr/sbin/update-rc.d ] && [ "$(command -v apt-get)" != "" ] ; then
-		echo "Detected Ubuntu or similar distribution (using update-rc.d)"
+	if [ "$(command -v apt-get)" != "" ] ; then
+		echo "Using APT package manager"
 		echo "Updating distribution software DB"
 		apt-get update >>$LOGFILE
 	    function vpl_install_base {
@@ -38,12 +38,76 @@ else
             apt-cache pkgnames $1 | grep -q -x -F $1
             return $?
 	    }
-    	LSYSTEM="2"
+    	PMTYPE="2"
     else
-    	echo "Sorry can't detect system type"
+    	echo "Sorry, I can't detect the package manager of the system"
     	exit 1
 	fi
 fi
+# Detect service manager
+if [ "$(command -v systemctl)" != "" ] ; then
+	echo "Using systemd service manager"	 
+    function vpl_install_service {
+        cp vpl-jail-system.initd /etc/vpl/vpl-jail-system
+        chmod +x /etc/vpl/vpl-jail-system
+        cp vpl-jail-system.service /etc/systemd/system/vpl-jail-system.service
+        systemctl daemon-reload
+        systemctl enable vpl-jail-system
+    }
+    function vpl_stop_service {
+        systemctl stop vpl-jail-system
+	}
+    function vpl_start_service {
+        systemctl start vpl-jail-system
+	}
+	function vpl_info_using_service {
+	    echo
+        echo "-------------------------------------------"
+        echo "Notice: you may use next command to control the service"
+        echo "systemctl [start|stop|status] vpl-jail-system"
+	}
+    SMANAGER="1"
+else
+	echo "Using system V service manager"	 
+    function vpl_install_service {
+        cp vpl-jail-system.initd /etc/init.d/vpl-jail-system
+        chmod +x /etc/init.d/vpl-jail-system
+        if [ "$(command -v update-rc.d)" != "" ] ; then
+	        update-rc.d -f vpl-jail-system remove >>$LOGFILE
+			update-rc.d vpl-jail-system defaults >>$LOGFILE
+        else
+        	if [ "$(command -v chkconfig)" != "" ] ; then
+	        	chkconfig --add vpl-jail-system  >>$LOGFILE
+	        else
+            	echo "ERROR installing the service. Not found update-rc.d or chkconfig"
+        	fi
+        fi
+    }
+    function vpl_stop_service {
+        service vpl-jail-system stop
+	}
+    function vpl_start_service {
+        service vpl-jail-system start
+	}
+	function vpl_info_using_service {
+		echo
+        echo "-------------------------------------------"
+        echo "Notice: you may use next command to control the service"
+        echo "service vpl-jail-system [start|stop|status]"
+	}
+    SMANAGER="2"
+fi
+
+function vpl_check_selinux {
+	if [ "$(command -v setenforce)" != "" ] ; then
+		echo "Your system seems to be using SELinux."
+		echo "You may need to disable or configure SELinux to install and run vpl-jail-system service"
+		echo "To reactivate the vpl-jail-system service run:"
+		echo "systemctl daemon-reload"
+		echo "systemctl enable vpl-jail-system"
+		echo "systemctl start vpl-jail-system"
+	fi
+}
 function vpl_install {
 	local found=0
 	local checked=""
@@ -170,7 +234,7 @@ function vpl_generate_selfsigned_certificate {
 		INAME=localhost
 	fi
 	#Generate key
-	openssl genrsa -passout pass:12345678 -des3 -out key.pem 1024
+	openssl genrsa -passout pass:12345678 -des3 -out key.pem 2048
 	#Generate certificate for this server
 	echo -n "Do you want to customize the certificate info? (y/n)"
 	read A
@@ -188,7 +252,7 @@ function vpl_generate_selfsigned_certificate {
 }
 echo "Installation log file => $LOGFILE"
 echo "Preparing the installation"
-if [ "$LSYSTEM" == "1" ] ; then
+if [ "$PMTYPE" == "1" ] ; then
 	vpl_install "LSB core" redhat-lsb-core
 	vpl_install "make" make
 	vpl_install "C compiler" gcc
@@ -234,7 +298,7 @@ VPLJAIL_INSTALL_DIR=/etc/vpl
 if [ -d $VPLJAIL_INSTALL_DIR ] ; then
     echo "Updating installation => $VPLJAIL_INSTALL_DIR"
 	#Stop service
-	service vpl-jail-system stop >>$LOGFILE
+	vpl_stop_service >>$LOGFILE
 else
 	echo "Installing => $VPLJAIL_INSTALL_DIR"
     mkdir $VPLJAIL_INSTALL_DIR
@@ -244,7 +308,8 @@ cp src/vpl-jail-server $VPLJAIL_INSTALL_DIR
 #Copy configuration file
 VPL_CONFIGFILE=$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf
 if [ -f $VPL_CONFIGFILE ] ; then
-	echo "Replace current configuration file $VPL_CONFIGFILE with a fresh one?"
+	echo "Replace current configuration file with a fresh one?"
+	echo -n "(y/n)"
 	read A
 	if [ "$A" == "y" ] ; then
 		cp vpl-jail-system.conf $VPL_CONFIGFILE
@@ -252,24 +317,25 @@ if [ -f $VPL_CONFIGFILE ] ; then
 	fi
 else
 	cp vpl-jail-system.conf $VPL_CONFIGFILE
-	if [ "$LSYSTEM" == "1"  ] ; then
+	if [ "$PMTYPE" == "1"  ] ; then
 		echo "" >> $VPL_CONFIGFILE
 		echo "ENVPATH=/usr/bin:/bin" >> $VPL_CONFIGFILE
 		echo "Configuration file changed for CentOS. Added ENVPATH"
 	fi
 fi
 chmod 600 $VPLJAIL_INSTALL_DIR/vpl-jail-system.conf
-#Copy launch scripts
+# Copy launch scripts
 cp vpl_*.sh /etc/vpl
 chmod +x /etc/vpl/*.sh
-#Copy service script
-cp vpl-jail-system.initd /etc/init.d/vpl-jail-system
-chmod +x /etc/init.d/vpl-jail-system
+
+vpl_install_service
+
 #create default control dir
 if [ ! -d /var/vpl-jail-system ] ; then
 	mkdir /var/vpl-jail-system
 fi
 chmod 0600 /var/vpl-jail-system
+
 if [ ! -f $VPLJAIL_INSTALL_DIR/cert.pem ] ; then
 	echo "VPL execution server needs SSL certificates to accept https:"
 	echo "and wss: requests."
@@ -288,9 +354,7 @@ if [ ! -f $VPLJAIL_INSTALL_DIR/cert.pem ] ; then
 else
 	echo "Found SSL certificate => Don't create a new one"
 fi
-if [ "$LSYSTEM" = "1" ] ; then
-	#Add service
-    chkconfig --add vpl-jail-system
+if [ "$PMTYPE" = "1" ] ; then
     echo "Do you want to install development software? (C, C++, Java, etc.) (y/n)"
     read A
     if [ "$A" != "n" ] ; then
@@ -313,8 +377,6 @@ if [ "$LSYSTEM" = "1" ] ; then
     echo "IMPORTANT: Please, set properly the ENVPATH in the config file /etc/vpl/vpl-jail-system.conf" 
     echo "           e.g. \"ENVPATH=/usr/bin:/bin:/usr/sbin\" and restart the service"
 else
-    update-rc.d -f vpl-jail-system remove >>$LOGFILE
-    update-rc.d vpl-jail-system defaults >>$LOGFILE
     echo "Do you want to install development software?"
     echo "  (Ada, Assambler, C, C++, C#, DDD, Fortran, gdb, Haskell, Java, "
     echo "   JUnit, Node.js, Octave, Pascal, Perl, PHP, Python, Ruby, Scala,"
@@ -406,11 +468,18 @@ else
     	if [ "$A" == "y" ] ; then
         	#remove apache2
         	echo "Removing apache2"
-        	rm /etc/init.d/apache2 >/dev/null 2>&1
-        	update-rc.d apache2 remove
+        	if [ "SMANAGER" == "2" ] ; then
+        		rm /etc/init.d/apache2 >/dev/null 2>&1
+        		update-rc.d apache2 remove
+        	else
+        		systemctl disable apache2
+        	fi
     	fi
     fi
 fi
+vpl_check_selinux
 echo "Starting the service (vpl-jail-system)"
-service vpl-jail-system start
+vpl_start_service
+vpl_info_using_service
+
 
