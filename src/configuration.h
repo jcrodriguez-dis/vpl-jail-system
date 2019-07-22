@@ -28,13 +28,13 @@ private:
 	int logLevel; //Log level 0 to 8, 0 = no log, 8 += do not remove home dir.
 	regex_t reg;
 	void checkConfigFile(string fileName, string men);
-	void readConfigFile();
 	Configuration();
 public:
 	static Configuration* getConfiguration(){
 		if(singlenton == NULL) singlenton= new Configuration();
 		return singlenton;
 	}
+	void readConfigFile();
 	static string generateCleanPATH(string jailPath, string dirtyPATH);
 	ExecutionLimits getLimits(){ return jailLimits;}
 	string getJailPath(){ return jailPath;}
