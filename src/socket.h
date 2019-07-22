@@ -30,23 +30,23 @@ class SSLBase{
 		SSL_load_error_strings(); 
 		method = SSLv23_server_method();
 		if(method == NULL){
-			syslog(LOG_ERR,"SSLv23_server_method() fail: %s",getError());
+			syslog(LOG_EMERG,"SSLv23_server_method() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
 		if((context = SSL_CTX_new((SSL_METHOD *)method)) == NULL){ //Conversion for backward compatibility
-			syslog(LOG_ERR,"SSL_CTX_new() fail: %s",getError());
+			syslog(LOG_EMERG,"SSL_CTX_new() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
 		if(SSL_CTX_use_certificate_chain_file(context, certFile) != 1){
-			syslog(LOG_ERR,"SSL_CTX_use_certificate_chain_file() fail: %s",getError());
+			syslog(LOG_EMERG,"SSL_CTX_use_certificate_chain_file() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
 		if(SSL_CTX_use_PrivateKey_file(context, keyFile, SSL_FILETYPE_PEM) != 1){
-			syslog(LOG_ERR,"SSL_CTX_use_PrivateKey_file() fail: %s",getError());
+			syslog(LOG_EMERG,"SSL_CTX_use_PrivateKey_file() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
 		if( !SSL_CTX_check_private_key(context) ){
-			syslog(LOG_ERR,"SSL_CTX_check_private_key() fail: %s",getError());
+			syslog(LOG_EMERG,"SSL_CTX_check_private_key() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
 		SSL_CTX_set_options(context,SSL_OP_NO_SSLv3);
