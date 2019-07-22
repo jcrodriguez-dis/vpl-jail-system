@@ -16,15 +16,12 @@ bool Daemon::finishRequest=false;
 using namespace std;
 void setLogLevel(int level){
 	openlog("vpl-jail-system",LOG_PID,LOG_DAEMON);
-	if(level > 0){
-		int mlevels[8]={LOG_EMERG, LOG_ALERT, LOG_CRIT, LOG_ERR, LOG_WARNING,
-				LOG_NOTICE, LOG_INFO, LOG_DEBUG};
-		syslog(LOG_INFO,"Set log mask up to %d",level);
-		if(level>7 || level<0) level=7;
-		setlogmask(LOG_UPTO(mlevels[level]));
-	}else{
-		setlogmask(LOG_UPTO(LOG_ERR));
-	}
+	if(level>7 || level<0) level=7;
+	int mlevels[8]={LOG_EMERG, LOG_ALERT, LOG_CRIT, LOG_ERR, LOG_WARNING,
+			LOG_NOTICE, LOG_INFO, LOG_DEBUG};
+
+	setlogmask(LOG_UPTO(mlevels[level]));
+	syslog(LOG_INFO,"Set log mask up to %d", level);
 }
 
 /**
@@ -32,8 +29,12 @@ void setLogLevel(int level){
  * where level is the syslog log level and URI is the xmlrpc server uri
  */
 int main(int const argc, const char ** const argv, char * const * const env) {
+	setLogLevel(3);
 	Configuration *conf = Configuration::getConfiguration();
 	setLogLevel(conf->getLogLevel());
+	if ( conf->getLogLevel() >= LOG_INFO) {
+		conf->readConfigFile(); // Reread configuration file to show values in log
+	}
 	int exitStatus=static_cast<int>(internalError);
 	try{
 		Daemon::getDaemon()->loop();
