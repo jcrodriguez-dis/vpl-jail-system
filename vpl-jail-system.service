@@ -1,0 +1,17 @@
+[Unit]
+Description=VPL Jail System Service
+After=network-online.target
+After=network.target
+Documentation=https://github.com/jcrodriguez-dis/vpl-xmlrpc-jail
+Documentation=https://vpl.dis.ulpgc.es
+
+[Service]
+Type=forking
+PIDFile=/run/vpl-jail-server.pid
+ExecStart=/etc/vpl/vpl-jail-system start
+ExecStopPost=/etc/vpl/vpl-jail-system stop
+ExecReload=/etc/vpl/vpl-jail-system restart
+
+[Install]
+WantedBy=multi-user.target
+Alias=vpl-jail-system.service
