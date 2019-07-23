@@ -15,7 +15,7 @@ The VPL-Jail-System 2.4 requires a Linux O.S with YUM or APT as package manager 
 
 O.S.   | Version       | Results
 -------|---------------|----------------
-Ubuntu | 18.04 64b     | Compatible
+Ubuntu | 18.04 32b/64b | Compatible
 Ubuntu | 16.04 32b/64b | Compatible
 Debian | 9     32b/64b | Compatible
 Debian | 10    32b/64b | Compatible
@@ -93,7 +93,7 @@ service vpl-jail-system restart
 - PORT. Socket port number to listen for http and ws connections. The default value is 80
 - SECURE_PORT. Socket port number to listen for https and wss connections. Default value 443
 - URLPATH. Act as a password, if no matches with the path of the URL request then it's rejected. The default value is "/".
-- LOGLEVEL. This value goes from 0 to 7. Use 0 for minimum log and 7 for the maximum log. Level 7 doesn't remove the prisoners' home directory. IMPORTANT: Do not use high loglevel in production servers, you may get low performance. The default value is 3.
+- LOGLEVEL. This value goes from 0 to 8. Use 0 for minimum log and 8 for the maximum log. Level 8 doesn't remove the prisoners' home directory. IMPORTANT: Do not use high loglevel in production servers, you may get low performance. The default value is 3.
 
 # Checking
 
@@ -117,7 +117,7 @@ http://server:PORT/URLPATH or https://server:SECURE_PORT/URLPATH
 # Changes from the 2.3 to 2.4 version
 The installer and service control script has been update to support systemd service manager. Versions before 2.4 use only system V service manager. The change allows to install vpl-jail-system on Linux distributions that use YUM or APT and systemd or system V. Other minor changes are:
 
-- The default loglevel has been increase to 3.
+- The default log level has been increased to 3.
 - The size of the SSL key created when installing has been increase to 2048. New versions of OpenSSL lib require this size.     
 
 # Changes from the 2.2 to 2.3 version
