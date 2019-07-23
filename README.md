@@ -1,4 +1,4 @@
-# VPL-JAIL-SYSTEM 2.3
+# VPL-JAIL-SYSTEM 2.4
 
 ![VPL Logo](https://vpl.dis.ulpgc.es/images/logo2.png)
 
@@ -7,34 +7,33 @@ The VPL-Jail-System serves an execution sandbox for the VPL Moodle plugin. This 
 For more details about VPL, visit the [VPL home page](http://vpl.dis.ulpgc.es) or
 the [VPL plugin page at Moodle](http://www.moodle.org/plugins/mod_vpl).
 # Requirements
-The of VPL-Jail-System is an open software execution system and require a specific environment. 
+The VPL-Jail-System is an open software execution system and requires a specific environment. 
 
 ## Software requirements 
 
-The VPL-Jail-System 2.3 requires a Linux O.S. and has been tested on Debian, Ubuntu and CentOS.
+The VPL-Jail-System 2.4 requires a Linux O.S with YUM or APT as package manager and systemd or system V as service manager. The system has been tested on Debian, Ubuntu and CentOS.
 
 O.S.   | Version       | Results
 -------|---------------|----------------
 Ubuntu | 18.04 64b     | Compatible
 Ubuntu | 16.04 32b/64b | Compatible
-Debian | 9 32b/64b     | Compatible
-CentOS | 7 64b         | GUI programs not available
+Debian | 9     32b/64b | Compatible
+Debian | 10    32b/64b | Compatible
+CentOS | 7     64b     | GUI programs not available. Requires to disable or configure SELinux  
 CentOS | 6             | Not functional
-
-But you may need to modify the installation script or do the installation by hand.
 
 ## Hardware requirements
 
 The system has been developed to offers immediate and interactive execution of student's programs. This means that the system can attend multiple-executions simultaneously.
 
-The hardware required to accomplish this task depends on the number of simultaneous executions at a time, the requisites of the program, and the programming language used. For example, a PHP Web program may require a huge amount of RAM, especially for the Web Browser execution, but a Python program may need ten times less of RAM.
+The hardware required to accomplish this task depends on the number of simultaneous executions at a time, the requisites of the program, and the programming language used. For example, a PHP Web program may require a huge amount of RAM, especially for the Web Browser execution, but a Python program may need one hundred times less of RAM.
 
-Our experience is that a machine with only 2Gb of RAM and 2 cores can support a class with 50 students online using Java (Non-GUI). If you are conducting an exam the hardware required may be tripled. Possibly the critical resource may be the RAM. If the system exhausts the RAM the O.S. will start swapping and the throughput will decrease drastically. Our tests indicate that the 32-bit O.S. uses less memory and CPU than the 64-bit version. Remember that you can  add (or remove) VPL-Jail-systems to a VPL online.
+Our experience is that a machine with only 2Gb of RAM and 2 cores can support a class with 50 students online using Java (Non-GUI). If you are conducting an exam the hardware required may be tripled. Possibly the critical resource may be the RAM. If the system exhausts the RAM the O.S. will start swapping and the throughput will decrease drastically. Our tests indicate that the 32-bit O.S. uses less memory and CPU than the 64-bit version. Remember that you can add (or remove) VPL-Jail-systems to a VPL installation online.
 
 ## Installation
 
 ### Selecting the hardware
-The recommended option is using a dedicated machine. If you can not use a  dedicated machine try using a Virtual Machine e.g. using VirtualBox. This will aisle and limit the resources used by the service.
+The recommended option is using a dedicated machine. If you can not use a dedicated machine try using a Virtual Machine e.g. using VirtualBox. This will aisle and limit the resources used by the service.
 If you decide to use other services in the same machine that the use of resources by VPL-Jail-System may decrease the performance of the others service. Although no security breach has been reported, notice that the nature of the service (execute external code) leads to an intrinsic threat.
 
 ### Preparing the system
@@ -81,6 +80,11 @@ Run uninstall-sh of the current version.
 After installing the VPL-Jail-Service, the service will be started with a default configuration. If you want to change the configuration you must edit the file */etc/vpl/vpl-jail-system.conf*.
 
 After configuration changes, you must restart (as user root) the service to use the new configuration values.
+Using systemd
+```shell
+systemctl restart vpl-jail-system
+```
+or using system V
 ```shell
 service vpl-jail-system restart
 ```
@@ -89,7 +93,7 @@ service vpl-jail-system restart
 - PORT. Socket port number to listen for http and ws connections. The default value is 80
 - SECURE_PORT. Socket port number to listen for https and wss connections. Default value 443
 - URLPATH. Act as a password, if no matches with the path of the URL request then it's rejected. The default value is "/".
-- LOGLEVEL. This value goes from 0 to 8. Use 0 for minimum log and 8 for the maximum log. Level 8 doesn't remove the prisoners' home directory. IMPORTANT: Do not use high loglevel in production servers, you may get low performance. The default value is 0.
+- LOGLEVEL. This value goes from 0 to 7. Use 0 for minimum log and 7 for the maximum log. Level 7 doesn't remove the prisoners' home directory. IMPORTANT: Do not use high loglevel in production servers, you may get low performance. The default value is 3.
 
 # Checking
 
@@ -110,6 +114,11 @@ The URL of the service in the general module configuration or in the local execu
 http://server:PORT/URLPATH or https://server:SECURE_PORT/URLPATH
 
 :PORT and :SECURE_PORT can be omitted if using the standard ports.
+# Changes from the 2.3 to 2.4 version
+The installer and service control script has been update to support systemd service manager. Versions before 2.4 use only system V service manager. The change allows to install vpl-jail-system on Linux distributions that use YUM or APT and systemd or system V. Other minor changes are:
+
+- The default loglevel has been increase to 3.
+- The size of the SSL key created when installing has been increase to 2048. New versions of OpenSSL lib require this size.     
 
 # Changes from the 2.2 to 2.3 version
 
