@@ -13,14 +13,14 @@ The VPL-Jail-System is an open software execution system and requires a specific
 
 The VPL-Jail-System 2.4 requires a Linux O.S with YUM or APT as package manager and systemd or system V as service manager. The system has been tested on Debian, Ubuntu and CentOS.
 
-O.S.   | Version       | Results
--------|---------------|----------------
-Ubuntu | 18.04 32b/64b | Compatible
-Ubuntu | 16.04 32b/64b | Compatible
-Debian | 9     32b/64b | Compatible
-Debian | 10    32b/64b | Compatible
-CentOS | 7     64b     | GUI programs not available. Requires to disable or configure SELinux  
-CentOS | 6             | Not functional
+O.S.   | Version | Arch.   | Results
+-------|---------|---------|----------------
+Ubuntu | 18.04   | 32b/64b | Compatible
+Ubuntu | 16.04   | 32b/64b | Compatible
+Debian | 9       | 32b/64b | Compatible
+Debian | 10      | 32b/64b | Compatible
+CentOS | 7       | 64b     | GUI programs not available. Requires to disable or configure SELinux  
+CentOS | 6       |         | Not functional
 
 ## Hardware requirements
 
