@@ -330,37 +330,37 @@ void Jail::process(Socket *socket){
 		if(Util::toUppercase(socket->getHeader("Upgrade"))!="WEBSOCKET"){
 			syslog(LOG_INFO,"http(s) request");
 			if(httpMethod=="GET" || httpMethod== "HEAD"){
-				if(socket->getURLPath() == "/OK"){
+				if(socket->getURLPath() == "/OK" || socket->getURLPath() == "/ok"){
 					string page;
 					if(httpMethod=="GET"){
-						page="<!DOCTYPE html><html><body>OK</body></html>";
+						page = "<!DOCTYPE html><html><body>OK</body></html>";
 						page += "<script>setTimeout(function(){window.close();},2000);</script>";
 					}
 					server.send200(page);
 					_exit(static_cast<int>(neutral));
 				}
 				if(socket->getURLPath() == "/favicon.ico"){
-					server.sendCode(notFoundCode,"");
+					server.sendCode(notFoundCode, "");
 					_exit(static_cast<int>(neutral));
 				}else{
-					throw HttpException(notFoundCode,"Url path not found '"+socket->getURLPath()+"'");
+					throw HttpException(notFoundCode, "Url path not found '" + socket->getURLPath() + "'");
 				}
 			}
 			if(httpMethod != "POST"){
-				throw HttpException(badRequestCode,"http(s) Unsupported METHOD "+httpMethod);
+				throw HttpException(badRequestCode, "http(s) Unsupported METHOD " + httpMethod);
 			}
 			if(!isValidIPforRequest())
-				throw HttpException(badRequestCode,"Client not allowed");
+				throw HttpException(badRequestCode, "Client not allowed");
 			server.validateRequest(httpURLPath);
-			string data=server.receive();
+			string data = server.receive();
 			XML xml(data);
-			string request=RPC::methodName(xml.getRoot());
-			mapstruct parsedata=RPC::getData(xml.getRoot());
-			syslog(LOG_INFO,"Execute request '%s'",request.c_str());
-			if(request=="available"){
-				ExecutionLimits jailLimits=configuration->getLimits();
-				int memRequested=parsedata["maxmemory"]->getInt();
-				string status=commandAvailable(memRequested);
+			string request = RPC::methodName(xml.getRoot());
+			mapstruct parsedata = RPC::getData(xml.getRoot());
+			syslog(LOG_INFO, "Execute request '%s'", request.c_str());
+			if(request == "available"){
+				ExecutionLimits jailLimits = configuration->getLimits();
+				int memRequested = parsedata["maxmemory"]->getInt();
+				string status = commandAvailable(memRequested);
 				syslog(LOG_INFO,"Status: '%s'",status.c_str());
 				server.send200(RPC::availableResponse(status,processMonitor::requestsInProgress(),
 						jailLimits.maxtime,
@@ -368,22 +368,22 @@ void Jail::process(Socket *socket){
 						jailLimits.maxmemory,
 						jailLimits.maxprocesses,
 						configuration->getSecurePort()));
-			}else if(request=="request"){
+			}else if(request == "request"){
 				string adminticket,monitorticket,executionticket;
 				commandRequest(parsedata, adminticket,monitorticket,executionticket);
 				server.send200(RPC::requestResponse(adminticket,monitorticket,executionticket
 						,configuration->getPort(),configuration->getSecurePort()));
-			}else if(request=="getresult"){
+			}else if(request == "getresult"){
 				string adminticket,compilation,execution;
 				bool executed,interactive;
 				adminticket=parsedata["adminticket"]->getString();
 				commandGetResult(adminticket, compilation, execution,executed,interactive);
 				server.send200(RPC::getResultResponse(compilation,execution,executed,interactive));
-			}else if(request=="running"){
+			}else if(request == "running"){
 				string adminticket;
 				adminticket=parsedata["adminticket"]->getString();
 				server.send200(RPC::runningResponse(commandRunning(adminticket)));
-			}else if(request=="stop"){
+			}else if(request == "stop"){
 				string adminticket;
 				adminticket=parsedata["adminticket"]->getString();
 				commandStop(adminticket);
