@@ -115,10 +115,11 @@ http://server:PORT/URLPATH or https://server:SECURE_PORT/URLPATH
 
 :PORT and :SECURE_PORT can be omitted if using the standard ports.
 # Changes from the 2.3 to 2.4 version
-The installer and service control script has been update to support systemd service manager. Versions before 2.4 use only system V service manager. The change allows to install vpl-jail-system on Linux distributions that use YUM or APT and systemd or system V. Other minor changes are:
+The installer and service control script has been update to support systemd service manager. Versions before 2.4 use only system V service manager. The change allows to install vpl-jail-system on Linux distributions that use YUM or APT and systemd or system V. Other fixes and changes are:
 
 - The default log level has been increased to 3.
-- The size of the SSL key created when installing has been increase to 2048. New versions of OpenSSL lib require this size.     
+- The size of the SSL key created when installing has been increase to 2048. New versions of OpenSSL lib require this size.
+- Improves the cleaning of finished tasks
 
 # Changes from the 2.2 to 2.3 version
 
