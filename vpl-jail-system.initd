@@ -281,19 +281,19 @@ function start_vpl {
 		local JAIL_LIVE="$CONTROLPATH/jail_live"
 		local JAIL_WORK="$CONTROLPATH/jail_work"
 		create_check_dir "$JAILPATH" 0755
+		rm -Rf "$CONTROLPATH" &> /dev/null
+		rm -Rf "$JAIL_LIVE" &> /dev/null
+		rm -Rf "$JAIL_WORK" &> /dev/null
 		create_check_dir "$CONTROLPATH" 0700
-		rm -R "$CONTROLPATH/*" &> /dev/null
 		create_check_dir "$JAIL_LIVE" 0755
-		rm -R "$JAIL_LIVE/*" &> /dev/null
 		create_check_dir "$JAIL_WORK" 0755
-		rm -R "$JAIL_WORK/*" &> /dev/null
 		mount -t overlay overlay -olowerdir=/,upperdir=$JAIL_LIVE,workdir=$JAIL_WORK${NOSUID} "$JAILPATH"
 		if [ "$?" != "0" ] ; then
 			log_failure_msg $"Error mounting jail dir"
 			exit 1
 		fi
 		set_etc
-		rm -R "$JAILPATH/home" &> /dev/null
+		rm -Rf "$JAILPATH/home" &> /dev/null
 		set_tmpdir /home $HOMESIZE
 		set_other /proc
 		set_other /dev

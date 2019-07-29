@@ -119,7 +119,11 @@ void Jail::commandGetResult(string adminticket,string &compilation,string &execu
 bool Jail::commandRunning(string adminticket){
 	try{
 		processMonitor pm(adminticket);
-		return pm.isRunnig();
+		bool running = pm.isRunnig();
+		if ( ! running ) {
+			pm.cleanMonitor();
+		}
+		return running;
 	}catch(...){
 		return false;
 	}
