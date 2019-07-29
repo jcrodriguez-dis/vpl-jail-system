@@ -319,8 +319,16 @@ processState processMonitor::getState(){
 	readInfo();
 	//syslog(LOG_DEBUG,"getState %d %d %d",compiler_pid,runner_pid, monitor_pid);
 	if(compiler_pid==0) return starting;
+	if (startTime + 2 * executionLimits.maxtime + JAIL_HARVEST_TIMEOUT < time(NULL)) {
+		cleanMonitor();
+		return stopped;
+	}
 	bool aliveCompiler=Util::processExists(compiler_pid);
 	if(aliveCompiler && runner_pid==0) return compiling;
+	if(monitor_pid == 0 && startTime + JAIL_MONITORSTART_TIMEOUT < time(NULL)) {
+		cleanMonitor();
+		return stopped;
+	}
 	if(runner_pid==0){
 		if(interactive) return beforeRunning;
 		if(controlFileExists("compilation")) return retrieve;
