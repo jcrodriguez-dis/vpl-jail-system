@@ -214,7 +214,7 @@ class Daemon{
 			devices[1].events=POLLIN;
 			ndev++;
 		}
-		int res=poll(devices,ndev,100);
+		int res=poll(devices, ndev, JAIL_ACCEPT_WAIT);
 		if(res==-1) {
 			if (errno == EINTR) {
 				return;
@@ -331,11 +331,30 @@ public:
 			daemon->actualSocket=-1;
 		}
 	}
+	void cleanTasks() {
+		static int checkPoint = 5 * 60 * 1000 / JAIL_ACCEPT_WAIT; // 5 minutes.
+		static int loops = 0;
+		loops++;
+		if ( loops == checkPoint ) {
+			loops = 0;
+			int pid = fork();
+			if (pid == 0) {
+				try {
+					processMonitor::cleanZombieTasks();
+				} catch(...) {
+				}
+				_exit(0);
+			}
+		}
+	}
 	//Main loop: receive requests/dispatch and control child
 	void loop(){ //FIXME implement e adequate exit
+		int checkPoint = 5 * 60 * 1000 / 20; // 5 minutes.
+		int loops = 0;
 		while(!finishRequest){
 			accept(); //Accept one request waiting 20 msec
 			harvest(); //Process all dead childrens
+			cleanTasks();
 		}
 		closeSockets();
 	}
