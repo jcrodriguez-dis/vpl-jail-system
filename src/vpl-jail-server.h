@@ -345,6 +345,10 @@ public:
 				}
 				_exit(0);
 			}
+			Child c;
+			c.IP = "127.0.0.1";
+			c.start = time(NULL);
+			children[pid]=c;
 		}
 	}
 	//Main loop: receive requests/dispatch and control child
