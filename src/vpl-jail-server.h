@@ -335,7 +335,7 @@ public:
 		static int checkPoint = 5 * 60 * 1000 / JAIL_ACCEPT_WAIT; // 5 minutes.
 		static int loops = 0;
 		loops++;
-		if ( loops == checkPoint ) {
+		if ( loops >= checkPoint ) {
 			loops = 0;
 			int pid = fork();
 			if (pid == 0) {
