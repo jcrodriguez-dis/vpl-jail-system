@@ -319,7 +319,10 @@ processState processMonitor::getState(){
 	readInfo();
 	//syslog(LOG_DEBUG,"getState %d %d %d",compiler_pid,runner_pid, monitor_pid);
 	if(compiler_pid==0) return starting;
-	if (startTime + 2 * executionLimits.maxtime + JAIL_HARVEST_TIMEOUT < time(NULL)) {
+	time_t tlimit = startTime;
+	tlimit += 2 * executionLimits.maxtime;
+	tlimit += JAIL_HARVEST_TIMEOUT;
+	if (tlimit < time(NULL)) {
 		cleanTask();
 		return stopped;
 	}
@@ -561,7 +564,9 @@ vector<string> processMonitor::getPrisionersFromDir(string dir) {
 	while((ent=readdir(dirfd))!=NULL){
 		if (ent->d_type == DT_DIR) {
 			const string name(ent->d_name);
-			if(name.at(0) == 'p') prisioners.push_back(name);
+			if(name.at(0) == 'p') {
+				prisioners.push_back(name);
+			}
 		}
 	}
 	closedir(dirfd);
@@ -569,15 +574,17 @@ vector<string> processMonitor::getPrisionersFromDir(string dir) {
 }
 
 void processMonitor::cleanZombieTasks() {
+	syslog(LOG_INFO,"Cleaning zombie tasks");
 	const string controlDir=Configuration::getConfiguration()->getControlPath();
 	const string homeDir=Configuration::getConfiguration()->getJailPath()+"/home";
 	vector<string> homes = getPrisionersFromDir(homeDir);
-	vector<string> tasks = getPrisionersFromDir(homeDir);
+	vector<string> tasks = getPrisionersFromDir(controlDir);
 	for (int i = 0; i < tasks.size(); i++) {
 		ConfigData data;
+		syslog(LOG_INFO,"Cleaning zombie tasks: checking(1) %s", tasks[i].c_str());
 		string configFile = controlDir + "/" + tasks[i] + "/" + "config";
 		try {
-			data=ConfigurationFile::readConfiguration(configFile,data);
+			data = ConfigurationFile::readConfiguration(configFile, data);
 			processMonitor pm(data["ADMINTICKET"]);
 			pm.getState();
 		}catch(...) {
@@ -585,9 +592,10 @@ void processMonitor::cleanZombieTasks() {
 	}
 	for (int i = 0; i < homes.size(); i++) {
 		ConfigData data;
+		syslog(LOG_INFO,"Cleaning zombie tasks: checking(2) %s", homes[i].c_str());
 		string configFile = controlDir + "/" + homes[i] + "/" + "config";
 		string phome = homeDir + "/" + homes[i];
-		if ( Util::dirExists(phome) && ! Util::dirExists(configFile)) {
+		if ( Util::dirExists(phome) || Util::dirExists(configFile)) {
 			try {
 				Util::removeDir(phome, 1000, true);
 				data=ConfigurationFile::readConfiguration(configFile,data);
@@ -595,6 +603,7 @@ void processMonitor::cleanZombieTasks() {
 				pm.getState();
 			}catch(...) {
 			}
+			Util::removeDir(controlDir + "/" + homes[i], 1000, true);
 		}
 	}
 }
