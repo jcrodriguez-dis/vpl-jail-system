@@ -319,19 +319,29 @@ processState processMonitor::getState(){
 	readInfo();
 	//syslog(LOG_DEBUG,"getState %d %d %d",compiler_pid,runner_pid, monitor_pid);
 	if(compiler_pid==0) return starting;
-	if (startTime + 2 * executionLimits.maxtime + JAIL_HARVEST_TIMEOUT < time(NULL)) {
+	time_t currentTime = time(NULL);
+	if (startTime > currentTime || startTime == 0 ) {
+		syslog(LOG_ERR,"Internal error stratTime bad %ld", startTime);
+		return starting;
+	}
+	time_t elapsedTime = currentTime - startTime;
+	time_t timeLimit = 2 * executionLimits.maxtime + JAIL_HARVEST_TIMEOUT;
+	if (elapsedTime > timeLimit) {
+		syslog(LOG_INFO,"Execution last timeout reached %ld. ", timeLimit);
 		cleanMonitor();
 		return stopped;
 	}
 	bool aliveCompiler=Util::processExists(compiler_pid);
 	if(aliveCompiler && runner_pid==0) return compiling;
-	if(monitor_pid == 0 && startTime + JAIL_MONITORSTART_TIMEOUT < time(NULL)) {
+	if(monitor_pid == 0 && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
+		syslog(LOG_INFO,"Execution without monitor timeout reached %d. ", JAIL_MONITORSTART_TIMEOUT);
 		cleanMonitor();
 		return stopped;
 	}
 	if(runner_pid==0){
 		if(interactive) return beforeRunning;
 		if(controlFileExists("compilation")) return retrieve;
+		syslog(LOG_INFO,"Execution stopped, not interactive, not runner, no compilation file");
 		return stopped;
 	}
 	bool aliveRunner=Util::processExists(runner_pid);
@@ -342,40 +352,42 @@ processState processMonitor::getState(){
 }
 
 void processMonitor::setRunner(){
-	if(security==monitor) return;
+	if (security == monitor) return;
 	Lock lock(getControlPath());
-	runner_pid=getpid();
+	readInfo();
+	runner_pid = getpid();
 	writeInfo();
 }
 void processMonitor::setCompiler(){
-	if(security==monitor) return;
+	if (security == monitor) return;
 	Lock lock(getControlPath());
-	compiler_pid=getpid();
+	readInfo();
+	compiler_pid = getpid();
 	writeInfo();
 }
 
 bool processMonitor::isMonitored(){
 	if(!Util::dirExists(getControlPath())) return false;
 	Lock lock(getControlPath());
-	if(monitor==0) readInfo();
-	if(monitor==0) return false;
+	if ( monitor == 0 ) readInfo();
+	if ( monitor == 0 ) return false;
 	return Util::processExists(monitor);
 }
 
 void processMonitor::monitorize(){
-	if(security!=monitor) return;
+	if ( security != monitor ) return;
 	Lock lock(getControlPath());
 	readInfo();
-	if(monitor_pid!=0)
+	if(monitor_pid != 0)
 		throw string("Process already monitorized");
-	monitor_pid=getpid();
+	monitor_pid = getpid();
 	writeInfo();
 }
 
 void processMonitor::setExtraInfo(ExecutionLimits el, bool ri, string lang){
-	executionLimits=el;
-	interactive=ri;
-	this->lang=lang;
+	executionLimits = el;
+	interactive = ri;
+	this->lang = lang;
 	writeInfo();
 }
 
