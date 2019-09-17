@@ -45,68 +45,76 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 	processMonitor pm(adminticket,monitorticket,executionticket);
 	pid_t pid=fork();
 	if(pid==0){ //new process
-		syslog(LOG_INFO,"parse files %lu",(long unsigned int)parsedata.size());
-		mapstruct files=RPC::getFiles(parsedata["files"]);
-		mapstruct filestodelete=RPC::getFiles(parsedata["filestodelete"]);
-		mapstruct fileencoding;
-		if ( parsedata.find("fileencoding") != parsedata.end() ) {
-			fileencoding = RPC::getFiles(parsedata["fileencoding"]);
-		}
-		string script=parsedata["execute"]->getString();
-		//Retrieve files to execution dir and options, decode data if needed
-		for(mapstruct::iterator i=files.begin(); i!=files.end(); i++){
-			string name=i->first;
-			string data=i->second->getString();
-			if ( fileencoding.find(name) != fileencoding.end()
-				 && fileencoding[name]->getInt() == 1 ) {
-				syslog(LOG_INFO,"Decoding file %s from b64",name.c_str());
-				data = Base64::decode(data);
-				if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
-					name = name.substr(0, name.length() - 4);
-				}
+		try {
+			syslog(LOG_INFO,"parse files %lu",(long unsigned int)parsedata.size());
+			mapstruct files=RPC::getFiles(parsedata["files"]);
+			mapstruct filestodelete=RPC::getFiles(parsedata["filestodelete"]);
+			mapstruct fileencoding;
+			if ( parsedata.find("fileencoding") != parsedata.end() ) {
+				fileencoding = RPC::getFiles(parsedata["fileencoding"]);
 			}
-			syslog(LOG_INFO,"Write file %s data size %lu",name.c_str(),(long unsigned int)data.size());
-			pm.writeFile(name,data);
-		}
-		ExecutionLimits executionLimits=Configuration::getConfiguration()->getLimits();
-		syslog(LOG_INFO,"Reading parms");
-		executionLimits.syslog("Config");
-		executionLimits.maxtime=min(parsedata["maxtime"]->getInt(),executionLimits.maxtime);
-		executionLimits.maxfilesize=min(parsedata["maxfilesize"]->getInt(),executionLimits.maxfilesize);
-		executionLimits.maxmemory=min(parsedata["maxmemory"]->getInt(),executionLimits.maxmemory);
-		executionLimits.maxprocesses=min(parsedata["maxprocesses"]->getInt(),executionLimits.maxprocesses);
-		executionLimits.syslog("Request");
-		string vpl_lang=parsedata["lang"]->getString();
-		syslog(LOG_DEBUG,"VPL_LANG %s",vpl_lang.c_str());
-		bool interactive=parsedata["interactive"]->getInt()>0;
-		syslog(LOG_DEBUG,"interactive %d",parsedata["interactive"]->getInt());
-		pm.setExtraInfo(executionLimits,interactive,vpl_lang);
-		pm.setCompiler();
-		syslog(LOG_INFO,"Compilation");
-		string compilationOutput=run(pm,script);
-		pm.setCompilationOutput(compilationOutput);
-		bool compiled=pm.FileExists(VPL_EXECUTION)||pm.FileExists(VPL_WEXECUTION);
-		if(compiled){
-			//Delete files
-			for(mapstruct::iterator i=filestodelete.begin(); i!=filestodelete.end(); i++){
+			string script=parsedata["execute"]->getString();
+			//Retrieve files to execution dir and options, decode data if needed
+			for(mapstruct::iterator i=files.begin(); i!=files.end(); i++){
 				string name=i->first;
-				syslog(LOG_INFO,"Delete file %s",name.c_str());
-				pm.deleteFile(name);
+				string data=i->second->getString();
+				if ( fileencoding.find(name) != fileencoding.end()
+					 && fileencoding[name]->getInt() == 1 ) {
+					syslog(LOG_INFO,"Decoding file %s from b64",name.c_str());
+					data = Base64::decode(data);
+					if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
+						name = name.substr(0, name.length() - 4);
+					}
+				}
+				syslog(LOG_INFO,"Write file %s data size %lu",name.c_str(),(long unsigned int)data.size());
+				pm.writeFile(name,data);
 			}
-			if(!interactive && pm.FileExists(VPL_EXECUTION)){
-				pm.setRunner();
-				syslog(LOG_INFO,"Non interactive execution");
-				string program;
-				if(pm.installScript(".vpl_launcher.sh","vpl_batch_launcher.sh"))
-					program=".vpl_launcher.sh";
-				else
-					program=VPL_EXECUTION;
-				string executionOutput=run(pm,program);
-				syslog(LOG_INFO,"Write execution result");
-				pm.setExecutionOutput(executionOutput,true);
+			ExecutionLimits executionLimits=Configuration::getConfiguration()->getLimits();
+			syslog(LOG_INFO,"Reading parms");
+			executionLimits.syslog("Config");
+			executionLimits.maxtime=min(parsedata["maxtime"]->getInt(),executionLimits.maxtime);
+			executionLimits.maxfilesize=min(parsedata["maxfilesize"]->getInt(),executionLimits.maxfilesize);
+			executionLimits.maxmemory=min(parsedata["maxmemory"]->getInt(),executionLimits.maxmemory);
+			executionLimits.maxprocesses=min(parsedata["maxprocesses"]->getInt(),executionLimits.maxprocesses);
+			executionLimits.syslog("Request");
+			string vpl_lang=parsedata["lang"]->getString();
+			syslog(LOG_DEBUG,"VPL_LANG %s",vpl_lang.c_str());
+			bool interactive=parsedata["interactive"]->getInt()>0;
+			syslog(LOG_DEBUG,"interactive %d",parsedata["interactive"]->getInt());
+			pm.setExtraInfo(executionLimits,interactive,vpl_lang);
+			pm.setCompiler();
+			syslog(LOG_INFO,"Compilation");
+			string compilationOutput=run(pm,script);
+			pm.setCompilationOutput(compilationOutput);
+			bool compiled=pm.FileExists(VPL_EXECUTION)||pm.FileExists(VPL_WEXECUTION);
+			if(compiled){
+				//Delete files
+				for(mapstruct::iterator i=filestodelete.begin(); i!=filestodelete.end(); i++){
+					string name=i->first;
+					syslog(LOG_INFO,"Delete file %s",name.c_str());
+					pm.deleteFile(name);
+				}
+				if(!interactive && pm.FileExists(VPL_EXECUTION)){
+					pm.setRunner();
+					syslog(LOG_INFO,"Non interactive execution");
+					string program;
+					if(pm.installScript(".vpl_launcher.sh","vpl_batch_launcher.sh"))
+						program=".vpl_launcher.sh";
+					else
+						program=VPL_EXECUTION;
+					string executionOutput=run(pm,program);
+					syslog(LOG_INFO,"Write execution result");
+					pm.setExecutionOutput(executionOutput,true);
+				}
+			}else{
+				syslog(LOG_INFO,"Compilation fail");
 			}
-		}else{
-			syslog(LOG_INFO,"Compilation fail");
+		}
+		catch(std::exception &e){
+			syslog(LOG_ERR,"unexpected exception: %s %s:%d",e.what(),__FILE__,__LINE__);
+		}
+		catch(...){
+			syslog(LOG_ERR,"unexpected exception %s:%d",__FILE__,__LINE__);
 		}
 		_exit(EXIT_SUCCESS);
 	}
