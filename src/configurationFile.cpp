@@ -68,5 +68,6 @@ void ConfigurationFile::writeConfiguration(string fileName, ConfigData data){
 		string line=i->first+"="+i->second;
 		file << line << endl;
 	}
+	file << "#End Config file of VPL " << endl;
 	file.close();
 }
