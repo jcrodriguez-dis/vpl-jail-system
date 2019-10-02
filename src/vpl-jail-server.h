@@ -59,28 +59,38 @@ class Daemon{
 	 * Check jail security (/etc, paswords files, /home, etc)
 	 */
 	void checkJail(){
-		string detc=configuration->getJailPath()+"/etc";
 		struct stat info;
+
+		string detc=configuration->getJailPath()+"/etc";
 		if(lstat(detc.c_str(),&info))
 			throw "jail /etc not checkable";
 		if(info.st_uid !=0 || info.st_gid !=0)
 			throw "jail /etc not owned by root";
 		if(info.st_mode & 022)
-			throw "Jail error: jail /etc with insecure permissions (must be 0xx44)";
+			throw "Jail error: jail /etc with insecure permissions (group or others with write permission)";
+
 		string fpasswd=configuration->getJailPath()+"/etc/passwd";
 		if(lstat(fpasswd.c_str(),&info))
 			throw "Jail error: jail /etc/passwd not checkable";
 		if(info.st_uid !=0 || info.st_gid !=0)
 			throw "Jail error: jail /etc/passwd not owned by root";
 		if(info.st_mode & 033)
-			throw "Jail error: jail /etc/passwd with insecure permissions (must be 0xx44)";
+			throw "Jail error: jail /etc/passwd with insecure permissions (group or others with write permission)";
+
+		string fgroup=configuration->getJailPath()+"/etc/group";
+		if(lstat(fgroup.c_str(),&info))
+			throw "Jail error: jail /etc/group not checkable";
+		if(info.st_uid !=0 || info.st_gid !=0)
+			throw "Jail error: jail /etc/group not owned by root";
+		if(info.st_mode & 033)
+			throw "Jail error: jail /etc/group with insecure permissions (group or others with write permission)";
 
 		string fshadow=configuration->getJailPath()+"/etc/shadow";
 		if(!lstat(fshadow.c_str(),&info)) {
 			if(info.st_uid !=0 || info.st_gid !=0)
 				throw "Jail error: jail /etc/shadow not owned by root";
 			if(info.st_mode & 077)
-				throw "Jail error: jail /etc/passwd with insecure permissions (must be 0x00)";
+				throw "Jail error: jail /etc/shadow with insecure permissions (group or others with some permission)";
 		}
 	}
 
@@ -100,11 +110,14 @@ class Daemon{
 
 	//Return if the IP is banned
 	bool isBanned(string IP){
-		Log l;
-		cleanOld(); /* Fix by Guilherme Gomes */
-		if(logs.find(IP) != logs.end())
-			l=logs[IP];
-		return l.errors>20 && l.errors*2>l.requests;
+		cleanOld(); /* Fixes by Guilherme Gomes */
+		if ( configuration->getFail2Ban() == 0 || logs.find(IP) == logs.end()) {
+			return false;
+		} else {
+			Log log=logs[IP];
+			return log.errors > 20 * configuration->getFail2Ban() &&
+				   log.errors > log.requests / 2;
+		}
 	}
 	void countRequest(string IP, ExitStatus es){
 		if(es == neutral){
