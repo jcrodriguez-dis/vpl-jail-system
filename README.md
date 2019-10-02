@@ -17,6 +17,7 @@ O.S.   | Version | Arch.   | Results
 -------|---------|---------|----------------
 Ubuntu | 18.04   | 32b/64b | Compatible
 Ubuntu | 16.04   | 32b/64b | Compatible
+Ubuntu | 14.04   | 32b/64b | Not functional due to the lack of OverlayFS
 Debian | 9       | 32b/64b | Compatible
 Debian | 10      | 32b/64b | Compatible
 CentOS | 7       | 64b     | GUI programs not available. Requires to disable or configure SELinux  
@@ -114,12 +115,6 @@ The URL of the service in the general module configuration or in the local execu
 http://server:PORT/URLPATH or https://server:SECURE_PORT/URLPATH
 
 :PORT and :SECURE_PORT can be omitted if using the standard ports.
-# Changes from the 2.3 to 2.4 version
-The installer and service control script has been update to support systemd service manager. Versions before 2.4 use only system V service manager. The change allows to install vpl-jail-system on Linux distributions that use YUM or APT and systemd or system V. Other fixes and changes are:
-
-- The default log level has been increased to 3.
-- The size of the SSL key created when installing has been increase to 2048. New versions of OpenSSL lib require this size.
-- Improves the cleaning of finished tasks
 
 # Changes from the 2.2 to 2.3 version
 
@@ -134,4 +129,17 @@ The new parameters to control these new features are:
 - HOMESIZE. This option set the size of the "/home" directory. The default value is 30% of the system memory. This option is applicable if using tmpfs file system for the "/home" directory.
 - SHMSIZE. This option set the size of the "/dev/shm" directory. The default value is 30% of the system memory. This option is applicable if using tmpfs file system for the "/dev/shm" directory.
 - ALLOWSUID. This switch allows the execution of programs with a suid bit inside the jail. This may be a security threat, use at your own risk. To activate this option, set ALLOWSUID=true.
+
+# Changes from the 2.3 to 2.4 version
+The installer and service control script has been update to support systemd service manager. Versions before 2.4 use only system V service manager. The change allows to install vpl-jail-system on Linux distributions that use YUM or APT and systemd or system V. Other fixes and changes are:
+
+- The default log level has been increased to 3.
+- The size of the SSL key created when installing has been increase to 2048. New versions of OpenSSL lib require this size.
+- Improves the cleaning of finished tasks
+
+# Changes from the 2.4 to 2.5 version
+
+From the first versions of the VPL jail service the system includes a logic to ban IPs with high number of failed requests. This feature now can be controlled with a new configuration numeric parameter called FAIL2BAN. The banning and the account of failed requests take periods of 5 minutes. If one IP does more than FAIL2BAN*20 failed requests and more failed request than succeeded the IP is banned until the next period. The FAIL2BAN set to 0 stop the banning process. The default value of FAIL2BAN is 0 then this feature has been disable by default. 
+
+To improve the compatibility and performance of the use of overlayFS in different O.S. configurations, the structure of mounted file systems has change. Now the upper layer of the overlaid file system is on a tmpfs file system or, if you set the USETMPFS=false, is on a loop file system located sibling to the control path (by default /var/vpl-jail-system.fs).
 
