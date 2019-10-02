@@ -26,6 +26,7 @@ private:
 	string URLPath; //URL path to accept tasks
 	int port, sport; //Server ports
 	int logLevel; //Log level 0 to 8, 0 = no log, 8 += do not remove home dir.
+	int fail2ban; //Fail to ban configuration. Relation fail / success to ban IP
 	regex_t reg;
 	void checkConfigFile(string fileName, string men);
 	Configuration();
@@ -48,6 +49,7 @@ public:
 	int getPort(){ return port;}
 	int getSecurePort(){ return sport;}
 	int getLogLevel(){ return logLevel;}
+	int getFail2Ban(){ return fail2ban;}
 };
 #endif
 

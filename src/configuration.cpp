@@ -63,6 +63,7 @@ void Configuration::readConfigFile(){
 	configDefault["URLPATH"]="/";
 	configDefault["ENVPATH"]=Util::getEnv("PATH");
 	configDefault["LOGLEVEL"]="0";
+	configDefault["FAIL2BAN"]="0";
 	ConfigData data=ConfigurationFile::readConfiguration(configPath,configDefault);
 	minPrisoner = atoi(data["MIN_PRISONER_UGID"].c_str());
 	if(minPrisoner < JAIL_MIN_PRISIONER_UID)
@@ -108,6 +109,7 @@ void Configuration::readConfigFile(){
 	URLPath = data["URLPATH"];
 	cleanPATH = data["ENVPATH"];
 	logLevel = atoi(data["LOGLEVEL"].c_str());
+	fail2ban = atoi(data["FAIL2BAN"].c_str());
 }
 
 Configuration::Configuration(){
