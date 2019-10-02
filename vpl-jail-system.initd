@@ -29,10 +29,10 @@
 #          |     |___ pts #Replicate original
 #          |     |___ shm #tmpfs
 #          |___ etc       #Replaced passwd and group
-#          |___ home      #tmfs dir to create suitable prisoner home dir
+#          |___ home      #Dir to create suitable prisoner home dir
 #          |___ proc      #Real dir by mount --bind
-#          |___ run       #tmpfs
-#          |     |___ lock #tmpfs
+#          |___ run       #Real dir by mount --bind
+#          |     |___ lock #Real dir by mount --bind
 
 LOGFILE=/etc/vpl/vpl-jail-service.log
 DEAMON=/etc/vpl/vpl-jail-server
@@ -149,7 +149,7 @@ function set_tmpdir {
 	fi
 	unset_tmpdir $1
 	create_check_dir "$JAILPATH$1" $mask
-	if [ "$USETMPFS" != "false" ] ; then 
+	if [ "${USETMPFS,,}" != "false" ] ; then 
 		mount -t tmpfs -osize="$2" tmpfs "$JAILPATH$1"
 	fi
 }
@@ -258,11 +258,15 @@ function read_config {
 		read_config_var "$CONFIG_FILE" PORT 80 SECURE_PORT 443
 		read_config_var "$CONFIG_FILE" FIREWALL 0
 		read_config_var "$CONFIG_FILE" ALLOWSUID false
-		read_config_var "$CONFIG_FILE" HOMESIZE 30%
-		read_config_var "$CONFIG_FILE" SHMSIZE 30%
 		read_config_var "$CONFIG_FILE" USETMPFS true
+		if [ "${USETMPFS,,}" != "false" ] ; then
+			read_config_var "$CONFIG_FILE" HOMESIZE 30%			
+		else
+			read_config_var "$CONFIG_FILE" HOMESIZE 2Gb			
+		fi
+		read_config_var "$CONFIG_FILE" SHMSIZE 30%
 		NOSUID=,nosuid
-		if [ "$ALLOWSUID" == "true" ] ; then
+		if [ "${ALLOWSUID,,}" == "true" ] ; then
 			NOSUID=
 		fi
 	else
@@ -270,6 +274,50 @@ function read_config {
 		exit 1
 	fi
 }
+
+function set_controldir {
+	local JAIL_LIVE="$CONTROLPATH/jail_live"
+	local JAIL_WORK="$CONTROLPATH/jail_work"
+	if [ -d "$CONTROLPATH" ] ; then
+		umount -l -f "$CONTROLPATH" &> /dev/null
+	fi
+	rm -Rf "$JAIL_LIVE" &> /dev/null
+	rm -Rf "$JAIL_WORK" &> /dev/null
+	rm -Rf "$CONTROLPATH" &> /dev/null
+	create_check_dir "$CONTROLPATH" 0700
+	if [ "${USETMPFS,,}" != "false" ] ; then 
+		mount -t tmpfs -o size=$HOMESIZE tmpfs "$CONTROLPATH"
+	else
+		if [ `expr index "%" "$HOMESIZE"` != "0" ] ; then
+			log_failure_msg $"Please use a fixed size for HOMESIZE. E.g. 2G, 1500M"
+			exit -6
+		fi
+		local CONTROLFS="${CONTROLPATH}.fs"
+		if [ -f "$CONTROLFS" ] ; then
+			rm "$CONTROLFS"
+		fi
+		touch "$CONTROLFS"
+		chmod 0600 "$CONTROLFS" 
+		truncate --size $HOMESIZE "$CONTROLFS"
+		mkfs.ext3 "$CONTROLFS" &> /dev/null
+		mount "$CONTROLFS" "$CONTROLPATH"
+	fi
+	chmod 0700 "$CONTROLPATH"
+	
+	create_check_dir "$JAIL_LIVE" 0700
+	create_check_dir "$JAIL_WORK" 0700
+}
+
+function unset_controldir {
+	if [ -d "$CONTROLPATH" ] ; then
+		umount -l -f "$CONTROLPATH" &> /dev/null
+	fi
+	local CONTROLFS="${CONTROLPATH}.fs"
+	if [ -f "$CONTROLFS" ] ; then
+		rm "$CONTROLFS"
+	fi
+}
+
 
 function start_vpl {
 	if [ -f $PIDFILE ] ; then
@@ -280,21 +328,18 @@ function start_vpl {
 		read_config start
 		local JAIL_LIVE="$CONTROLPATH/jail_live"
 		local JAIL_WORK="$CONTROLPATH/jail_work"
+		set_controldir
 		create_check_dir "$JAILPATH" 0755
-		rm -Rf "$CONTROLPATH" &> /dev/null
-		rm -Rf "$JAIL_LIVE" &> /dev/null
-		rm -Rf "$JAIL_WORK" &> /dev/null
-		create_check_dir "$CONTROLPATH" 0700
-		create_check_dir "$JAIL_LIVE" 0755
-		create_check_dir "$JAIL_WORK" 0755
 		mount -t overlay overlay -olowerdir=/,upperdir=$JAIL_LIVE,workdir=$JAIL_WORK${NOSUID} "$JAILPATH"
+		chmod 0755 "$JAILPATH"
 		if [ "$?" != "0" ] ; then
 			log_failure_msg $"Error mounting jail dir"
 			exit 1
 		fi
 		set_etc
 		rm -Rf "$JAILPATH/home" &> /dev/null
-		set_tmpdir /home $HOMESIZE
+		rm -Rf "$JAILPATH/jail" &> /dev/null
+		create_check_dir "$JAILPATH/home" 0711
 		set_other /proc
 		set_other /dev
 		set_tmpdir /dev/shm $SHMSIZE 1777
@@ -338,8 +383,8 @@ function stop_vpl {
 		unset_tmpdir /dev/shm
 		unset_other /dev
 		unset_other /proc
-		unset_tmpdir /home
 		umount "$JAILPATH"
+		unset_controldir
 		unset_firewall
 		post_stop
 	} 2>> $LOGFILE
