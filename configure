@@ -5075,7 +5075,7 @@ fi
 done
 
 
-for ac_header in arpa/inet.h fcntl.h limits.h jail_limits.h netinet/in.h stdint.h stdlib.h string.h sys/socket.h syslog.h unistd.h
+for ac_header
 do :
   as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
 ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
@@ -5288,7 +5288,7 @@ _ACEOF
 ;;
   esac
 
-
+CPPFLAGS="-Wall"
 # Checks for library functions.
 for ac_header in unistd.h
 do :
