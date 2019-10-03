@@ -139,7 +139,10 @@ The installer and service control script has been update to support systemd serv
 
 # Changes from the 2.4 to 2.5 version
 
-From the first versions of the VPL jail service the system includes a logic to ban IPs with high number of failed requests. This feature now can be controlled with a new configuration numeric parameter called FAIL2BAN. The banning and the account of failed requests take periods of 5 minutes. If one IP does more than FAIL2BAN*20 failed requests and more failed request than succeeded the IP is banned until the next period. The FAIL2BAN set to 0 stop the banning process. The default value of FAIL2BAN is 0 then this feature has been disable by default. 
+From the first versions of the VPL jail service the system includes a logic to ban IPs with high number of failed requests. This feature now can be controlled with a new configuration numeric parameter called FAIL2BAN. The banning and the account of failed requests take periods of 5 minutes. If one IP does more than FAIL2BAN*20 failed requests and more failed request than succeeded then the IP is banned until the next period. The FAIL2BAN set to 0 stop the banning process. The default value of FAIL2BAN is 0 then this feature has been disable by default. 
 
-To improve the compatibility and performance of the use of overlayFS in different O.S. configurations, the structure of mounted file systems has change. Now the upper layer of the overlaid file system is on a tmpfs file system or, if you set the USETMPFS=false, is on a loop file system located sibling to the control path (by default /var/vpl-jail-system.fs).
+The structure of jail file systems has change to improve the compatibility and performance of the use of overlayFS in different O.S. configurations. Now the upper layer of the overlaid file system is on a tmpfs file system or, if you set the USETMPFS=false, is on a loop file system located at a sibling path to the control path (by default /var/vpl-jail-system.fs). IMPORTANT! if you set USETMPFS=false the you can not set HOMESIZE to a system memory percent, you must set HOMESIZE to an fixed value. The HOMESIZE value can be in megabyte or gigabyte. E.g.
+
+* HOMESIZE=8G
+* HOMESIZE=4500M
 
