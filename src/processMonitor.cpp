@@ -608,7 +608,7 @@ void processMonitor::cleanZombieTasks() {
 		syslog(LOG_INFO,"Cleaning zombie tasks: checking(2) %s", homes[i].c_str());
 		string configFile = controlDir + "/" + homes[i] + "/" + "config";
 		string phome = homeDir + "/" + homes[i];
-		if ( Util::dirExists(phome) && ! Util::dirExists(configFile)) {
+		if ( Util::dirExists(phome) && ! Util::fileExists(configFile)) {
 			struct stat statbuf;
 			stat(phome.c_str(), &statbuf);
 			if ( statbuf.st_mtime + JAIL_MONITORSTART_TIMEOUT < time(NULL) ) {
