@@ -3,11 +3,7 @@
 
 <<<<<<< HEAD
 AC_PREREQ([2.68])
-AC_INIT([vpl jail system], [2.5.0])
-=======
-AC_PREREQ([2.65])
-AC_INIT([vpl jail system], [2.4.1.0])
->>>>>>> refs/heads/V2.4.1
+AC_INIT([vpl jail system], [2.5.1])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
