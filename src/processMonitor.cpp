@@ -169,7 +169,6 @@ ConfigData processMonitor::readInfo(){
 
 processMonitor::processMonitor(string & adminticket, string & monitorticket, string & executionticket){
 	const int salt=127;
-	//TODO first create controlDIr
 	configuration = Configuration::getConfiguration();
 	security=admin;
 	string cp=configuration->getControlPath();
@@ -317,7 +316,6 @@ processState processMonitor::getState(){
 	string fileName=getControlPath("config");
 	if(!Util::fileExists(fileName))	return stopped;
 	readInfo();
-	//syslog(LOG_DEBUG,"getState %d %d %d",compiler_pid,runner_pid, monitor_pid);
 	if(compiler_pid==0) return starting;
 	time_t currentTime = time(NULL);
 	if (startTime > currentTime || startTime == 0 ) {
@@ -329,7 +327,7 @@ processState processMonitor::getState(){
 	tlimit += 2 * executionLimits.maxtime;
 	tlimit += JAIL_HARVEST_TIMEOUT;
 	if (tlimit < time(NULL)) {
-		syslog(LOG_INFO,"Execution last timeout reached %ld. ", timeLimit);
+		syslog(LOG_INFO,"Execution last timeout reached %ld. ", tlimit);
 		cleanTask();
 		return stopped;
 	}
@@ -590,7 +588,7 @@ void processMonitor::cleanZombieTasks() {
 	const string homeDir=Configuration::getConfiguration()->getJailPath()+"/home";
 	vector<string> homes = getPrisionersFromDir(homeDir);
 	vector<string> tasks = getPrisionersFromDir(controlDir);
-	for (int i = 0; i < tasks.size(); i++) {
+	for (size_t i = 0; i < tasks.size(); i++) {
 		ConfigData data;
 		syslog(LOG_INFO,"Cleaning zombie tasks: checking(1) %s", tasks[i].c_str());
 		string configFile = controlDir + "/" + tasks[i] + "/" + "config";
@@ -601,7 +599,7 @@ void processMonitor::cleanZombieTasks() {
 		}catch(...) {
 		}
 	}
-	for (int i = 0; i < homes.size(); i++) {
+	for (size_t i = 0; i < homes.size(); i++) {
 		ConfigData data;
 		syslog(LOG_INFO,"Cleaning zombie tasks: checking(2) %s", homes[i].c_str());
 		string configFile = controlDir + "/" + homes[i] + "/" + "config";
