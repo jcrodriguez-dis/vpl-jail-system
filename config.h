@@ -121,7 +121,11 @@
 #define PACKAGE_NAME "vpl jail system"
 
 /* Define to the full name and version of this package. */
+<<<<<<< HEAD
 #define PACKAGE_STRING "vpl jail system 2.5.0"
+=======
+#define PACKAGE_STRING "vpl jail system 2.4.1.0"
+>>>>>>> refs/heads/V2.4.1
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "vpl-jail-system"
@@ -130,13 +134,21 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
+<<<<<<< HEAD
 #define PACKAGE_VERSION "2.5.0"
+=======
+#define PACKAGE_VERSION "2.4.1.0"
+>>>>>>> refs/heads/V2.4.1
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
 
 /* Version number of package */
+<<<<<<< HEAD
 #define VERSION "2.5.0"
+=======
+#define VERSION "2.4.1.0"
+>>>>>>> refs/heads/V2.4.1
 
 /* Define for Solaris 2.5.1 so the uint32_t typedef from <sys/synch.h>,
    <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the

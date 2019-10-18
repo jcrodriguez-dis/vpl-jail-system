@@ -321,21 +321,23 @@ processState processMonitor::getState(){
 	if(compiler_pid==0) return starting;
 	time_t currentTime = time(NULL);
 	if (startTime > currentTime || startTime == 0 ) {
-		syslog(LOG_ERR,"Internal error stratTime bad %ld", startTime);
+		syslog(LOG_ERR,"Internal error startTime bad %ld", startTime);
 		return starting;
 	}
 	time_t elapsedTime = currentTime - startTime;
-	time_t timeLimit = 2 * executionLimits.maxtime + JAIL_HARVEST_TIMEOUT;
-	if (elapsedTime > timeLimit) {
+	time_t tlimit = startTime;
+	tlimit += 2 * executionLimits.maxtime;
+	tlimit += JAIL_HARVEST_TIMEOUT;
+	if (tlimit < time(NULL)) {
 		syslog(LOG_INFO,"Execution last timeout reached %ld. ", timeLimit);
-		cleanMonitor();
+		cleanTask();
 		return stopped;
 	}
 	bool aliveCompiler=Util::processExists(compiler_pid);
 	if(aliveCompiler && runner_pid==0) return compiling;
 	if(monitor_pid == 0 && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
 		syslog(LOG_INFO,"Execution without monitor timeout reached %d. ", JAIL_MONITORSTART_TIMEOUT);
-		cleanMonitor();
+		cleanTask();
 		return stopped;
 	}
 	if(runner_pid==0){
@@ -485,16 +487,12 @@ void processMonitor::removePrisonerHome(){
 /**
  * Remove prisoner files and stop prisoner process
  */
-void processMonitor::clean(){
-	syslog(LOG_INFO,"Cleaning");
-	stopPrisonerProcess(true);
-	removePrisonerHome();
-}
+
 /**
- * Remove monitor control files
+ * Remove task home dir and monitor control files
  */
-void processMonitor::cleanMonitor(){
-	syslog(LOG_INFO,"Cleaning monitor");
+void processMonitor::cleanTask(){
+	syslog(LOG_INFO,"Cleaning task");
 	stopPrisonerProcess(false);
 	removePrisonerHome();
 	string controlPath=configuration->getControlPath();
@@ -504,6 +502,10 @@ void processMonitor::cleanMonitor(){
 	Util::deleteFile(controlPath+"/"+adminticket);
 	Util::deleteFile(controlPath+"/"+monitorticket);
 	Util::deleteFile(controlPath+"/"+executionticket);
+
+	usleep(100000);
+	stopPrisonerProcess(true);
+	removePrisonerHome();
 }
 
 bool processMonitor::isOutOfMemory(){
@@ -561,4 +563,58 @@ uint64_t processMonitor::getMemoryUsed(){
 void processMonitor::freeWatchDog(){
 	//TODO check process running based on /proc
 	//looking for inconsistences
+}
+vector<string> processMonitor::getPrisionersFromDir(string dir) {
+	vector<string> prisioners;
+	dirent *ent;
+	DIR *dirfd=opendir(dir.c_str());
+	if(dirfd==NULL){
+		syslog(LOG_ERR,"Can't open dir \"%s\": %m",dir.c_str());
+		return prisioners;
+	}
+	while((ent=readdir(dirfd))!=NULL){
+		if (ent->d_type == DT_DIR) {
+			const string name(ent->d_name);
+			if(name.at(0) == 'p') {
+				prisioners.push_back(name);
+			}
+		}
+	}
+	closedir(dirfd);
+	return prisioners;
+}
+
+void processMonitor::cleanZombieTasks() {
+	syslog(LOG_INFO,"Cleaning zombie tasks");
+	const string controlDir=Configuration::getConfiguration()->getControlPath();
+	const string homeDir=Configuration::getConfiguration()->getJailPath()+"/home";
+	vector<string> homes = getPrisionersFromDir(homeDir);
+	vector<string> tasks = getPrisionersFromDir(controlDir);
+	for (int i = 0; i < tasks.size(); i++) {
+		ConfigData data;
+		syslog(LOG_INFO,"Cleaning zombie tasks: checking(1) %s", tasks[i].c_str());
+		string configFile = controlDir + "/" + tasks[i] + "/" + "config";
+		try {
+			data = ConfigurationFile::readConfiguration(configFile, data);
+			processMonitor pm(data["ADMINTICKET"]);
+			pm.getState();
+		}catch(...) {
+		}
+	}
+	for (int i = 0; i < homes.size(); i++) {
+		ConfigData data;
+		syslog(LOG_INFO,"Cleaning zombie tasks: checking(2) %s", homes[i].c_str());
+		string configFile = controlDir + "/" + homes[i] + "/" + "config";
+		string phome = homeDir + "/" + homes[i];
+		if ( Util::dirExists(phome) || Util::dirExists(configFile)) {
+			try {
+				Util::removeDir(phome, 1000, true);
+				data=ConfigurationFile::readConfiguration(configFile,data);
+				processMonitor pm(data["ADMINTICKET"]);
+				pm.getState();
+			}catch(...) {
+			}
+			Util::removeDir(controlDir + "/" + homes[i], 1000, true);
+		}
+	}
 }

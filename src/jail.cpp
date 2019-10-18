@@ -129,7 +129,7 @@ bool Jail::commandRunning(string adminticket){
 		processMonitor pm(adminticket);
 		bool running = pm.isRunnig();
 		if ( ! running ) {
-			pm.cleanMonitor();
+			pm.cleanTask();
 		}
 		return running;
 	}catch(...){
@@ -141,8 +141,7 @@ void Jail::commandStop(string adminticket){
 	if(pid==0){ //new process
 		try{
 			processMonitor pm(adminticket);
-			pm.clean();
-			pm.cleanMonitor();
+			pm.cleanTask();
 		}catch(...){
 
 		}
@@ -198,8 +197,7 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 					ws.send("close:");
 					ws.close();
 					ws.wait(500); //wait client response
-					pm.clean();
-					pm.cleanMonitor();
+					pm.cleanTask();
 					ws.receive();
 					return;
 				}
@@ -238,8 +236,7 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 		//Check running timeout
 		if(timeout< time(NULL)){
 			ws.send("message:timeout");
-			pm.clean();
-			pm.cleanMonitor();
+			pm.cleanTask();
 			usleep(3000000);
 			ws.send("close:");
 			ws.close();
@@ -252,8 +249,7 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 			syslog(LOG_DEBUG,"Out of memory (%s)",ml.c_str());
 			ws.send("message:outofmemory:"+ml);
 			usleep(1500000);
-			pm.clean();
-			pm.cleanMonitor();
+			pm.cleanTask();
 			usleep(1500000);
 			ws.send("close:");
 			ws.close();
@@ -263,8 +259,7 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 		}
 		lastTime = now;
 	}
-	pm.clean();
-	pm.cleanMonitor();
+	pm.cleanTask();
 }
 
 void Jail::commandExecute(string executeticket,Socket *s){
@@ -394,6 +389,11 @@ void Jail::process(Socket *socket){
 			}else if(request == "running"){
 				string adminticket;
 				adminticket=parsedata["adminticket"]->getString();
+				bool running = commandRunning(adminticket);
+				if (! running && parsedata.count("pluginversion") == 0) {
+					// Restores behaviour of < 2.3 version
+					throw "Ticket invalid";
+				}
 				server.send200(RPC::runningResponse(commandRunning(adminticket)));
 			}else if(request == "stop"){
 				string adminticket;
@@ -651,8 +651,7 @@ string Jail::run(processMonitor &pm,string name, int othermaxtime){
 	string output=redirector.getOutput();
 	syslog(LOG_DEBUG,"Complete program output: %s", output.c_str());
 	if(noMonitor){
-		pm.clean();
-		pm.cleanMonitor();
+		pm.cleanTask();
 	}
 	return output;
 }
@@ -741,8 +740,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 	}
 	if(noMonitor){
 		syslog(LOG_DEBUG,"Not monitored");
-		pm.clean();
-		pm.cleanMonitor();
+		pm.cleanTask();
 	}
 }
 
@@ -801,7 +799,6 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 		syslog(LOG_DEBUG,"%s",output.c_str());
 	}
 	if(noMonitor){
-		pm.clean();
-		pm.cleanMonitor();
+		pm.cleanTask();
 	}
 }

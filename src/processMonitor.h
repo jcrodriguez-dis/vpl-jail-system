@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include <string>
+#include <vector>
 using namespace std;
 #include "configurationFile.h"
 #include "configuration.h"
@@ -80,8 +81,7 @@ public:
 	void becomePrisoner();
 	bool isRunnig();
 	void stopPrisonerProcess(bool soft);
-	void clean();
-	void cleanMonitor();
+	void cleanTask();
 	processState getState();
 	void setCompiler();
 	void setRunner();
@@ -95,5 +95,7 @@ public:
 	void setCompilationOutput(const string &compilation);
 	void setExecutionOutput(const string &execution, bool executed);
 	void freeWatchDog();
+	static vector<string> getPrisionersFromDir(string dir);
+	static void cleanZombieTasks();
 };
 #endif

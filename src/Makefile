@@ -226,15 +226,27 @@ OBJEXT = o
 PACKAGE = vpl-jail-system
 PACKAGE_BUGREPORT = 
 PACKAGE_NAME = vpl jail system
+<<<<<<< HEAD
 PACKAGE_STRING = vpl jail system 2.5.0
+=======
+PACKAGE_STRING = vpl jail system 2.4.1.0
+>>>>>>> refs/heads/V2.4.1
 PACKAGE_TARNAME = vpl-jail-system
 PACKAGE_URL = 
+<<<<<<< HEAD
 PACKAGE_VERSION = 2.5.0
+=======
+PACKAGE_VERSION = 2.4.1.0
+>>>>>>> refs/heads/V2.4.1
 PATH_SEPARATOR = :
 SET_MAKE = 
 SHELL = /bin/bash
 STRIP = 
+<<<<<<< HEAD
 VERSION = 2.5.0
+=======
+VERSION = 2.4.1.0
+>>>>>>> refs/heads/V2.4.1
 abs_builddir = /home/juanca/git/vpl-xmlrpc-jail/src
 abs_srcdir = /home/juanca/git/vpl-xmlrpc-jail/src
 abs_top_builddir = /home/juanca/git/vpl-xmlrpc-jail
