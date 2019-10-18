@@ -1,4 +1,4 @@
-# VPL-JAIL-SYSTEM 2.5
+# VPL-JAIL-SYSTEM 2.5.1
 
 ![VPL Logo](https://vpl.dis.ulpgc.es/images/logo2.png)
 
