@@ -339,6 +339,8 @@ function start_vpl {
 		set_etc
 		rm -Rf "$JAILPATH/home" &> /dev/null
 		rm -Rf "$JAILPATH/jail" &> /dev/null
+		rm -Rf "$JAILPATH/etc/vpl" &> /dev/null
+		rm -Rf "$JAILPATH/$CONTROLPATH" &> /dev/null
 		create_check_dir "$JAILPATH/home" 0711
 		set_other /proc
 		set_other /dev
