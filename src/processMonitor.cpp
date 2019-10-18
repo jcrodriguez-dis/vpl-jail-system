@@ -1,6 +1,6 @@
 /**
  * @package:   Part of vpl-jail-system
- * @copyright: Copyright (C) 2013 Juan Carlos Rodríguez-del-Pino
+ * @copyright: Copyright (C) 2019 Juan Carlos Rodríguez-del-Pino
  * @license:   GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 #include <list>
@@ -326,7 +326,7 @@ processState processMonitor::getState(){
 	time_t tlimit = startTime;
 	tlimit += 2 * executionLimits.maxtime;
 	tlimit += JAIL_HARVEST_TIMEOUT;
-	if (tlimit < time(NULL)) {
+	if (tlimit < currentTime) {
 		syslog(LOG_INFO,"Execution last timeout reached %ld. ", tlimit);
 		cleanTask();
 		return stopped;
@@ -591,28 +591,33 @@ void processMonitor::cleanZombieTasks() {
 	for (size_t i = 0; i < tasks.size(); i++) {
 		ConfigData data;
 		syslog(LOG_INFO,"Cleaning zombie tasks: checking(1) %s", tasks[i].c_str());
-		string configFile = controlDir + "/" + tasks[i] + "/" + "config";
+		string configDir = controlDir + "/" + tasks[i];
+		string configFile = configDir + "/" + "config";
 		try {
-			data = ConfigurationFile::readConfiguration(configFile, data);
-			processMonitor pm(data["ADMINTICKET"]);
-			pm.getState();
+			struct stat statbuf;
+			stat(configDir.c_str(), &statbuf);
+			if ( statbuf.st_mtime + JAIL_MONITORSTART_TIMEOUT < time(NULL) ) {
+				data = ConfigurationFile::readConfiguration(configFile, data);
+				processMonitor pm(data["ADMINTICKET"]);
+				pm.getState();
+			}
 		}catch(...) {
 		}
 	}
 	for (size_t i = 0; i < homes.size(); i++) {
-		ConfigData data;
 		syslog(LOG_INFO,"Cleaning zombie tasks: checking(2) %s", homes[i].c_str());
 		string configFile = controlDir + "/" + homes[i] + "/" + "config";
 		string phome = homeDir + "/" + homes[i];
-		if ( Util::dirExists(phome) || Util::dirExists(configFile)) {
-			try {
-				Util::removeDir(phome, 1000, true);
-				data=ConfigurationFile::readConfiguration(configFile,data);
-				processMonitor pm(data["ADMINTICKET"]);
-				pm.getState();
-			}catch(...) {
+		if ( Util::dirExists(phome) && ! Util::dirExists(configFile)) {
+			struct stat statbuf;
+			stat(phome.c_str(), &statbuf);
+			if ( statbuf.st_mtime + JAIL_MONITORSTART_TIMEOUT < time(NULL) ) {
+				try {
+					Util::removeDir(phome, 1000, true);
+					Util::removeDir(controlDir + "/" + homes[i], 1000, true);
+				}catch(...) {
+				}
 			}
-			Util::removeDir(controlDir + "/" + homes[i], 1000, true);
 		}
 	}
 }
