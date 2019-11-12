@@ -104,6 +104,10 @@ http://server:PORT/OK and https://server:SECURE_PORT/OK
 
 where "server" is the name of your execution server. The system must return a page with OK
 
+# Updating the software in the jail
+
+After installing or updating packages or files in the system that you want to be availables in the jail, you may restart the service with "systemctl restart vpl-jail-system" or, if you don't want to restart the service, you can drop the kernel caches to do the overlayFS file system aware of the changes. To drop the kernel caches run as root "sync; echo 7 > /proc/sys/vm/dropcaches".
+
 # Troubleshooting
 
 You can obtain a detailed log of the execution process by changing the log level at the configuration file. Commonly The logs will be written to "/var/log/syslog".
