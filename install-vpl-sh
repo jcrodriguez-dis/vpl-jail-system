@@ -148,7 +148,7 @@ function vpl_install_npm {
 	fi
 	local found=1
 	local checked=""
-	echo -n "Installing with npm $1: "
+	echo -n "Installing $1 (using npm): "
 	shift
 	while [ "$#" != "0" ] ; do
 	    checked="$checked $1"
@@ -422,9 +422,15 @@ else
         vpl_install "Python pydb" pydb
         vpl_install "Python pudb" python-pudb
         vpl_install "Pythom Thonny" thonny
-        vpl_install "Python tk" python-tk
+        vpl_install "Python Tk" python-tk
+        vpl_install "Python NumPy" python-numpy
+        vpl_install "Python pandas" python-pandas
+        vpl_install "Python Matplotlib" python-matplotlib
         vpl_install "Python3" python3
-        vpl_install "Python3 tk" python3-tk
+        vpl_install "Python3 Tk" python3-tk
+        vpl_install "Python3 NumPy" python3-numpy
+        vpl_install "Python3 pandas" python3-pandas
+        vpl_install "Python3 Matplotlib" python3-matplotlib
         vpl_install "Python3 pudb" python3-pudb
         vpl_install "Ruby interpreter" ruby
         vpl_install "Scala programming language" scala
