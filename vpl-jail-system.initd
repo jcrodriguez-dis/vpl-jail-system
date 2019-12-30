@@ -174,6 +174,28 @@ function unset_other {
 	fi
 }
 
+function set_snap {
+	if [ -d "$JAILPATH/snap" ] ; then
+		for DIR in $(ls -d /snap/*/*)
+		do
+			if [ ! -h $DIR ] ; then
+				set_other $DIR
+			fi
+		done
+	fi
+}
+
+function unset_snap {
+	if [ -d "$JAILPATH/snap" ] ; then
+		for DIR in $(ls -d /snap/*/*)
+		do
+			if [ ! -h $DIR ] ; then
+				unset_other $DIR
+			fi
+		done
+	fi
+}
+
 function set_firewall {
 #0: No firewall
 #1: VPL service+DNS+ full internet access
@@ -348,6 +370,7 @@ function start_vpl {
 		set_other /dev/pts
 		set_other /run
 		set_other /run/lock
+		set_snap
 	} 2>> $LOGFILE
 	start_daemon /etc/vpl/vpl-jail-server $1 $2
 	sleep 1
@@ -379,13 +402,26 @@ function stop_vpl {
 			log_failure_msg $"vpl-jail-system jail path error '$JAILPATH' not a directory"
 			exit 1
 		fi
+		unset_snap
 		unset_other /run/lock
 		unset_other /run
 		unset_other /dev/pts
 		unset_tmpdir /dev/shm
 		unset_other /dev
 		unset_other /proc
-		umount "$JAILPATH"
+		local I
+		for (( I=1 ; $I < 10 ; I+=1 )) ; do
+			umount "$JAILPATH"
+			if [ "$?" == "0" ] ;  then
+				break
+			fi
+			echo -n "."
+			sleep 1
+		done
+		if [ "$I" == "10" ] ;  then
+			umount -f "$JAILPATH"
+			umount -l "$JAILPATH"
+		fi
 		unset_controldir
 		unset_firewall
 		post_stop
