@@ -48,6 +48,8 @@ fi
 #Stop services
 service vpl-jail-system stop
 CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf"
+JAILPATH=/jail
+CONTROLPATH=/var/vpl-jail-system
 #Load config file
 if [ -f "$CONFIG_FILE" ]; then
 	read_config_var "$CONFIG_FILE" JAILPATH /jail
@@ -55,6 +57,7 @@ if [ -f "$CONFIG_FILE" ]; then
 	#Check $JAILPATH not been "/"
 	if [ -f "$JAILPATH$CONFIG_FILE" ] ; then
 		echo "vpl-jail-system jail path error '$JAILPATH'"
+		exit 1
 	else
 		#Remove safe dir
 		remove_dir $JAILPATH
@@ -63,13 +66,20 @@ if [ -f "$CONFIG_FILE" ]; then
 else
 	echo "vpl-jail-system config file not found: $CONFIG_FILE"
 fi
-rm $VPLJAIL_INSTALL_DIR/vpl-jail-server
-rm $VPLJAIL_INSTALL_DIR/vpl-jail-system.conf
-rmdir $VPLJAIL_INSTALL_DIR
 if [ "$LSYSTEM" = "1" ] ;
 then
 	chkconfig --del vpl-jail-system
 else
 	update-rc.d -f vpl-jail-system remove
 fi
-rm /etc/init.d/vpl-jail-system
+
+if [ -f /bin/systemctl ]
+	systemctl stop vpl-jail-system
+	systemctl disable vpl-jail-system
+	rm /etc/systemd/system/vpl-jail-system*
+	systemctl deamon-reload
+	systemctl reset-failed
+fi
+rm /etc/init.d/vpl-jail-system* &> /dev/null
+rm -Rf $VPLJAIL_INSTALL_DIR
+
