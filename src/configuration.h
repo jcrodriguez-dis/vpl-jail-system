@@ -41,8 +41,8 @@ public:
 	string getJailPath(){ return jailPath;}
 	string getCleanPATH(){ return cleanPATH;}
 	string getControlPath(){ return controlPath;}
-	size_t getMinPrisioner(){ return minPrisoner;}
-	size_t getMaxPrisioner(){ return maxPrisoner;}
+	size_t getMinPrisoner(){ return minPrisoner;}
+	size_t getMaxPrisoner(){ return maxPrisoner;}
 	const vector<string> & getTaskOnlyFrom(){ return taskOnlyFrom;}
 	string getInterface(){ return interface;}
 	string getURLPath(){ return URLPath;}

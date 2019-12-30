@@ -66,14 +66,14 @@ void Configuration::readConfigFile(){
 	configDefault["FAIL2BAN"]="0";
 	ConfigData data=ConfigurationFile::readConfiguration(configPath,configDefault);
 	minPrisoner = atoi(data["MIN_PRISONER_UGID"].c_str());
-	if(minPrisoner < JAIL_MIN_PRISIONER_UID)
+	if(minPrisoner < JAIL_MIN_PRISONER_UID)
 		throw "Incorrect MIN_PRISONER_UGID config value"
 		+data["MIN_PRISONER_UGID"];
 	maxPrisoner= atoi(data["MAX_PRISONER_UGID"].c_str());
-	if(maxPrisoner > JAIL_MAX_PRISIONER_UID)
+	if(maxPrisoner > JAIL_MAX_PRISONER_UID)
 		throw "Incorrect MAX_PRISONER_UGID config value"
 		+data["MAX_PRISONER_UGID"];
-	if(minPrisoner>maxPrisoner || minPrisoner<JAIL_MIN_PRISIONER_UID || maxPrisoner>JAIL_MAX_PRISIONER_UID)
+	if(minPrisoner>maxPrisoner || minPrisoner<JAIL_MIN_PRISONER_UID || maxPrisoner>JAIL_MAX_PRISONER_UID)
 		throw "Incorrect config file, prisoner uid inconsistency";
 	jailPath = data["JAILPATH"];
 	if(!Util::correctPath(jailPath))
