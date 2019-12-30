@@ -176,7 +176,7 @@ function unset_other {
 
 function set_snap {
 	if [ -d "$JAILPATH/snap" ] ; then
-		for DIR in $(ls -d /snap/*/*)
+		for DIR in $(ls -d /snap/*/* 2>/dev/null)
 		do
 			if [ ! -h $DIR ] ; then
 				set_other $DIR
@@ -187,7 +187,7 @@ function set_snap {
 
 function unset_snap {
 	if [ -d "$JAILPATH/snap" ] ; then
-		for DIR in $(ls -d /snap/*/*)
+		for DIR in $(ls -d /snap/*/* 2>/dev/null)
 		do
 			if [ ! -h $DIR ] ; then
 				unset_other $DIR
