@@ -6,4 +6,4 @@
 
 g++ test.cpp ../util.cpp ../configuration.cpp ../configurationFile.cpp -o test
 ./test
-
+rm test
