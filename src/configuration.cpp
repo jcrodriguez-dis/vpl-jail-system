@@ -94,13 +94,13 @@ void Configuration::readConfigFile(){
 	size_t pos=0;
 	while((pos=tof.find(" ",pos)) != string::npos){
 		dir=tof.substr(0,pos);
-		Util::trim(dir);
+		Util::trimAndRemoveQuotes(dir);
 		if(dir.length()>0)
 			taskOnlyFrom.push_back(dir);
 		tof.erase(0,pos);
 	}
 	dir=tof.substr(0,pos);
-	Util::trim(dir);
+	Util::trimAndRemoveQuotes(dir);
 	if(dir.size()>0)
 		taskOnlyFrom.push_back(dir);
 	interface=data["INTERFACE"];

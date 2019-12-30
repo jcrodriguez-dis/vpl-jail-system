@@ -25,7 +25,7 @@ void ConfigurationFile::parseConfigLine(ConfigData &data,const string &line){
 			string param=line.substr(match[1].rm_so,match[1].rm_eo-match[1].rm_so);
 			string value=line.substr(match[2].rm_so,match[2].rm_eo-match[2].rm_so);
 			param = Util::toUppercase(param);
-			Util::trim(value);
+			Util::trimAndRemoveQuotes(value);
 			data[param] = value;
 			syslog(LOG_INFO,"Read config param %s=%s", param.c_str(), value.c_str());
 		} else {
