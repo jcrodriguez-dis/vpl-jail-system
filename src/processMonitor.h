@@ -47,13 +47,17 @@ class processMonitor{
 	void removePrisonerHome();
 	static void catchSIGTERM(int n){}
 	void limitResultSize(string &);
-	void setControlPath(){
-		processControlPath=configuration->getControlPath()+"/p"+Util::itos(getPrisonerID());
+	void setPrisonerID(uid_t  prisoner) {
+		this->prisoner = prisoner;
+		setProcessControlPath();
 	}
-	string getControlPath(){
+	void setProcessControlPath(){
+		processControlPath = configuration->getControlPath() + "/p" + Util::itos(getPrisonerID());
+	}
+	string getProcessControlPath(){
 		return processControlPath;
 	}
-	string getControlPath(string name){
+	string getProcessControlPath(string name){
 		return processControlPath+"/"+name;
 	}
 public:
@@ -79,8 +83,10 @@ public:
 	string getHomePath(){return configuration->getJailPath()+"/home/p"+Util::itos(prisoner);}
 	string getRelativeHomePath(){return "/home/p"+Util::itos(prisoner);}
 	void becomePrisoner();
+	void becomePrisoner(int);
 	bool isRunnig();
-	void stopPrisonerProcess(bool soft);
+	void stopPrisonerProcess(bool);
+	void stopPrisonerProcess(int, bool);
 	void cleanTask();
 	processState getState();
 	void setCompiler();
@@ -95,7 +101,7 @@ public:
 	void setCompilationOutput(const string &compilation);
 	void setExecutionOutput(const string &execution, bool executed);
 	void freeWatchDog();
-	static vector<string> getPrisionersFromDir(string dir);
+	static vector<string> getPrisonersFromDir(string dir);
 	static void cleanZombieTasks();
 };
 #endif

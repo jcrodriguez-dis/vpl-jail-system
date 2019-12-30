@@ -34,10 +34,11 @@ int processMonitor::requestsInProgress(){
 	closedir(dirfd);
 	return nprisoner;
 }
+
 /**
  * Root mutate to be prisoner
  */
-void processMonitor::becomePrisoner(){
+void processMonitor::becomePrisoner(int prisoner){
 	if(setresgid(prisoner,prisoner,prisoner)!= 0) {
 		throw HttpException(internalServerErrorCode
 				,"I can't change to prisoner group",Util::itos(prisoner));
@@ -54,11 +55,22 @@ void processMonitor::becomePrisoner(){
 	syslog(LOG_INFO,"change user to %d",prisoner);
 }
 
+/**
+ * Root mutate to be prisoner
+ */
+void processMonitor::becomePrisoner(){
+	becomePrisoner(prisoner);
+}
+
 void processMonitor::stopPrisonerProcess(bool soft){
+	stopPrisonerProcess(prisoner, soft);
+}
+
+void processMonitor::stopPrisonerProcess(int prisoner, bool soft){
 	syslog(LOG_INFO,"Sttoping prisoner process");
 	pid_t pid=fork();
 	if(pid==0){ //new process
-		becomePrisoner();
+		becomePrisoner(prisoner);
 		if(soft){
 			//To not stop at first signal
 			signal(SIGTERM,catchSIGTERM);
@@ -94,83 +106,95 @@ string processMonitor::prisonerHomePath(){
 
 /**
  * Select a prisoner id from minPrisoner to maxPrisoner
- * Create prisioner home dir
+ * Create prisoner home dir
  */
 void processMonitor::selectPrisoner(){
-	int const range=configuration->getMaxPrisioner()-configuration->getMinPrisioner()+1;
-	int const ntry=range;
-	int const umask=0700;
-	for(int i=0; i<ntry; i++){
-		prisoner = configuration->getMinPrisioner()+Util::random()%range;
-		setControlPath();
-		string controlPath=getControlPath();
-		if(mkdir(controlPath.c_str(),umask)==0){
-			homePath=prisonerHomePath();
-			if(mkdir(homePath.c_str(),umask)==0){
-				if(chown(homePath.c_str(),prisoner,prisoner))
+	int const range = configuration->getMaxPrisoner() - configuration->getMinPrisoner() + 1;
+	int const ntry = range;
+	int const umask = 0700;
+	Lock lock(configuration->getControlPath());
+	for(int i = 0; i < ntry; i++){
+		setPrisonerID(configuration->getMinPrisoner() + (Util::random() + i) % range);
+		string controlPath = getProcessControlPath();
+		if( mkdir(controlPath.c_str(), umask) == 0 ) {
+			homePath = prisonerHomePath();
+			if( mkdir(homePath.c_str(), umask) == 0 ){
+				if( chown(homePath.c_str(), prisoner, prisoner) ) {
 					throw HttpException(internalServerErrorCode
-							,"I can't change prisoner home dir owner");
-			}else{
-				syslog(LOG_ERR, "Exists home dir without control dir");
-				rmdir(homePath.c_str());
+							, "I can't change prisoner home dir \"" + homePath +
+							  "\" to proper owner: " + strerror(errno));
+				}
+				return;
+			} else if ( errno == EEXIST) {
+				syslog(LOG_ERR, "Exists home dir without control dir, removing ... %s", homePath.c_str());
+				Util::removeDir(homePath, getPrisonerID(), true);
+				Util::removeDir(configuration->getJailPath() + "/tmp", getPrisonerID(), false);
+				rmdir(controlPath.c_str());
 				continue;
 			}
-			return;
+			throw HttpException(internalServerErrorCode
+							, "I can't create prisoner home dir \"" + homePath +
+							  "\" : " + strerror(errno));
+		} else if ( errno == EEXIST) {
+			continue;
 		}
+		throw HttpException(internalServerErrorCode
+						, "I can't create prisoner control dir \"" + Util::itos(prisoner) +
+							  "\" : "+ strerror(errno));
 	}
 	throw HttpException(internalServerErrorCode
-			,"I can't create prisoner home dir");
+			,"I can't select prisoner home dir: free UID not found");
 }
 
 void processMonitor::writeInfo(ConfigData data){
-	string configFile=getControlPath()+"/config";
+	string configFile = getProcessControlPath() + "/config";
 	//Read current config and don't lost data not set now
 	if(Util::fileExists(configFile)){
-		data=ConfigurationFile::readConfiguration(configFile,data);
+		data = ConfigurationFile::readConfiguration(configFile, data);
 	}
-	data["MAXTIME"]=Util::itos(executionLimits.maxtime);
-	data["MAXFILESIZE"]=Util::itos(executionLimits.maxfilesize);
-	data["MAXMEMORY"]=Util::itos(executionLimits.maxmemory);
-	data["MAXPROCESSES"]=Util::itos(executionLimits.maxprocesses);
+	data["MAXTIME"] = Util::itos(executionLimits.maxtime);
+	data["MAXFILESIZE"] = Util::itos(executionLimits.maxfilesize);
+	data["MAXMEMORY"] = Util::itos(executionLimits.maxmemory);
+	data["MAXPROCESSES"] = Util::itos(executionLimits.maxprocesses);
 
 	data["ADMINTICKET"] = adminticket;
 	data["EXECUTIONTICKET"] = executionticket;
 	data["MONITORTICKET"] = monitorticket;
 
-	data["STARTTIME"]=Util::itos(startTime);
-	data["INTERACTIVE"]=interactive?"1":"0";
-	data["LANG"]=lang;
-	data["COMPILER_PID"]=Util::itos(compiler_pid);
-	data["RUNNER_PID"]=Util::itos(runner_pid);
-	data["MONITOR_PID"]=Util::itos(monitor_pid);
-	ConfigurationFile::writeConfiguration(configFile,data);
+	data["STARTTIME"] = Util::itos(startTime);
+	data["INTERACTIVE"] = interactive?"1":"0";
+	data["LANG"] = lang;
+	data["COMPILER_PID"] = Util::itos(compiler_pid);
+	data["RUNNER_PID"] = Util::itos(runner_pid);
+	data["MONITOR_PID"] = Util::itos(monitor_pid);
+	ConfigurationFile::writeConfiguration(configFile, data);
 }
 
 ConfigData processMonitor::readInfo(){
 	ConfigData data;
-	data=ConfigurationFile::readConfiguration(getControlPath("config"),data);
-	executionLimits.maxtime=atoi(data["MAXTIME"].c_str());
-	executionLimits.maxfilesize=atoi(data["MAXFILESIZE"].c_str());
-	executionLimits.maxmemory=atoi(data["MAXMEMORY"].c_str());
-	executionLimits.maxprocesses=atoi(data["MAXPROCESSES"].c_str());
+	data=ConfigurationFile::readConfiguration(getProcessControlPath("config"), data);
+	executionLimits.maxtime = atoi(data["MAXTIME"].c_str());
+	executionLimits.maxfilesize = atoi(data["MAXFILESIZE"].c_str());
+	executionLimits.maxmemory = atoi(data["MAXMEMORY"].c_str());
+	executionLimits.maxprocesses = atoi(data["MAXPROCESSES"].c_str());
 
 	adminticket = data["ADMINTICKET"];
 	executionticket = data["EXECUTIONTICKET"];
 	monitorticket = data["MONITORTICKET"];
 
-	startTime=atoi(data["STARTTIME"].c_str());
-	interactive=atoi(data["INTERACTIVE"].c_str());
-	lang=data["LANG"];
-	compiler_pid=atoi(data["COMPILER_PID"].c_str());
-	runner_pid=atoi(data["RUNNER_PID"].c_str());
-	monitor_pid=atoi(data["MONITOR_PID"].c_str());
+	startTime = atoi(data["STARTTIME"].c_str());
+	interactive = atoi(data["INTERACTIVE"].c_str());
+	lang = data["LANG"];
+	compiler_pid = atoi(data["COMPILER_PID"].c_str());
+	runner_pid = atoi(data["RUNNER_PID"].c_str());
+	monitor_pid = atoi(data["MONITOR_PID"].c_str());
 	return data;
 }
 
 processMonitor::processMonitor(string & adminticket, string & monitorticket, string & executionticket){
 	const int salt=127;
 	configuration = Configuration::getConfiguration();
-	security=admin;
+	security = admin;
 	string cp=configuration->getControlPath();
 	adminticket = Util::itos(Util::random()/salt);
 	monitorticket = Util::itos(Util::random()/salt);
@@ -193,20 +217,20 @@ processMonitor::processMonitor(string & adminticket, string & monitorticket, str
 		}
 		//Write tickets
 		ConfigData data;
-		data["USER_ID"]=Util::itos(prisoner);
-		data["SECURITY"]=Util::itos(admin);
-		ConfigurationFile::writeConfiguration(cp+"/"+adminticket,data);
-		data["SECURITY"]=Util::itos(monitor);
-		ConfigurationFile::writeConfiguration(cp+"/"+monitorticket,data);
-		data["SECURITY"]=Util::itos(execute);
-		ConfigurationFile::writeConfiguration(cp+"/"+executionticket,data);
-		executionLimits.maxtime=0;
-		executionLimits.maxfilesize=0;
-		executionLimits.maxmemory=0;
-		executionLimits.maxprocesses=0;
-		this->adminticket=adminticket;
-		this->monitorticket=monitorticket;
-		this->executionticket=executionticket;
+		data["USER_ID"] = Util::itos(prisoner);
+		data["SECURITY"] = Util::itos(admin);
+		ConfigurationFile::writeConfiguration(cp + "/" + adminticket, data);
+		data["SECURITY"] = Util::itos(monitor);
+		ConfigurationFile::writeConfiguration(cp + "/" + monitorticket, data);
+		data["SECURITY"] = Util::itos(execute);
+		ConfigurationFile::writeConfiguration(cp + "/" + executionticket, data);
+		executionLimits.maxtime = 0;
+		executionLimits.maxfilesize = 0;
+		executionLimits.maxmemory = 0;
+		executionLimits.maxprocesses = 0;
+		this->adminticket = adminticket;
+		this->monitorticket = monitorticket;
+		this->executionticket = executionticket;
 		startTime = time(NULL);
 		interactive=false;
 		compiler_pid=0;
@@ -219,7 +243,7 @@ processMonitor::processMonitor(string & adminticket, string & monitorticket, str
 processMonitor::processMonitor(string ticket){
 	configuration = Configuration::getConfiguration();
 	bool error=true;
-	Util::trim(ticket);
+	Util::trimAndRemoveQuotes(ticket);
 	regex_t reg;
 	regcomp(&reg,"^[0-9]+$", REG_EXTENDED);
 	regmatch_t match[1];
@@ -227,18 +251,17 @@ processMonitor::processMonitor(string ticket){
 	regfree(&reg);
 	if(nomatch == 0){
 		Lock lock(configuration->getControlPath());
-		string fileName=configuration->getControlPath()+"/"+ticket;
+		string fileName=configuration->getControlPath() + "/" + ticket;
 		if(Util::fileExists(fileName)){
 			ConfigData data;
-			data["USER_ID"]="0";
-			data["SECURITY"]="3"; //none
-			data=ConfigurationFile::readConfiguration(fileName,data);
-			prisoner=atoi(data["USER_ID"].c_str());
+			data["USER_ID"] = "0";
+			data["SECURITY"] = "3"; //none
+			data = ConfigurationFile::readConfiguration(fileName,data);
+			setPrisonerID (atoi(data["USER_ID"].c_str()));
 			security = (securityLevel) atoi(data["SECURITY"].c_str());
-			setControlPath();
 			if(security == monitor || security == execute)
 				Util::deleteFile(fileName);//Anulate tikect
-			string configFile=getControlPath("config");
+			string configFile = getProcessControlPath("config");
 			if(Util::fileExists(configFile)){
 				readInfo();
 				error=false;
@@ -257,7 +280,7 @@ bool processMonitor::FileExists(string name){
 }
 
 bool processMonitor::controlFileExists(string name){
-	return Util::fileExists(getControlPath(name));
+	return Util::fileExists(getProcessControlPath(name));
 }
 
 string processMonitor::readFile(string name){
@@ -279,13 +302,9 @@ void processMonitor::writeFile(string name, const string &data){
 				if(p != '\n' && n != '\n') newdata += '\n';
 			}
 		}
-		Util::writeFile(fullName,newdata
-				,getPrisonerID()
-				,homePath.size()+1);
+		Util::writeFile(fullName, newdata, getPrisonerID(), homePath.size() + 1);
 	}else{
-		Util::writeFile(fullName,data
-				,getPrisonerID()
-				,homePath.size()+1);
+		Util::writeFile(fullName, data, getPrisonerID(), homePath.size() + 1);
 	}
 }
 
@@ -293,14 +312,14 @@ void processMonitor::writeFile(string name, const string &data){
  * Delete a file from prisoner home directory
  */
 void processMonitor::deleteFile(string name){
-	Util::deleteFile(getHomePath()+"/"+name);
+	Util::deleteFile(getHomePath() + "/" + name);
 }
 
 bool processMonitor::installScript(string to, string from){
-	if(Util::fileExists("/etc/vpl/"+from)){
-		string scriptCode=Util::readFile("/etc/vpl/"+from);
-		syslog(LOG_DEBUG,"Installing %s in %s",to.c_str(),from.c_str());
-		writeFile(to,scriptCode);
+	if(Util::fileExists("/etc/vpl/" + from)){
+		string scriptCode=Util::readFile("/etc/vpl/" + from);
+		syslog(LOG_DEBUG, "Installing %s in %s", to.c_str(), from.c_str());
+		writeFile(to, scriptCode);
 		return true;
 	}
 	return false;
@@ -311,9 +330,9 @@ bool processMonitor::isRunnig(){
 }
 
 processState processMonitor::getState(){
-	if(!Util::dirExists(getControlPath())) return stopped;
-	Lock lock(getControlPath());
-	string fileName=getControlPath("config");
+	if(!Util::dirExists(getProcessControlPath())) return stopped;
+	Lock lock(getProcessControlPath());
+	string fileName = getProcessControlPath("config");
 	if(!Util::fileExists(fileName))	return stopped;
 	readInfo();
 	if(compiler_pid==0) return starting;
@@ -353,22 +372,22 @@ processState processMonitor::getState(){
 
 void processMonitor::setRunner(){
 	if (security == monitor) return;
-	Lock lock(getControlPath());
+	Lock lock(getProcessControlPath());
 	readInfo();
 	runner_pid = getpid();
 	writeInfo();
 }
 void processMonitor::setCompiler(){
 	if (security == monitor) return;
-	Lock lock(getControlPath());
+	Lock lock(getProcessControlPath());
 	readInfo();
 	compiler_pid = getpid();
 	writeInfo();
 }
 
 bool processMonitor::isMonitored(){
-	if(!Util::dirExists(getControlPath())) return false;
-	Lock lock(getControlPath());
+	if(!Util::dirExists(getProcessControlPath())) return false;
+	Lock lock(getProcessControlPath());
 	if ( monitor == 0 ) readInfo();
 	if ( monitor == 0 ) return false;
 	return Util::processExists(monitor);
@@ -376,7 +395,7 @@ bool processMonitor::isMonitored(){
 
 void processMonitor::monitorize(){
 	if ( security != monitor ) return;
-	Lock lock(getControlPath());
+	Lock lock(getProcessControlPath());
 	readInfo();
 	if(monitor_pid != 0)
 		throw string("Process already monitorized");
@@ -405,17 +424,17 @@ void processMonitor::getResult(string &compilation, string &execution, bool &exe
 		throw HttpException(internalServerErrorCode,"Security: process in bad state");
 	{
 		string fileName;
-		Lock lock(getControlPath());
+		Lock lock(getProcessControlPath());
 		compilation="";
 		execution="";
 		executed=false;
-		fileName=getControlPath("compilation");
+		fileName=getProcessControlPath("compilation");
 		if(Util::fileExists(fileName)){
 			compilation=Util::readFile(fileName);
 			limitResultSize(compilation);
 			Util::deleteFile(fileName);
 		}
-		fileName=getControlPath("execution");
+		fileName=getProcessControlPath("execution");
 		if((executed=Util::fileExists(fileName))){
 			execution=Util::readFile(fileName);
 			limitResultSize(execution);
@@ -428,8 +447,8 @@ string processMonitor::getCompilation(){
 	if(security != monitor)
 		throw HttpException(internalServerErrorCode,"Security: requiere monitor ticket for getCompilation");
 	{
-		Lock lock(getControlPath());
-		string fileName=getControlPath("compilation");
+		Lock lock(getProcessControlPath());
+		string fileName = getProcessControlPath("compilation");
 		if(Util::fileExists(fileName))
 			return Util::readFile(fileName);
 		return "";
@@ -438,23 +457,23 @@ string processMonitor::getCompilation(){
 
 void processMonitor::setCompilationOutput(const string &compilation){
 	string fileName;
-	Lock lock(getControlPath());
-	fileName=getControlPath("compilation");
+	Lock lock(getProcessControlPath());
+	fileName = getProcessControlPath("compilation");
 	if(Util::fileExists(fileName))
 		throw "Compilation already save";
 	Util::writeFile(fileName,compilation);
 }
 void processMonitor::setExecutionOutput(const string &execution, bool executed){
 	string fileName;
-	Lock lock(getControlPath());
-	fileName=getControlPath("compilation");
+	Lock lock(getProcessControlPath());
+	fileName = getProcessControlPath("compilation");
 	if(!Util::fileExists(fileName))
 		throw "Compilation not saved";
 	if(executed){
-		fileName=getControlPath("execution");
+		fileName = getProcessControlPath("execution");
 		if(Util::fileExists(fileName))
 			throw "Execution already saved";
-		Util::writeFile(fileName,execution);
+		Util::writeFile(fileName, execution);
 	}
 }
 
@@ -466,7 +485,7 @@ void processMonitor::setExecutionOutput(const string &execution, bool executed){
  * and complete directories owned by prisoner (all files and directories owns by prisoner or not)
  */
 int processMonitor::removeDir(string dir, bool force){
-	return Util::removeDir(dir,prisoner,force);
+	return Util::removeDir(dir, prisoner, force);
 }
 
 /**
@@ -474,9 +493,9 @@ int processMonitor::removeDir(string dir, bool force){
  */
 void processMonitor::removePrisonerHome(){
 	if ( configuration->getLogLevel() != 8 ) {
-		syslog(LOG_INFO,"Remove prisoner home (%d)",prisoner);
-		Util::removeDir(configuration->getJailPath()+"/tmp",getPrisonerID(),false); //Only prisoner files and dirs
-		Util::removeDir(prisonerHomePath(),getPrisonerID(),true); //All files and dir
+		syslog(LOG_INFO, "Remove prisoner home (%d)", prisoner);
+		Util::removeDir(configuration->getJailPath() + "/tmp", getPrisonerID(), false); //Only prisoner files and dirs
+		Util::removeDir(prisonerHomePath(), getPrisonerID(), true); //All files and dir
 	} else {
 		syslog(LOG_INFO,"Loglevel = 8 => do not remove prisoner home (%d)",prisoner);
 	}
@@ -493,13 +512,13 @@ void processMonitor::cleanTask(){
 	syslog(LOG_INFO,"Cleaning task");
 	stopPrisonerProcess(false);
 	removePrisonerHome();
-	string controlPath=configuration->getControlPath();
+	string controlPath = configuration->getControlPath();
 	Lock lock(controlPath);
 
-	Util::removeDir(getControlPath(),0,true);
-	Util::deleteFile(controlPath+"/"+adminticket);
-	Util::deleteFile(controlPath+"/"+monitorticket);
-	Util::deleteFile(controlPath+"/"+executionticket);
+	Util::removeDir(getProcessControlPath(), getPrisonerID(), true);
+	Util::deleteFile(controlPath + "/" + adminticket);
+	Util::deleteFile(controlPath + "/" + monitorticket);
+	Util::deleteFile(controlPath + "/" + executionticket);
 
 	usleep(100000);
 	stopPrisonerProcess(true);
@@ -537,16 +556,16 @@ uint64_t processMonitor::getMemoryUsed(){
 		const string name(ent->d_name);
 		const pid_t PID = Util::atoi(name);
 		if(Util::itos(PID) != name ) continue;
-		const string statusFile=dir+"/"+name+"/status";
-		string status=Util::readFile(statusFile,false);
-		int nomatch=regexec(&reg_uid, status.c_str(),3, match, 0);
+		const string statusFile = dir + "/" + name + "/status";
+		string status = Util::readFile(statusFile, false);
+		int nomatch=regexec(&reg_uid, status.c_str(), 3, match, 0);
 		if(nomatch==0){
-			string UIDF=status.substr(match[1].rm_so,match[1].rm_eo-match[1].rm_so);
+			string UIDF=status.substr(match[1].rm_so, match[1].rm_eo - match[1].rm_so);
 			if(Util::atoi(UIDF) == (int) prisoner){
-				nomatch=regexec(&reg_mem, status.c_str(),3, match, 0);
-				if(nomatch==0){
-					string MEM=status.substr(match[1].rm_so,match[1].rm_eo-match[1].rm_so);
-					string MUL=status.substr(match[2].rm_so,match[2].rm_eo-match[2].rm_so);
+				nomatch = regexec(&reg_mem, status.c_str(),3, match, 0);
+				if(nomatch == 0){
+					string MEM = status.substr(match[1].rm_so, match[1].rm_eo - match[1].rm_so);
+					string MUL = status.substr(match[2].rm_so, match[2].rm_eo - match[2].rm_so);
 					int mul=1024; //Default kB 1024
 					if(MUL == "mB") mul *= 1024;
 					s += Util::atol(MEM) * mul;
@@ -562,39 +581,39 @@ void processMonitor::freeWatchDog(){
 	//TODO check process running based on /proc
 	//looking for inconsistences
 }
-vector<string> processMonitor::getPrisionersFromDir(string dir) {
-	vector<string> prisioners;
+vector<string> processMonitor::getPrisonersFromDir(string dir) {
+	vector<string> prisoners;
 	dirent *ent;
 	DIR *dirfd=opendir(dir.c_str());
 	if(dirfd==NULL){
 		syslog(LOG_ERR,"Can't open dir \"%s\": %m",dir.c_str());
-		return prisioners;
+		return prisoners;
 	}
 	while((ent=readdir(dirfd))!=NULL){
 		if (ent->d_type == DT_DIR) {
 			const string name(ent->d_name);
 			if(name.at(0) == 'p') {
-				prisioners.push_back(name);
+				prisoners.push_back(name);
 			}
 		}
 	}
 	closedir(dirfd);
-	return prisioners;
+	return prisoners;
 }
 
 void processMonitor::cleanZombieTasks() {
 	syslog(LOG_INFO,"Cleaning zombie tasks");
 	const string controlDir=Configuration::getConfiguration()->getControlPath();
-	const string homeDir=Configuration::getConfiguration()->getJailPath()+"/home";
-	vector<string> homes = getPrisionersFromDir(homeDir);
-	vector<string> tasks = getPrisionersFromDir(controlDir);
+	const string homeDir=Configuration::getConfiguration()->getJailPath() + "/home";
+	vector<string> homes = getPrisonersFromDir(homeDir);
+	vector<string> tasks = getPrisonersFromDir(controlDir);
 	for (size_t i = 0; i < tasks.size(); i++) {
 		ConfigData data;
 		syslog(LOG_INFO,"Cleaning zombie tasks: checking(1) %s", tasks[i].c_str());
 		string configDir = controlDir + "/" + tasks[i];
 		string configFile = configDir + "/" + "config";
+		struct stat statbuf;
 		try {
-			struct stat statbuf;
 			stat(configDir.c_str(), &statbuf);
 			if ( statbuf.st_mtime + JAIL_MONITORSTART_TIMEOUT < time(NULL) ) {
 				data = ConfigurationFile::readConfiguration(configFile, data);
@@ -602,10 +621,17 @@ void processMonitor::cleanZombieTasks() {
 				pm.getState();
 			}
 		}catch(...) {
+			time_t tlimit = statbuf.st_mtime;
+			tlimit += Configuration::getConfiguration()->getLimits().maxtime;
+			tlimit += JAIL_HARVEST_TIMEOUT;
+			if ( tlimit < time(NULL) ) {
+
+			}
 		}
 	}
+	Lock lock(controlDir);
 	for (size_t i = 0; i < homes.size(); i++) {
-		syslog(LOG_INFO,"Cleaning zombie tasks: checking(2) %s", homes[i].c_str());
+		syslog(LOG_INFO, "Cleaning zombie tasks: checking(2) %s", homes[i].c_str());
 		string configFile = controlDir + "/" + homes[i] + "/" + "config";
 		string phome = homeDir + "/" + homes[i];
 		if ( Util::dirExists(phome) && ! Util::fileExists(configFile)) {
