@@ -5,5 +5,7 @@
 # Description:  Script to install run tests for vpl-jail-system
 
 g++ test.cpp ../util.cpp ../configuration.cpp ../configurationFile.cpp -o test
-./test
-rm test
+if [ -x test ] ; then
+   ./test
+   rm test
+fi
