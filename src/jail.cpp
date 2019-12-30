@@ -111,10 +111,24 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 			}
 		}
 		catch(std::exception &e){
-			syslog(LOG_ERR,"unexpected exception: %s %s:%d",e.what(),__FILE__,__LINE__);
+			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.what(), __FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		catch(string &e){
+			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.c_str(), __FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		catch(HttpException &e){
+			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.getLog().c_str(), __FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		catch(const char *e){
+			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e,__FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
 		}
 		catch(...){
-			syslog(LOG_ERR,"unexpected exception %s:%d",__FILE__,__LINE__);
+			syslog(LOG_ERR, "unexpected exception %s:%d", __FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
 		}
 		_exit(EXIT_SUCCESS);
 	}
