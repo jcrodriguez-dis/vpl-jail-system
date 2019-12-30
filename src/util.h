@@ -176,8 +176,7 @@ public:
 	 * clean the string removing spaces from end and start
 	 * remove a 'text'=>text and "text"=>text
 	 */
-	static void trim(string &s){
-		//FIXME is incorrect remove ' and "!!!!!
+	static void trimAndRemoveQuotes(string &s){
 		while(s.size()>0 && s[0] == ' ') s.erase(0,1);
 		while(s.size()>0 && s[s.size()-1] == ' ') s.erase(s.size()-1,1);
 		if(s.size()>1 && s[0]=='\'' && s[s.size()-1] == '\''){ //remove ''' surrounding
@@ -333,12 +332,12 @@ public:
 		return "";
 	}
 
-	static bool createDir(const string &path, uid_t user,size_t pos=0){ //absolute path
+	static bool createDir(const string &path, uid_t user,size_t pos=1){ //absolute path
 		string curDir;
-		while((pos=path.find('/',pos)) != string::npos){
+		while((pos = path.find('/',pos)) != string::npos){
 			curDir=path.substr(0,pos++);
 			syslog(LOG_DEBUG,"dir to check or create '%s' user %d",curDir.c_str(),user);
-			if(!dirExists(curDir)){
+			if(! dirExists(curDir) ){
 				if(mkdir(curDir.c_str(),0700)){
 					syslog(LOG_DEBUG,"Can't create dir '%s'",curDir.c_str());
 					return false;
@@ -352,7 +351,7 @@ public:
 			}
 		}
 		syslog(LOG_DEBUG,"dir to check or create '%s'",path.c_str());
-		if(!dirExists(path)){
+		if(! dirExists(path) ){
 			syslog(LOG_DEBUG,"Create '%s'",path.c_str());
 			if(mkdir(path.c_str(),0700)){
 				syslog(LOG_DEBUG,"Can't create dir '%s' %m",path.c_str());
@@ -431,56 +430,60 @@ public:
 
 	/**
 	 * remove a directory and its content
-	 * if force=true remove always
+	 * if force = true remove always
 	 * else remove files owned by prisoner
 	 * and complete directories owned by prisoner (all files and directories owns by prisoner or not)
 	 */
 	static int removeDir(string dir, uid_t owner,bool force){
-		if(!dirExists(dir))
-			return 0;
-		const string parent(".."),me(".");
-		int nunlink=0;
-		struct stat filestat;
-		dirent *ent;
-		DIR *dirfd=opendir(dir.c_str());
-		if(dirfd==NULL){
-			syslog(LOG_ERR,"Can't open dir \"%s\": %m",dir.c_str());
+		if(! dirExists(dir) ) {
 			return 0;
 		}
-		while((ent=readdir(dirfd))!=NULL){
+		const string parent(".."), me(".");
+		int nunlinks = 0;
+		struct stat filestat;
+		lstat(dir.c_str(), &filestat);
+		force = force || (filestat.st_uid == owner || filestat.st_gid == owner);
+
+		dirent *ent;
+		DIR *dirfd = opendir(dir.c_str());
+		if(dirfd==NULL){
+			syslog(LOG_ERR, "Can't open dir \"%s\": %m", dir.c_str());
+			return 0;
+		}
+		while( ( ent = readdir(dirfd) ) != NULL){
 			const string name(ent->d_name);
-			const string fullname=dir+"/"+name;
-			lstat(fullname.c_str(),&filestat);
-			bool owned=filestat.st_uid == owner || filestat.st_gid == owner;
+			const string fullname = dir + "/" + name;
+			lstat(fullname.c_str(), &filestat);
 			if(S_ISDIR(filestat.st_mode)){
 				if(name != parent && name != me){
-					nunlink+=removeDir(fullname,owner,force||owned);
-					if((force || owned) && dirExists(fullname)){
-						syslog(LOG_DEBUG,"Delete dir \"%s\"",fullname.c_str());
-						if(rmdir(fullname.c_str())){
-							syslog(LOG_ERR,"Can't rmdir \"%s\": %m",fullname.c_str());
-						}
-					}
+					nunlinks += removeDir(fullname, owner, force);
 				}
-			}
-			else{
-				if(force || owned){
-					syslog(LOG_DEBUG,"Delete \"%s\"",fullname.c_str());
-					if(unlink(fullname.c_str())){
+			} else {
+				bool remove = force;
+				if ( ! remove ) {
+					lstat(fullname.c_str(), &filestat);
+					remove = filestat.st_uid == owner || filestat.st_gid == owner;
+				}
+				if ( remove ) {
+					syslog(LOG_DEBUG,"Delete \"%s\"", fullname.c_str());
+					if( unlink(fullname.c_str()) ){
 						syslog(LOG_ERR,"Can't unlink \"%s\": %m",fullname.c_str());
+					} else {
+						nunlinks++;
 					}
-					else nunlink++;
 				}
 			}
 		}
 		closedir(dirfd);
-		if(force){
+		if (force) {
 			syslog(LOG_DEBUG,"rmdir \"%s\"",dir.c_str());
-			if(rmdir(dir.c_str())){
+			if ( rmdir(dir.c_str()) ) {
 				syslog(LOG_ERR,"Can't rmdir \"%s\": %m",dir.c_str());
+			} else {
+				nunlinks++;
 			}
 		}
-		return nunlink;
+		return nunlinks;
 	}
 	/**
  	* Set/Unset socket operation int block/nonblock mode
