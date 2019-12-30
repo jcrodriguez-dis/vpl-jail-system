@@ -5,10 +5,11 @@
  **/
 #include <cassert>
 #include <iostream>
-#include "util.h"
-#include "configuration.h"
+#include "../util.h"
+#include "../configuration.h"
 #include <assert.h>
 using namespace std;
+
 void testBase64Encode(){
 	assert(Base64::encode("Hello")=="SGVsbG8="||(cerr <<Base64::encode("Hello")<<endl,0));
 	assert(Base64::encode("abcde")=="YWJjZGU="||(cerr <<Base64::encode("abcde")<<endl,0));
@@ -33,11 +34,21 @@ void testBase64Decode(){
 		assert(i==raw[i]);
 
 }
-void testRandom(){
 
-}
 void testTrim(){
-
+    string val = ""; Util::trimAndRemoveQuotes(val); assert(val == "");
+    val = "algo"; Util::trimAndRemoveQuotes(val); assert(val == "algo");
+    val = "algo más"; Util::trimAndRemoveQuotes(val); assert(val == "algo más");
+    val = "hola que     tal nada"; Util::trimAndRemoveQuotes(val); assert(val == "hola que     tal nada");
+    val = "      "; Util::trimAndRemoveQuotes(val); assert(val == "");
+    val = "  a  b "; Util::trimAndRemoveQuotes(val); assert(val == "a  b");
+    val = "           a   ff  b    "; Util::trimAndRemoveQuotes(val); assert(val == "a   ff  b");
+    val = "''"; Util::trimAndRemoveQuotes(val); assert(val == "");
+    val = "\"\""; Util::trimAndRemoveQuotes(val); assert(val == "");
+    val = "'  a  b '"; Util::trimAndRemoveQuotes(val); assert(val == "  a  b ");
+    val = "\"  a  b \""; Util::trimAndRemoveQuotes(val); assert(val == "  a  b ");
+    val = "   '  a  b '"; Util::trimAndRemoveQuotes(val); assert(val == "  a  b ");
+    val = "       \"  a  b \"        "; Util::trimAndRemoveQuotes(val); assert(val == "  a  b ");
 }
 
 void testItos(){
@@ -104,15 +115,50 @@ void testCleanPATH(){
 	assert(Configuration::generateCleanPATH("/usr","/bin:/kk:/sbin:/local/bin:/local/nada")=="/bin:/sbin:/local/bin");
 }
 
+void testCreateExistRemoveDir(){
+	Util::removeDir("/tmp/to_be_or_not_to_be", getuid(), false);
+	assert( ! Util::dirExists("/tmp/to_be_or_not_to_be"));
+	assert( Util::createDir("/tmp/to_be_or_not_to_be", geteuid()) );
+	assert( Util::dirExists("/tmp/to_be_or_not_to_be") );
+	assert( Util::removeDir("/tmp/to_be_or_not_to_be", geteuid(), false) == 1);
+	assert( ! Util::dirExists("/tmp/to_be_or_not_to_be"));
+	Util::removeDir("/tmp/a/e/i", getuid(), false);
+	Util::removeDir("/tmp/a/e/o", getuid(), false);
+	Util::removeDir("/tmp/a/e/u", getuid(), false);
+	Util::removeDir("/tmp/a/e", getuid(), false);
+	Util::removeDir("/tmp/a/y", getuid(), false);
+	Util::removeDir("/tmp/a", getuid(), false);
+	assert( ! Util::dirExists("/tmp/a"));
+	assert( Util::createDir("/tmp/a/e/i", getuid()) );
+	assert( Util::dirExists("/tmp/a/e/i") );
+	assert( Util::createDir("/tmp/a/e/o", getuid()) );
+	assert( Util::dirExists("/tmp/a/e/o") );
+	assert( Util::createDir("/tmp/a/e/u", getuid()) );
+	assert( Util::dirExists("/tmp/a/e/u") );
+	assert( Util::createDir("/tmp/a/y", getuid()) );
+	assert( Util::dirExists("/tmp/a/y") );
+	assert( Util::removeDir("/tmp/a", getuid(), false) == 6);
+	assert( ! Util::dirExists("/tmp/a") );
+}
+
+void testWriteReadRemoveFile(){
+	Util::writeFile("/tmp/to_be_or_not_to_be", "mi texto único", getuid());
+	assert( Util::fileExists("/tmp/to_be_or_not_to_be") );
+	assert( Util::readFile("/tmp/to_be_or_not_to_be") == "mi texto único" );
+	Util::deleteFile("/tmp/to_be_or_not_to_be");
+	assert( ! Util::fileExists("/tmp/to_be_or_not_to_be") );
+}
+
 int main(){
 	//Test util
 	testBase64Encode();
 	testBase64Decode();
-	testRandom();
 	testTrim();
 	testItos();
 	testToUppercase();
 	testCorrectFileName();
+	testWriteReadRemoveFile();
+	testCreateExistRemoveDir();
 	//Test config
 }
 
