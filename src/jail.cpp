@@ -360,6 +360,14 @@ void Jail::process(Socket *socket){
 					server.send200(page);
 					_exit(static_cast<int>(neutral));
 				}
+				if(socket->getURLPath() == "/robots.txt"){
+					string page;
+					if(httpMethod=="GET"){
+						page = "User-agent: *\nDisallow: /\n";
+					}
+					server.send200(page);
+					_exit(static_cast<int>(neutral));
+				}
 				if(socket->getURLPath() == "/favicon.ico"){
 					server.sendCode(notFoundCode, "");
 					_exit(static_cast<int>(neutral));
