@@ -84,11 +84,14 @@ void HttpJailServer::send(int code, const string &codeText, const string &respon
 		output += "Content-Length: " + Util::itos(response.size()) + "\r\n";
 		syslog(LOG_DEBUG,"Response Content-Length: %lu",(unsigned long)response.size());
 		output += "Content-Type: text/";
-		if(code==200 && response.find("<!DOCTYPE html") != 0)
+		if(response.find("<?xml ") != 0) {
 			output += "xml";
-		else
+		} else if (response.find("<!DOCTYPE html") == 0 || response.find("<html") == 0) {
 			output += "html";
-		output += ";chartype=UTF-8\r\n\r\n";
+		} else {
+			output += "plain";
+		}
+		output += "; chartype=UTF-8\r\n\r\n";
 		output += response;
 	}else{
 		output += "\r\n";
