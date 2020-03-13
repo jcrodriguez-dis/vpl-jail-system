@@ -25,9 +25,9 @@ public:
 	HttpJailServer(Socket *s):socket(s){}
 	void validateRequest(string path);
 	string receive();
-	void send(int code, const string &codeText, const string &response);
+	void send(int code, const string &codeText, const string &response, const bool headMethod = false);
 	void sendRaw(const string &);
-	void send200(const string &);
+	void send200(const string &, const bool headMethod = false);
 	void sendCode(CodeNumber, string text="");
 };
 

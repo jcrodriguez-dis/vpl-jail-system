@@ -75,24 +75,28 @@ void HttpJailServer::sendRaw(const string &data){
  * @param string http code text
  * @param string response
  */
-void HttpJailServer::send(int code, const string &codeText, const string &response){
+void HttpJailServer::send(int code, const string &codeText, const string &load, const bool headMethod){
 	string output;
 	output +="HTTP/1.1 "+ Util::itos(code)+" "+codeText+"\r\n";
 	if(code != 100){
 		output += "Server: vpl-jail-system "+string(Util::version())+"\r\n";
 		output += "Connection: close\r\n";
-		output += "Content-Length: " + Util::itos(response.size()) + "\r\n";
-		syslog(LOG_DEBUG,"Response Content-Length: %lu",(unsigned long)response.size());
-		output += "Content-Type: text/";
-		if(response.find("<?xml ") != 0) {
-			output += "xml";
-		} else if (response.find("<!DOCTYPE html") == 0 || response.find("<html") == 0) {
-			output += "html";
+		output += "Content-Length: " + Util::itos(load.size()) + "\r\n";
+		syslog(LOG_DEBUG,"Response Content-Length: %lu",(unsigned long)load.size());
+		output += "Content-Type: ";
+		if(load.find("<?xml ") == 0) {
+			output += "text/xml";
+		} else if (load.find("<!DOCTYPE svg") == 0 || load.find("<svg") == 0) {
+			output += "image/svg+xml";
+		} else if (load.find("<!DOCTYPE html") == 0 || load.find("<html") == 0) {
+			output += "text/html";
 		} else {
-			output += "plain";
+			output += "text/plain";
 		}
 		output += "; chartype=UTF-8\r\n\r\n";
-		output += response;
+		if (! headMethod) {
+			output += load;
+		}
 	}else{
 		output += "\r\n";
 	}
@@ -106,8 +110,8 @@ void HttpJailServer::send(int code, const string &codeText, const string &respon
  * send a 200 OK response to client
  * @param response xml to send as content
  */
-void HttpJailServer::send200(const string &response){
-	send(200,"OK", response);
+void HttpJailServer::send200(const string &response, const bool headMethod){
+	send(200,"OK", response, headMethod);
 }
 
 /**
