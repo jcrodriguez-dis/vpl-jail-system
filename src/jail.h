@@ -48,6 +48,7 @@ class Jail{
 	void commandStop(string adminticket);
 	void commandMonitor(string userticket,Socket *s);
 	void commandExecute(string userticket,Socket *s);
+	string predefinedURLResponse(string URLPath);
 public:
 	Jail(string);
 	void process(Socket *);//process request and return answer

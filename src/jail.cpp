@@ -166,18 +166,18 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 	processMonitor pm(monitorticket);
 	webSocket ws(s);
 	processState state=prestarting;
-	time_t timeout=pm.getStartTime()+pm.getMaxTime();
 	time_t startTime = 0;
 	time_t lastMessageTime = 0;
 	time_t lastTime=pm.getStartTime();
 	string lastMessage;
 	while(state != stopped){
+		processState newstate=pm.getState();
 		time_t now = time(NULL);
+		time_t timeout = pm.getStartTime() + pm.getMaxTime();
 		if( ! lastMessage.empty() && now != lastMessageTime){
 			ws.send(lastMessage+": "+Util::itos(now-startTime)+" seg");
 			lastMessageTime = now;
 		}
-		processState newstate=pm.getState();
 		if(newstate!=state){
 			state=newstate;
 			switch(state){
@@ -248,7 +248,7 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 			break;
 		}
 		//Check running timeout
-		if(timeout< time(NULL)){
+		if(state != starting && timeout< time(NULL)){
 			ws.send("message:timeout");
 			pm.cleanTask();
 			usleep(3000000);
@@ -327,6 +327,21 @@ Jail::Jail(string IP){
 	configuration = Configuration::getConfiguration();
 }
 
+string Jail::predefinedURLResponse(string URLPath) {
+	string page;
+	if( Util::toUppercase(URLPath) == "/OK"){
+		page = "<!DOCTYPE html><html><body>OK</body></html>";
+		page += "<script>setTimeout(function(){window.close();},2000);</script>";
+	} else if( URLPath == "/robots.txt"){
+		page = "User-agent: *\nDisallow: /\n";
+	} else if( URLPath == "/favicon.ico"){
+		page = "<svg viewBox=\"0 0 25 14\" xmlns=\"http://www.w3.org/2000/svg\">"
+				"<style> .logo { font: bold 12px Arial Rounded MT,Arial,Helvetica;"
+				"fill: #277ab0; stroke: black; stroke-width: 0.7px;} </style>"
+				"<text x=\"0\" y=\"12\" class=\"logo\">VPL</text></svg>";
+	}
+	return page;
+}
 /**
  * Process request
  *  3) read http request and header
@@ -350,36 +365,28 @@ void Jail::process(Socket *socket){
 		string httpMethod=socket->getMethod();
 		if(Util::toUppercase(socket->getHeader("Upgrade"))!="WEBSOCKET"){
 			syslog(LOG_INFO,"http(s) request");
-			if(httpMethod=="GET" || httpMethod== "HEAD"){
-				if(socket->getURLPath() == "/OK" || socket->getURLPath() == "/ok"){
-					string page;
-					if(httpMethod=="GET"){
-						page = "<!DOCTYPE html><html><body>OK</body></html>";
-						page += "<script>setTimeout(function(){window.close();},2000);</script>";
-					}
-					server.send200(page);
-					_exit(static_cast<int>(neutral));
+			if(httpMethod=="GET"){
+				string response = predefinedURLResponse(socket->getURLPath());
+				if ( response.size() == 0 ) {
+					throw HttpException(notFoundCode, "Http GET: Url path not found '" + socket->getURLPath() + "'");
 				}
-				if(socket->getURLPath() == "/robots.txt"){
-					string page;
-					if(httpMethod=="GET"){
-						page = "User-agent: *\nDisallow: /\n";
-					}
-					server.send200(page);
-					_exit(static_cast<int>(neutral));
+				server.send200(response);
+				_exit(static_cast<int>(neutral));
+			}
+			if(httpMethod=="HEAD"){
+				string response = predefinedURLResponse(socket->getURLPath());
+				if ( response.size() == 0 ) {
+					throw HttpException(notFoundCode, "Http HEAD: Url path not found '" + socket->getURLPath() + "'");
 				}
-				if(socket->getURLPath() == "/favicon.ico"){
-					server.sendCode(notFoundCode, "");
-					_exit(static_cast<int>(neutral));
-				}else{
-					throw HttpException(notFoundCode, "Url path not found '" + socket->getURLPath() + "'");
-				}
+				server.send200(response, true);
+				_exit(static_cast<int>(neutral));
 			}
 			if(httpMethod != "POST"){
-				throw HttpException(badRequestCode, "http(s) Unsupported METHOD " + httpMethod);
+				throw HttpException(badRequestCode, "Http(s) Unsupported METHOD " + httpMethod);
 			}
-			if(!isValidIPforRequest())
+			if(!isValidIPforRequest()) {
 				throw HttpException(badRequestCode, "Client not allowed");
+			}
 			server.validateRequest(httpURLPath);
 			string data = server.receive();
 			XML xml(data);
