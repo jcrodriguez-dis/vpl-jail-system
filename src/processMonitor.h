@@ -60,6 +60,7 @@ class processMonitor{
 	string getProcessControlPath(string name){
 		return processControlPath+"/"+name;
 	}
+	static void cleanPrisonerFiles(string);
 public:
 	processMonitor(string & adminticket, string & monitorticket, string & executionticket);
 	processMonitor(string ticket);

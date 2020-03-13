@@ -381,6 +381,7 @@ void processMonitor::setCompiler(){
 	if (security == monitor) return;
 	Lock lock(getProcessControlPath());
 	readInfo();
+	startTime = time(NULL);
 	compiler_pid = getpid();
 	writeInfo();
 }
@@ -579,9 +580,12 @@ uint64_t processMonitor::getMemoryUsed(){
 
 void processMonitor::freeWatchDog(){
 	//TODO check process running based on /proc
-	//looking for inconsistences
+	//looking for inconsistencies
 }
+
 vector<string> processMonitor::getPrisonersFromDir(string dir) {
+	size_t minUid = Configuration::getConfiguration()->getMinPrisoner();
+	size_t maxUid = Configuration::getConfiguration()->getMaxPrisoner();
 	vector<string> prisoners;
 	dirent *ent;
 	DIR *dirfd=opendir(dir.c_str());
@@ -593,12 +597,50 @@ vector<string> processMonitor::getPrisonersFromDir(string dir) {
 		if (ent->d_type == DT_DIR) {
 			const string name(ent->d_name);
 			if(name.at(0) == 'p') {
-				prisoners.push_back(name);
+				size_t uid = (size_t) Util::atoi(name.substr(1));
+				if (uid >= minUid && uid <= maxUid) {
+					prisoners.push_back(name);
+				}
 			}
 		}
 	}
 	closedir(dirfd);
 	return prisoners;
+}
+
+void processMonitor::cleanPrisonerFiles(string pdir) {
+	syslog(LOG_INFO,"Cleaning prisoner files");
+	const string controlDir = Configuration::getConfiguration()->getControlPath();
+	const string jailPath = Configuration::getConfiguration()->getControlPath();
+	const string phome = jailPath + "/home" + "/" + pdir;
+	const string tmpDir = jailPath + "/tmp";
+	const string configDir = controlDir + "/" + pdir;
+	const string configFile = configDir + "/" + "config";
+	ConfigData data;
+
+	try {
+		data = ConfigurationFile::readConfiguration(configFile, data);
+	} catch(...) {}
+	if ( data["ADMINTICKET"] > "") {
+		Util::deleteFile( controlDir + "/" + data["ADMINTICKET"] );
+	}
+	if ( data["EXECUTIONTICKET"] > "") {
+		Util::deleteFile( controlDir + "/" + data["EXECUTIONTICKET"] );
+	}
+	if ( data["MONITORTICKET"] > "") {
+		Util::deleteFile( controlDir + "/" + data["MONITORTICKET"] );
+	}
+
+	int uid = Util::atoi(pdir.substr(1));
+	try {
+		Util::removeDir(phome, uid, true);
+	} catch(...) {}
+	try {
+		Util::removeDir(tmpDir, uid, false);
+	}catch(...) {}
+	try {
+		Util::removeDir(configDir, uid, true);
+	}catch(...) {}
 }
 
 void processMonitor::cleanZombieTasks() {
@@ -625,7 +667,7 @@ void processMonitor::cleanZombieTasks() {
 			tlimit += Configuration::getConfiguration()->getLimits().maxtime;
 			tlimit += JAIL_HARVEST_TIMEOUT;
 			if ( tlimit < time(NULL) ) {
-
+				cleanPrisonerFiles(tasks[i]);
 			}
 		}
 	}
@@ -637,13 +679,10 @@ void processMonitor::cleanZombieTasks() {
 		if ( Util::dirExists(phome) && ! Util::fileExists(configFile)) {
 			struct stat statbuf;
 			stat(phome.c_str(), &statbuf);
-			if ( statbuf.st_mtime + JAIL_MONITORSTART_TIMEOUT < time(NULL) ) {
-				try {
-					Util::removeDir(phome, 1000, true);
-					Util::removeDir(controlDir + "/" + homes[i], 1000, true);
-				}catch(...) {
-				}
+			if ( statbuf.st_mtime + (JAIL_MONITORSTART_TIMEOUT * 2) < time(NULL) ) {
+				cleanPrisonerFiles( homes[i] );
 			}
 		}
 	}
+	// TODO remove orphan tickets
 }
