@@ -51,7 +51,7 @@ CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf"
 JAILPATH=/jail
 CONTROLPATH=/var/vpl-jail-system
 #Load config file
-if [ -f "$CONFIG_FILE" ]; then
+if [ -f "$CONFIG_FILE" ] ; then
 	read_config_var "$CONFIG_FILE" JAILPATH /jail
 	read_config_var "$CONFIG_FILE" CONTROLPATH /var/vpl-jail-system
 	#Check $JAILPATH not been "/"
@@ -66,18 +66,17 @@ if [ -f "$CONFIG_FILE" ]; then
 else
 	echo "vpl-jail-system config file not found: $CONFIG_FILE"
 fi
-if [ "$LSYSTEM" = "1" ] ;
-then
+if [ "$LSYSTEM" = "1" ] ; then
 	chkconfig --del vpl-jail-system
 else
 	update-rc.d -f vpl-jail-system remove
 fi
 
-if [ -f /bin/systemctl ]
+if [ -f /bin/systemctl ] ; then
 	systemctl stop vpl-jail-system
 	systemctl disable vpl-jail-system
 	rm /etc/systemd/system/vpl-jail-system*
-	systemctl deamon-reload
+	systemctl daemon-reload
 	systemctl reset-failed
 fi
 rm /etc/init.d/vpl-jail-system* &> /dev/null
