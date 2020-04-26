@@ -148,7 +148,7 @@ function vpl_install_npm {
 	fi
 	local found=1
 	local checked=""
-	echo -n "Installing with npm $1: "
+	echo -n "Installing $1 (using npm): "
 	shift
 	while [ "$#" != "0" ] ; do
 	    checked="$checked $1"
@@ -173,6 +173,34 @@ function vpl_installq {
    if [ "$A" == "y" ] ; then
         vpl_install $@
    fi
+}
+
+function vpl_install_letsencrypt {
+	vpl_install "Let's Encrypt" certbot
+}
+
+function vpl_install_ssl_version {
+	if [ "$(command -v yum)" != "" ] ; then
+		version = $(cat /etc/centos_release | sed 's/[^0-9]*//g' | cut -c1-1)
+		if (version < 7) ; then
+			vpl_install "SSL Library 1.0.2" openssl-devel1.0.2
+			vpl_install "SSL Library 1.0.2" openssl1.0.2
+		else 
+			vpl_install "SSL library" openssl
+			vpl_install "SSL library" openssl-devel
+		fi	
+	else
+		if [ "$(command -v apt-get)" != "" ] ; then
+			version = $(lsb_release -r | sed 's/[^0-9]*//g' | cut -c1-2)
+			if (version < 18) ; then
+				vpl_install "SSL Library 1.0.2" openssl-devel1.0.2
+				vpl_install "SSL Library 1.0.2" openssl1.0.2
+			else
+				vpl_install "SSL library" openssl
+				vpl_install "SSL library" openssl-devel
+			fi	
+		fi	
+	fi
 }
 
 function vpl_install_jgrasp {
@@ -257,8 +285,8 @@ if [ "$PMTYPE" == "1" ] ; then
 	vpl_install "make" make
 	vpl_install "C compiler" gcc
 	vpl_install "C++ compiler" gcc-c++
-	vpl_install "SSL library" openssl
-	vpl_install "SSL library" openssl-devel
+	#vpl_install "SSL library" openssl		## Cambiar versión a instalar
+	#vpl_install "SSL library" openssl-devel		## de SSL
 	vpl_install "Firewall" iptables
 	vpl_install "Window manager" metacity
 	vpl_install "xterm" xterm
@@ -271,8 +299,8 @@ else
 	vpl_install "make" make
 	vpl_install "LSB" lsb lsb-core lsb-compat
 	vpl_install "C++ compiler" g++
-	vpl_install "SSL library" openssl
-	vpl_install "SSL library" libssl-dev
+	#vpl_install "SSL library" openssl
+	#vpl_install "SSL library" libssl-dev
 	vpl_install "Firewall" iptables
 	vpl_install "X system" xorg
 	vpl_install "dbus-x11" dbus-x11
@@ -336,7 +364,14 @@ if [ ! -d /var/vpl-jail-system ] ; then
 fi
 chmod 0600 /var/vpl-jail-system
 
-if [ ! -f $VPLJAIL_INSTALL_DIR/cert.pem ] ; then
+echo "Do you want to try to install Let's Encrypt support?"
+echo -n "(y/n)"
+read A4
+if [ "$A4" == "y" ] ; then
+	vpl_install_letsencrypt
+fi
+
+if [ ! -f $VPLJAIL_INSTALL_DIR/*.pem ] && [ "$A4" != "y" ] ; then
 	echo "VPL execution server needs SSL certificates to accept https:"
 	echo "and wss: requests."
 	echo "If you have certificates then copy the key and the certificate file"
@@ -411,6 +446,7 @@ else
         vpl_install "JavaScript (Nodejs-legacy)" nodejs-legacy
         vpl_install_npm "TypeScript" typescript
         vpl_install_npm "Sass" sass
+        vpl_install_npm "Sass" sass
         vpl_install "Octave (GNU)" octave
         vpl_install "Pascal compiler" fp-compiler
         vpl_install "Perl interpreter" perl
@@ -422,9 +458,15 @@ else
         vpl_install "Python pydb" pydb
         vpl_install "Python pudb" python-pudb
         vpl_install "Pythom Thonny" thonny
-        vpl_install "Python tk" python-tk
+        vpl_install "Python Tk" python-tk
+        vpl_install "Python NumPy" python-numpy
+        vpl_install "Python pandas" python-pandas
+        vpl_install "Python Matplotlib" python-matplotlib
         vpl_install "Python3" python3
-        vpl_install "Python3 tk" python3-tk
+        vpl_install "Python3 Tk" python3-tk
+        vpl_install "Python3 NumPy" python3-numpy
+        vpl_install "Python3 pandas" python3-pandas
+        vpl_install "Python3 Matplotlib" python3-matplotlib
         vpl_install "Python3 pudb" python3-pudb
         vpl_install "Ruby interpreter" ruby
         vpl_install "Scala programming language" scala
@@ -459,6 +501,7 @@ else
     if [ "$A3" != "n" ] ; then
     	vpl_install_jgrasp
     fi
+
     if [ -f /etc/init.d/apache2 ] ; then
     	echo "If you are planning to use apache2 or other service in this system,"
     	echo "notice that you must use different ports that in vpl-jail-system"
@@ -477,6 +520,15 @@ else
     	fi
     fi
 fi
+
+cd /etc/vpl/
+if [ $(ls /.well-known) == "" ] ; then
+	mkdir /.well-known/
+fi
+cd .well-known
+mkdir acme-challenge
+
+
 vpl_check_selinux
 echo "Starting the service (vpl-jail-system)"
 vpl_start_service
