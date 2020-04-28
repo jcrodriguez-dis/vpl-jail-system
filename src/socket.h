@@ -49,7 +49,7 @@ class SSLBase{
 			syslog(LOG_EMERG,"SSL_CTX_check_private_key() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
-		SSL_CTX_set_options(context,SSL_OP_NO_SSLv3);
+		SSL_CTX_set_options(context,SSL_OP_NO_SSLv2|SSL_OP_NO_TLSv1_1|SSL_OP_NO_SSLv3|SSL_OP_NO_TLSv1);
 		SSL_CTX_set_mode(context,SSL_MODE_ENABLE_PARTIAL_WRITE|
 								SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 	}
