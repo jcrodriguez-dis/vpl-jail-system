@@ -186,7 +186,7 @@ function vpl_install_letsencrypt {
 	systemctl status certbot-renew.timer
 	echo "renew_hook = systemctl reload vpl-jail-system" >> /etc/letsencrypt/renewal/$HNAME.conf
 	ln -s /etc/letsencrypt/live/$HNAME/fullchain.pem /etc/vpl/fullchain.pem
-	ln -s /etc/letsencrypt/live/$HNAME/cert.pem /etc/vpl/cert.pem
+	ln -s /etc/letsencrypt/live/$HNAME/privkey.pem /etc/vpl/privkey.pem
 	service vpl-jail-system restart
 }
 
