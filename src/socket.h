@@ -23,8 +23,8 @@ class SSLBase{
 	const SSL_METHOD *method;
 	SSL_CTX *context;
 	SSLBase(){
-		const char *certFile="/etc/vpl/cert.pem";
-		const char *keyFile="/etc/vpl/key.pem";
+		const char *certFile="/etc/vpl/fullchain.pem";
+		const char *keyFile="/etc/vpl/privkey.pem";
 		SSL_library_init();
 		OpenSSL_add_all_algorithms();
 		SSL_load_error_strings(); 
