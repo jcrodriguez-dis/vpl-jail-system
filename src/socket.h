@@ -26,14 +26,14 @@ class SSLBase{
 		// The following pair of variables are used for setting cipher options
 		// Used for TLSv1.2 and below
 		cout << "Please, enter cipher options for OpenSSL";
-		cout << "In case you want to have ECDHE cipher, write: ECDHE-RSA-AES256-GCM-SHA384
+		cout << "In case you want to have ECDHE cipher, enter: ECDHE-RSA-AES256-GCM-SHA384
 		cin >> str;
 		int SSL_CTX_set_cipher_list(SSL_CTX *ctx, str);
  		int SSL_set_cipher_list(SSL *ssl, str);	
 		// Used for TLSv1.3
 		int SSL_CTX_set_ciphersuites(SSL_CTX *ctx, str);
  		int SSL_set_ciphersuites(SSL *s, str);		
-		const char *certFile="/etc/vpl/fullchain.pem";
+		const char *certFile="/etc/vpl/cert.pem";
 		const char *keyFile="/etc/vpl/privkey.pem";
 		SSL_library_init();
 		OpenSSL_add_all_algorithms();
