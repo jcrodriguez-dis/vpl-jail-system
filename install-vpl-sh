@@ -180,14 +180,13 @@ function vpl_install_letsencrypt {
 	echo "Please, enter your domain name in order to install the Certbot's certificates."
 	read A
 	HNAME=$A
-	service vpl-jail-system stop
 	certbot certonly --standalone --preferred-challenges http -d $HNAME
 	systemctl enable --now certbot-renew.timer
 	systemctl status certbot-renew.timer
-	echo "renew_hook = systemctl reload vpl-jail-system" >> /etc/letsencrypt/renewal/$HNAME.conf
-	ln -s /etc/letsencrypt/live/$HNAME/fullchain.pem /etc/vpl/fullchain.pem
+	echo "pre_hook = systemctl stop vpl-jail-system" >> /etc/letsencrypt/renewal/$HNAME.conf
+	echo "post_hook = systemctl start vpl-jail-system" >> /etc/letsencrypt/renewal/$HNAME.conf
+	ln -s /etc/letsencrypt/live/$HNAME/fullchain.pem /etc/vpl/cert.pem
 	ln -s /etc/letsencrypt/live/$HNAME/privkey.pem /etc/vpl/privkey.pem
-	service vpl-jail-system restart
 }
 
 function vpl_install_ssl_version {
