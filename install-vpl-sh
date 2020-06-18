@@ -186,7 +186,7 @@ function vpl_install_letsencrypt {
 	echo "pre_hook = systemctl stop vpl-jail-system" >> /etc/letsencrypt/renewal/$HNAME.conf
 	echo "post_hook = systemctl start vpl-jail-system" >> /etc/letsencrypt/renewal/$HNAME.conf
 	ln -s /etc/letsencrypt/live/$HNAME/fullchain.pem /etc/vpl/cert.pem
-	ln -s /etc/letsencrypt/live/$HNAME/privkey.pem /etc/vpl/privkey.pem
+	ln -s /etc/letsencrypt/live/$HNAME/privkey.pem /etc/vpl/key.pem
 }
 
 function vpl_install_ssl_version {
