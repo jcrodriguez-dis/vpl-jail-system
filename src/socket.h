@@ -34,7 +34,7 @@ class SSLBase{
 		int SSL_CTX_set_ciphersuites(SSL_CTX *ctx, str);
  		int SSL_set_ciphersuites(SSL *s, str);		
 		const char *certFile="/etc/vpl/cert.pem";
-		const char *keyFile="/etc/vpl/privkey.pem";
+		const char *keyFile="/etc/vpl/key.pem";
 		SSL_library_init();
 		OpenSSL_add_all_algorithms();
 		SSL_load_error_strings(); 
