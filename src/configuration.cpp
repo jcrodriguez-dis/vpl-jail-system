@@ -64,6 +64,9 @@ void Configuration::readConfigFile(){
 	configDefault["ENVPATH"]=Util::getEnv("PATH");
 	configDefault["LOGLEVEL"]="0";
 	configDefault["FAIL2BAN"]="0";
+	configDefault["SSL_CIPHER_LIST"]="DEFAULT";
+	configDefault["SSL_CERT_FILE"]="/etc/vpl/cert.pem";
+	configDefault["SSL_KEY_FILE"]="/etc/vpl/key.pem";
 	ConfigData data=ConfigurationFile::readConfiguration(configPath,configDefault);
 	minPrisoner = atoi(data["MIN_PRISONER_UGID"].c_str());
 	if(minPrisoner < JAIL_MIN_PRISIONER_UID)
@@ -110,6 +113,9 @@ void Configuration::readConfigFile(){
 	cleanPATH = data["ENVPATH"];
 	logLevel = atoi(data["LOGLEVEL"].c_str());
 	fail2ban = atoi(data["FAIL2BAN"].c_str());
+	SSLCipherList = data["SSL_CIPHER_LIST"];
+	SSLCertFile = data["SSL_CERT_FILE"];
+	SSLKeyFile = data["SSL_KEY_FILE"];
 }
 
 Configuration::Configuration(){

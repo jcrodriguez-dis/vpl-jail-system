@@ -23,21 +23,13 @@ class SSLBase{
 	const SSL_METHOD *method;
 	SSL_CTX *context;
 	SSLBase(){
-		// The following pair of variables are used for setting cipher options
-		// Used for TLSv1.2 and below
-		cout << "Please, enter cipher options for OpenSSL";
-		cout << "In case you want to have ECDHE cipher, enter: ECDHE-RSA-AES256-GCM-SHA384
-		cin >> str;
-		int SSL_CTX_set_cipher_list(SSL_CTX *ctx, str);
- 		int SSL_set_cipher_list(SSL *ssl, str);	
-		// Used for TLSv1.3
-		int SSL_CTX_set_ciphersuites(SSL_CTX *ctx, str);
- 		int SSL_set_ciphersuites(SSL *s, str);		
-		const char *certFile="/etc/vpl/cert.pem";
-		const char *keyFile="/etc/vpl/key.pem";
+		Configuration* configuration = Configuration::getConfiguration();
+		const char *cipherList = configuration->getSSLCipherList().c_str();
+		const char *certFile = configuration->getSSLCertFile().c_str();
+		const char *keyFile = configuration->getSSLKeyFile().c_str();
 		SSL_library_init();
 		OpenSSL_add_all_algorithms();
-		SSL_load_error_strings(); 
+		SSL_load_error_strings();
 		method = SSLv23_server_method();
 		if(method == NULL){
 			syslog(LOG_EMERG,"SSLv23_server_method() fail: %s",getError());
@@ -59,6 +51,7 @@ class SSLBase{
 			syslog(LOG_EMERG,"SSL_CTX_check_private_key() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
+		SSL_CTX_set_cipher_list(context, cipherList);
 		SSL_CTX_set_options(context,SSL_OP_NO_SSLv2|SSL_OP_NO_TLSv1_1|SSL_OP_NO_TLSv1);
 		SSL_CTX_set_mode(context,SSL_MODE_ENABLE_PARTIAL_WRITE|
 								SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
@@ -68,8 +61,8 @@ public:
 		if(singlenton == NULL) singlenton= new SSLBase();
 		return singlenton;
 	}
-    static const char *getError(){
-    	int error_n=ERR_get_error();
+	static const char *getError(){
+		int error_n=ERR_get_error();
 		const char* error_string="No detail";
 		if(error_n !=0){
 			error_string = ERR_error_string(error_n,NULL);
@@ -78,7 +71,7 @@ public:
 			}
 		}
 		return error_string;
-    }
+	}
 	SSL_CTX *getContext(){
 		return context; 
 	}

@@ -27,6 +27,9 @@ private:
 	int port, sport; //Server ports
 	int logLevel; //Log level 0 to 8, 0 = no log, 8 += do not remove home dir.
 	int fail2ban; //Fail to ban configuration. Relation fail / success to ban IP
+	string SSLCipherList;
+	string SSLCertFile;
+	string SSLKeyFile;
 	regex_t reg;
 	void checkConfigFile(string fileName, string men);
 	Configuration();
@@ -50,6 +53,9 @@ public:
 	int getSecurePort(){ return sport;}
 	int getLogLevel(){ return logLevel;}
 	int getFail2Ban(){ return fail2ban;}
+	string getSSLCipherList(){ return SSLCipherList;}
+	string getSSLCertFile(){ return SSLCertFile;}
+	string getSSLKeyFile(){ return SSLKeyFile;}
 };
 #endif
 
