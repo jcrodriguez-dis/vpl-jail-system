@@ -5,271 +5,310 @@
  **/
 
 #include "cgroup.h"
-#include <fstream>
-#include <iostream>
 
-Cgroup *Cgroup::singlenton=0;
+using namespace std;
 
-string readCgroupFile(string filename){
-	string data;
-	ifstream infile;
-	infile.open(filename);
-	infile >> data;
-	infile.close();
-	return data;
-}
-
-string readCgroupType(){
+string getCgroupType(){
 	string type;
-	cout << "Reading from the file cgroup.type" << endl;
-	type = readCgroupFile("cgroup.type");
-	cout << type << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.type");
+	type = Util::readFile(cgroupDirectory + "cgroup.type");
 	return type;
 }
 
-//string test;
-//test = readCgroupType();
-//cout << test << endl;
-
-string readCgroupProcs(){
-	string procs;
-	cout << "Reading from the file cgroup.procs" << endl;
-	procs = readCgroupFile("cgroup.procs");
-	cout << procs << endl;
-	return procs;
+int getCgroupProc(){
+	int proc;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.procs");
+	proc = (int) Util::readFile(cgroupDirectory + "cgroup.procs");
+	return proc;
 }
 
-string readCgroupThreads(){
+string getCgroupThreads(){
 	string threads;
-	cout << "Reading from the file cgroup.threads" << endl;
-	threads = readCgroupFile("cgroup.threads");
-	cout << threads << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.threads");
+	threads = Util::readFile(cgroupDirectory + "cgroup.threads");
 	return threads;
 }
 
-string readCgroupControllers(){
+string getCgroupControllers(){
 	string controllers;
-	cout << "Reading from the file cgroup.controllers" << endl;
-	controllers = readCgroupFile("cgroup.controllers");
-	cout << controllers << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.controllers");
+	controllers = Util::readFile(cgroupDirectory + "cgroup.controllers");
 	return controllers;
 }
 
-string readCgroupEvents(){
+string getCgroupEvents(){
 	string events;
-	cout << "Reading from the file cgroup.events" << endl;
-	events = readCgroupFile("cgroup.events");
-	cout << events << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.events");
+	events = Util::readFile(cgroupDirectory + "cgroup.events");
 	return events;
 }
 
-string readCgroupMaxDescendants(){
+string getCgroupMaxDescendants(){
 	string maxDesc;
-	cout << "Reading from the file cgroup.max.descendants" << endl;
-	maxDesc = readCgroupFile("cgroup.max.descendants");
-	cout << maxDesc << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.max.descendants");
+	maxDesc = Util::readFile(cgroupDirectory + "cgroup.max.descendants");
 	return maxDesc;
 }
 
-string readCgroupMaxDepth(){
+string getCgroupMaxDepth(){
 	string maxDepth;
-	cout << "Reading from the file cgroup.max.depth" << endl;
-	maxDepth = readCgroupFile("cgroup.max.depth");
-	cout << maxDepth << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.max.depth");
+	maxDepth = Util::readFile(cgroupDirectory + "cgroup.max.depth");
 	return maxDepth;
 }
 
-string readCgroupStat(){
+std::map<std::string, int> getCgroupStat(){
 	string stat;
-	cout << "Reading from the file cgroup.stat" << endl;
-	stat = readCgroupFile("cgroup.stat");
-	cout << stat << endl;
-	return stat;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.stat");
+	stat = Util::readFile(cgroupDirectory + "cgroup.stat");
+	int descendants = stat.substr(cpu.find(" "), stat.find("\n"));
+	int dying = stat.substr(stat.find("nr_dying_descendants")+21, stat.length());
+	std::map<string,int> descendantInfo;
+	descendantInfo.insert(std::pair<string,int>("nr_descendants", descendants));
+	descendantInfo.insert(std::pair<string,int>("nr_dying_descendants", dying));
+	return descendantInfo;
 }
 
-string readCPUStat(){
+/**
+ * parameter flag:
+ * 0 = get all cpu usage info
+ * 1 = get total cpu usage
+ * 2 = get user cpu usage
+ * 3 = get system cpu usage
+ */
+
+std::map<std::string, int> getCPUStat(int flag){
 	string cpu;
-	cout << "Reading from the file cgroup.cpu.stat" << endl;
-	cpu = readCgroupFile("cgroup.cpu.stat");
-	cout << cpu << endl;
-	return cpu;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.cpu.stat");
+	cpu = Util::readFile(cgroupDirectory + "cgroup.cpu.stat");
+	int total = cpu.substr(cpu.find(" "), cpu.find("\n"));
+	int user = cpu.substr(cpu.find("user_usec")+10, cpu.find("system_usec"));
+	int system = cpu.substr(cpu.find("system_usec")+12, cpu.length());
+	std::map<string,int> cpuInfo;
+	switch (flag) {
+	case 0:
+		cpuInfo.insert(std::pair<string,int>("usage_usec", total));
+		cpuInfo.insert(std::pair<string,int>("user_usec", user));
+		cpuInfo.insert(std::pair<string,int>("system_usec", system));
+		break;
+	case 1:
+		cpuInfo.insert(std::pair<string,int>("usage_usec", total));
+		break;
+	case 2:
+		cpuInfo.insert(std::pair<string,int>("user_usec", user));
+		break;
+	case 3:
+		cpuInfo.insert(std::pair<string,int>("system_usec", system));
+		break;
+	default:
+		break;
+	}		
+	return cpuInfo;
 }
 
-string readCPUWeight(){
-	string weight;
-	cout << "Reading from the file cgroup.cpu.weight" << endl;
-	weight = readCgroupFile("cgroup.cpu.weight");
-	cout << weight << endl;
+double getCPUWeight(){
+	double weight;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.cpu.weight");
+	weight = (double) Util::readFile(cgroupDirectory + "cgroup.cpu.weight");
 	return weight;
 }
 
-string readCPUMax(){
+string getCPUMax(){
 	string cpuMax;
-	cout << "Reading from the file cgroup.cpu.max" << endl;
-	cpuMax = readCgroupFile("cgroup.cpu.max");
-	cout << cpuMax << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.cpu.max");
+	cpuMax = Util::readFile(cgroupDirectory + "cgroup.cpu.max");
 	return cpuMax;
 }
 
-string readMemoryCurrent(){
-	string currentMem;
+double getMemoryCurrent(){
+	double currentMem;
 	cout << "Reading from the file cgroup.memory.current" << endl;
-	currentMem = readCgroupFile("cgroup.memory.current");
-	cout << currentMem << endl;
+	currentMem = (double) Util::readFile(cgroupDirectory + "cgroup.memory.current");
 	return currentMem;
 }
 
-string readMemoryLow(){
-	string low;
-	cout << "Reading from the file cgroup.memory.low" << endl;
-	low = readCgroupFile("cgroup.memory.low");
-	cout << low << endl;
+double getMemoryLow(){
+	double low;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.memory.low");
+	low = (double) Util::readFile(cgroupDirectory + "cgroup.memory.low");
 	return low;
 }
 
-string readMemoryHigh(){
+string getMemoryHigh(){
 	string high;
-	cout << "Reading from the file cgroup.memory.high" << endl;
-	high = readCgroupFile("cgroup.memory.high");
-	cout << high << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.memory.high");
+	high = Util::readFile(cgroupDirectory + "cgroup.memory.high");
 	return high;
 }
 
-string readMemoryMax(){
+string getMemoryMax(){
 	string maxMem;
-	cout << "Reading from the file cgroup.memory.max" << endl;
-	maxMem = readCgroupFile("cgroup.memory.max");
-	cout << maxMem << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.memory.max");
+	maxMem = Util::readFile(cgroupDirectory + "cgroup.memory.max");
 	return maxMem;
 }
 
-string readMemorySwapCurrent(){
-	string currentSwap;
-	cout << "Reading from the file cgroup.swap.current" << endl;
-	currentSwap = readCgroupFile("cgroup.swap.current");
-	cout << currentSwap << endl;
+double getMemorySwapCurrent(){
+	double currentSwap;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.swap.current");
+	currentSwap = (double) Util::readFile(cgroupDirectory + "cgroup.swap.current");
 	return currentSwap;
 }
 
-string readMemorySwapMax(){
+string getMemorySwapMax(){
 	string maxSwap;
-	cout << "Reading from the file cgroup.swap.max" << endl;
-	maxSwap = readCgroupFile("cgroup.swap.max");
-	cout << maxSwap << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.swap.max");
+	maxSwap = Util::readFile(cgroupDirectory + "cgroup.swap.max");
 	return maxSwap;
 }
 
-string readIOWeight(){
+double getIOWeight(){
 	string ioWeight;
-	cout << "Reading from the file cgroup.io.weight" << endl;
-	ioWeight = readCgroupFile("cgroup.io.weight");
-	cout << ioWeight << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.io.weight");
+	ioWeight = Util::readFile(cgroupDirectory + "cgroup.io.weight");
 	return ioWeight;
 }
 
-string readIOMax(){
+/**
+ * parameter flag:
+ * 
+ * 0 = get all information
+ * 1 = get max read bytes per second
+ * 2 = get max write bytes per second
+ * 3 = get max read IO operations per second
+ * 4 = get max write IO operations per second
+ */
+std::map<string,string> getIOMax(int flag){
 	string ioMax;
-	cout << "Reading from the file cgroup.io.max" << endl;
-	ioMax = readCgroupFile("cgroup.io.max");
-	cout << ioMax << endl;
-	return ioMax;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.io.max");
+	ioMax = Util::readFile(cgroupDirectory + "cgroup.io.max");
+	string rbps = cpu.substr(cpu.find("rbps")+5, cpu.find(" "));
+	string wbps = cpu.substr(cpu.find("wbps")+5, cpu.find(" "));
+	string riops = cpu.substr(cpu.find("riops")+6, cpu.find(" "));
+	string wiops = cpu.substr(cpu.find("wiops")+5, cpu.find(" "));
+	std::map<string,int> ioInfo;
+	switch (flag){
+	case 0:
+		ioInfo.insert(std::pair<string,string>("rbps", rbps));
+		ioInfo.insert(std::pair<string,string>("wbps", wbps));
+		ioInfo.insert(std::pair<string,string>("riops", riops));
+		ioInfo.insert(std::pair<string,string>("wiops", wiops));
+	case 1:
+		ioInfo.insert(std::pair<string,string>("rbps", rbps));
+	case 2:
+		ioInfo.insert(std::pair<string,string>("wbps", wbps));
+	case 3:
+		ioInfo.insert(std::pair<string,string>("riops", riops));
+	case 4:
+		ioInfo.insert(std::pair<string,string>("wiops", wiops));
+	default:
+		break;
+	}
+	return ioInfo;
 }
 
-string readPIDSMax(){
+string getPIDSMax(){
 	string pidsMax;
-	cout << "Reading from the file cgroup.pids.max" << endl;
-	pidsMax = readCgroupFile("cgroup.pids.max");
-	cout << pidsMax << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.pids.max");
+	pidsMax = Util::readFile(cgroupDirectory + "cgroup.pids.max");
 	return pidsMax;
 }
 
-string readPIDSCurrent(){
+int getPIDSCurrent(){
 	string currentPids;
-	cout << "Reading from the file cgroup.pids.max" << endl;
-	currentPids = readCgroupFile("cgroup.pids.max");
-	cout << currentPids << endl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.pids.current");
+	currentPids = Util::readFile(cgroupDirectory + "cgroup.pids.current");
 	return currentPids;
 }
 
-void writeCgroupFile(string filename, string input){
-	ofstream file;
-	file.open(filename);
-	file << input;
-	file.close();
+/**
+ * option:
+ * - "threaded": Turn the cgroup into a member of a threaded subtree
+ */
+void setCgroupType(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.type");
+	Util::writeFile(cgroupDirectory + "cgroup.type",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.type");
 }
 
-void writeCgroupType(string input){
-	cout << "Writing to the file cgroup.type" << endl;
-	writeCgroupFile("cgroup.type",input);
-	cout << "File has been successfully written";
+/**
+ * param: Insert PID of desired process
+ */
+void setCgroupProcs(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.procs");
+	Util::writeFile(cgroupDirectory + "cgroup.procs",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.procs");
 }
-void writeCgroupProcs(string input){
-	cout << "Writing to the file cgroup.procs" << endl;
-	writeCgroupFile("cgroup.procs",input);
-	cout << "File has been successfully written";
+/**
+ * param: Insert TID of desired thread
+ */
+void setCgroupThreads(int input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.threads");
+	Util::writeFile(cgroupDirectory + "cgroup.threads",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.threads");
 }
-void writeCgroupThreads(string input){
-	cout << "Writing to the file cgroup.threads" << endl;
-	writeCgroupFile("cgroup.threads",input);
-	cout << "File has been successfully written";
+/**
+ * param: Space separated list of controllers prefixed with '+' or '-' can be written
+ * to enable or disable controllers. Controllers are 'cpu', 'memory' and 'io'
+ * E.g: "+cpu +memory -io"
+ */
+void setCgroupSubtreeControl(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.subtree_control");
+	Util::writeFile(cgroupDirectory + "cgroup.subtree_control",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.subtree_control");
 }
-void writeCgroupSubtreeControl(string input){
-	cout << "Writing to the file cgroup.subtree_control" << endl;
-	writeCgroupFile("cgroup.subtree_control",input);
-	cout << "File has been successfully written";
+void setCgroupMaxDesscendants(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.max.descendants");
+	Util::writeFile(cgroupDirectory + "cgroup.max.descendants",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.max.descendants");
 }
-void writeCgroupMaxDesscendants(string input){
-	cout << "Writing to the file cgroup.max.descendants" << endl;
-	writeCgroupFile("cgroup.max.descendants",input);
-	cout << "File has been successfully written";
+void setCgroupMaxDepth(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.max.depth");
+	Util::writeFile(cgroupDirectory + "cgroup.max.depth",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "max.depth");
 }
-void writeCgroupMaxDepth(string input){
-	cout << "Writing to the file cgroup.max.depth" << endl;
-	writeCgroupFile("cgroup.max.depth",input);
-	cout << "File has been successfully written";
+void setCPUWeight(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.cpu.weight");
+	Util::writeFile(cgroupDirectory + "cgroup.cpu.weight",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.cpu.weight");
 }
-void writeCPUWeight(string input){
-	cout << "Writing to the file cgroup.cpu.weight" << endl;
-	writeCgroupFile("cgroup.cpu.weight",input);
-	cout << "File has been successfully written";
+void setCPUMax(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.cpu.max");
+	Util::writeFile(cgroupDirectory + "cgroup.cpu.max",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.cpu.max");
 }
-void writeCPUMax(string input){
-	cout << "Writing to the file cgroup.cpu.max" << endl;
-	writeCgroupFile("cgroup.cpu.max",input);
-	cout << "File has been successfully written";
+void setMemoryLow(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.memory.low");
+	Util::writeFile(cgroupDirectory + "cgroup.memory.low",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.memory.low");
 }
-void writeMemoryLow(string input){
-	cout << "Writing to the file cgroup.memory.low" << endl;
-	writeCgroupFile("cgroup.memory.low",input);
-	cout << "File has been successfully written";
+void setMemoryHigh(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.memory.high");
+	Util::writeFile(cgroupDirectory + "cgroup.memory.high",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.memory.high");
 }
-void writeMemoryHigh(string input){
-	cout << "Writing to the file cgroup.memory.high" << endl;
-	writeCgroupFile("cgroup.memory.high",input);
-	cout << "File has been successfully written";
+void setMemoryMax(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.memory.max");
+	Util::writeFile(cgroupDirectory + "cgroup.memory.max",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.memory.max");
 }
-void writeMemoryMax(string input){
-	cout << "Writing to the file cgroup.memory.max" << endl;
-	writeCgroupFile("cgroup.memory.max",input);
-	cout << "File has been successfully written";
+void setMemorySwapMax(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.swap.max");
+	Util::writeFile(cgroupDirectory + "cgroup.swap.max",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.swap.max");
 }
-void writeMemorySwapMax(string input){
-	cout << "Writing to the file cgroup.memory.swap.max" <<  endl;
-	writeCgroupFile("cgroup.swap.max",input);
-	cout << "File has been successfully written";
-}
-void writeIOWeight(string input){
-	cout << "Writing to the file cgroup.io.weight" << endl;
-	writeCgroupFile("cgroup.io.weight",input);
-	cout << "File has been successfully written";
+void setIOWeight(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.io.weight");
+	Util::writeFile(cgroupDirectory + "cgroup.io.weight",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.io.weight");
 }
 void writeIOMax(string input){
-	cout << "Writing to the file cgroup.io.max" << endl;
-	writeCgroupFile("cgroup.io.max",input);
-	cout << "File has been successfully written";
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.io.max");
+	Util::writeFile(cgroupDirectory + "cgroup.io.max",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.io.max");
 }
-void writePIDSMax(string filename, string input){
-	cout << "Writing to the file cgroup.pids.max" << endl;
-	writeCgroupFile("cgroup.pids.max",input);
-	cout << "File has been successfully written";
+void writePIDSMax(string input){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.pids.max");
+	Util::writeFile(cgroupDirectory + "cgroup.pids.max",input);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.pids.max");
 }
