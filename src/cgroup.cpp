@@ -8,145 +8,133 @@
 
 using namespace std;
 
-string getCgroupType(){
-	string type;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.type");
-	type = Util::readFile(cgroupDirectory + "cgroup.type");
-	return type;
-}
-
-int getCgroupProc(){
-	int proc;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.procs");
-	proc = (int) Util::readFile(cgroupDirectory + "cgroup.procs");
-	return proc;
-}
-
-string getCgroupThreads(){
-	string threads;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.threads");
-	threads = Util::readFile(cgroupDirectory + "cgroup.threads");
-	return threads;
-}
-
-string getCgroupControllers(){
-	string controllers;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.controllers");
-	controllers = Util::readFile(cgroupDirectory + "cgroup.controllers");
-	return controllers;
-}
-
-string getCgroupEvents(){
-	string events;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.events");
-	events = Util::readFile(cgroupDirectory + "cgroup.events");
-	return events;
-}
-
-string getCgroupMaxDescendants(){
-	string maxDesc;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.max.descendants");
-	maxDesc = Util::readFile(cgroupDirectory + "cgroup.max.descendants");
-	return maxDesc;
-}
-
-string getCgroupMaxDepth(){
-	string maxDepth;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.max.depth");
-	maxDepth = Util::readFile(cgroupDirectory + "cgroup.max.depth");
-	return maxDepth;
-}
-
-std::map<std::string, int> getCgroupStat(){
+std::map<std::string, int> getCPUAcctStat(){
+	std::map<std::string, int> cpuStat;
 	string stat;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.stat");
-	stat = Util::readFile(cgroupDirectory + "cgroup.stat");
-	int descendants = stat.substr(cpu.find(" "), stat.find("\n"));
-	int dying = stat.substr(stat.find("nr_dying_descendants")+21, stat.length());
-	std::map<string,int> descendantInfo;
-	descendantInfo.insert(std::pair<string,int>("nr_descendants", descendants));
-	descendantInfo.insert(std::pair<string,int>("nr_dying_descendants", dying));
-	return descendantInfo;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/cpuacct.stat");
+	stat = Util::readFile(cgroupDirectory + "/cpu/cpuacct.stat");
+	int user = Util::atoi(stat.substr(cpu.find("user")+5, stat.find("\n")));
+	int system = Util::atoi(stat.substr(stat.find("system")+7, stat.length()));
+	cpuStat.insert(std::pair<string,int>("user", user));
+	cpuStat.insert(std::pair<string,int>("system", system));
+	return cpuStat;
 }
 
-/**
- * parameter flag:
- * 0 = get all cpu usage info
- * 1 = get total cpu usage
- * 2 = get user cpu usage
- * 3 = get system cpu usage
- */
-
-std::map<std::string, int> getCPUStat(int flag){
-	string cpu;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.cpu.stat");
-	cpu = Util::readFile(cgroupDirectory + "cgroup.cpu.stat");
-	int total = cpu.substr(cpu.find(" "), cpu.find("\n"));
-	int user = cpu.substr(cpu.find("user_usec")+10, cpu.find("system_usec"));
-	int system = cpu.substr(cpu.find("system_usec")+12, cpu.length());
-	std::map<string,int> cpuInfo;
-	switch (flag) {
-	case 0:
-		cpuInfo.insert(std::pair<string,int>("usage_usec", total));
-		cpuInfo.insert(std::pair<string,int>("user_usec", user));
-		cpuInfo.insert(std::pair<string,int>("system_usec", system));
-		break;
-	case 1:
-		cpuInfo.insert(std::pair<string,int>("usage_usec", total));
-		break;
-	case 2:
-		cpuInfo.insert(std::pair<string,int>("user_usec", user));
-		break;
-	case 3:
-		cpuInfo.insert(std::pair<string,int>("system_usec", system));
-		break;
-	default:
-		break;
-	}		
-	return cpuInfo;
+long int getCPUUsage(){
+	long int usage;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/cpuacct.usage");
+	usage = Util::atol(Util::readFile(cgroupDirectory + "/cpu/cpuacct.usage"));
+	return usage;
 }
 
-double getCPUWeight(){
-	double weight;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.cpu.weight");
-	weight = (double) Util::readFile(cgroupDirectory + "cgroup.cpu.weight");
-	return weight;
+int getNotify(){
+	int flag;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/notify_on_release");
+	threads = Util::readFile(cgroupDirectory + "/cpu/notify_on_release");
+	return flag;
 }
 
-string getCPUMax(){
-	string cpuMax;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.cpu.max");
-	cpuMax = Util::readFile(cgroupDirectory + "cgroup.cpu.max");
-	return cpuMax;
+string getReleaseAgent(){
+	string releaseAgent;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/release_agent");
+	releaseAgent = Util::readFile(cgroupDirectory + "/cpu/release_agent");
+	return releaseAgent;
 }
 
-double getMemoryCurrent(){
-	double currentMem;
-	cout << "Reading from the file cgroup.memory.current" << endl;
-	currentMem = (double) Util::readFile(cgroupDirectory + "cgroup.memory.current");
-	return currentMem;
+string getCPUTasks(){
+	string tasks;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/tasks");
+	events = Util::readFile(cgroupDirectory + "/cpu/tasks");
+	return tasks;
 }
 
-double getMemoryLow(){
-	double low;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.memory.low");
-	low = (double) Util::readFile(cgroupDirectory + "cgroup.memory.low");
-	return low;
+std::map<std::string, int> getCPUStat(){
+	std::map<std::string, int> cpuStat;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/cpu.stat");
+	string stat = Util::readFile(cgroupDirectory + "/cpu/cpu.stat");
+	int nrPeriods = Util::atoi(stat.substr(cpu.find("nr_periods")+11, stat.find("\n")));
+	int nrThrottled = Util::atoi(stat.substr(stat.find("nr_throttled")+13, stat.find("\n")));
+	int throttledTime = Util::atoi(stat.substr(stat.find("throttled_time")+15, stat.length()));
+	cpuStat.insert(std::pair<string,int>("nr_periods", nrPeriods));
+	cpuStat.insert(std::pair<string,int>("nr_throttled", nrThrottled));
+	cpuStat.insert(std::pair<string,int>("throttled_time", throttledTime));
+	return cpuStat;
 }
 
-string getMemoryHigh(){
-	string high;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.memory.high");
-	high = Util::readFile(cgroupDirectory + "cgroup.memory.high");
-	return high;
+int getCloneChildren(){
+	int clone;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/cgroup.clone_children");
+	clone = Util::atoi(Util::readFile(cgroupDirectory + "/cpu/cgroup.clone_children"));
+	return clone;
 }
 
-string getMemoryMax(){
-	string maxMem;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.memory.max");
-	maxMem = Util::readFile(cgroupDirectory + "cgroup.memory.max");
-	return maxMem;
+string getMemoryTasks(){
+	string tasks;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", "/memory/tasks");
+	tasks = Util::readFile(cgroupDirectory + "/memory/tasks");	
+	return tasks;
+
+int getMemCloneChildren(){
+	int clone;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/cgroup.clone_children");
+	clone = Util::atoi(Util::readFile(cgroupDirectory + "/cpu/cgroup.clone_children"));
+	return clone;
+	}
+
+long int getMemoryLimitInBytes(){
+	long int memLimit;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.limit_in_bytes");
+	weight = Util::atol(Util::readFile(cgroupDirectory + "/memory/memory.limit_in_bytes"));
+	return memLimit;
 }
+
+std::map<std::string, long int> getMemoryStat(){
+	std::map<std::string, int> memStat;
+	string stat;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.stat");
+	stat = Util::readFile(cgroupDirectory + "/memory/memory.stat");
+	long int cache = Util::atoi(stat.substr(cpu.find("cache")+6, stat.find("\n")));
+	long int shmem = Util::atoi(stat.substr(stat.find("shmem")+6, stat.find("\n")));
+	long int mappedFile = Util::atoi(stat.substr(stat.find("mapped_file")+12, stat.find("\n")));
+	long int pgfault = Util::atoi(stat.substr(cpu.find("pgfault")+8, stat.find("\n")));
+	long int hierarchicalLimit = Util::atoi(stat.substr(stat.find("hierarchical_memory_limit")+26, stat.find("\n")));	
+	memStat.insert(std::pair<string,long int>("cache", cache));
+	memStat.insert(std::pair<string,long int>("shmem", shmem));
+	memStat.insert(std::pair<string,long int>("mapped_file", mappedFile));
+	memStat.insert(std::pair<string,long int>("pgfault", pgfault));
+	memStat.insert(std::pair<string,long int>("hierarchical_memory_limit", hierarchicalLimit));
+	return memStat;
+}
+
+int getMemSwappiness(){
+	int memSwap;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.swappiness");
+	memSwap = Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.swappiness"));
+	return memSwap;
+}
+
+long int getMemoryUsageInBytes(){
+	long int memUsage;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.usage_in_bytes);
+	memUsage = Util::atol(Util::readFile(cgroupDirectory + "/memory/memory.usage_in_bytes"));
+	return memUsage;
+}
+
+int getMemNotify(){
+	int flag;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/notify_on_release");
+	flag = Util::atoi(Util::readFile(cgroupDirectory + "/memory/notify_on_release"));
+	return flag;
+}
+
+string getMemReleaseAgent(){
+	string releaseAgent;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/release_agent");
+	releaseAgent = Util::readFile(cgroupDirectory + "/memory/release_agent");
+	return releaseAgent;
+}
+
+//TODO 
 
 double getMemorySwapCurrent(){
 	double currentSwap;
@@ -182,11 +170,11 @@ std::map<string,string> getIOMax(int flag){
 	string ioMax;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.io.max");
 	ioMax = Util::readFile(cgroupDirectory + "cgroup.io.max");
-	string rbps = cpu.substr(cpu.find("rbps")+5, cpu.find(" "));
-	string wbps = cpu.substr(cpu.find("wbps")+5, cpu.find(" "));
-	string riops = cpu.substr(cpu.find("riops")+6, cpu.find(" "));
-	string wiops = cpu.substr(cpu.find("wiops")+5, cpu.find(" "));
-	std::map<string,int> ioInfo;
+	string rbps = cpu.substr(cpu.find("rbytes")+5, cpu.find(" "));
+	string wbps = cpu.substr(cpu.find("wbytes")+5, cpu.find(" "));
+	string riops = cpu.substr(cpu.find("rios")+6, cpu.find(" "));
+	string wiops = cpu.substr(cpu.find("wios")+5, cpu.find(" "));
+	std::map<string,string> ioInfo;
 	switch (flag){
 	case 0:
 		ioInfo.insert(std::pair<string,string>("rbps", rbps));

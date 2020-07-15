@@ -5,22 +5,7 @@
  *
  * cgroup files:
  *
- * 		cgroup.controllers: Lists all controllers available for the cgroup to enable
- * 		cgroup.subtree_control: Controllers can be enabled and disables by writing to this file
- * 		cpu.weight: Proportionally distributes CPU cycles. Weights are in the range [1..10000]
- *		io.max: Limits the maximum BPS and/or IOPS that a cgroup can consume
- *		cgroup.type: Read-write single value file that indicates the current type of the cgroup
- *		cpu.stat
- *		cpu.max
- *		memory.current
- *		memory.low
- *		memory.high
- *		memory.max
- *		memory.swap.current
- *		memory.swap.max
- *		io.weight
- *		pids.max
- *		pids.current
+ * 		
  *
  **/
 
@@ -42,30 +27,34 @@ public:
 		cgroupDirectory = baseCgroupFilesystem + "/" + name + "/";
 	}
 
-	string getgroupType();
-	int getCgroupProcs();
-	string getCgroupThreads();
-	string getCgroupControllers();
-	string getCgroupEvents();
-	string getCgroupMaxDescendants();
-	std::map<std::string, int> getCgroupStat();
-	std::map<std::string, int> getCPUStat(int flag);
-	double getCPUWeight();
-	string getCPUMax();
-	double getMemoryCurrent();
-	double getMemoryLow();
+	std::map<std::string, int> getCPUStat();
+	long int getCPUUsage();
+	int getNotify();
+	string getReleaseAgent();
+	string getCPUTasks();
+	std::map<std::string, int> getCPUStat();
+	int getCloneChildren();
+	string getMemoryTasks();
+	int getMemCloneChildren();
+	long int getMemoryLimitInBytes();
+	std::map<std::string, long int> getMemoryStat();
+	int getMemSwappiness();
+	long int getMemoryUsageInBytes();
+	int getMemNotify();
+	string getMemReleaseAgent();
+	// TODO
 	double getMemoryHigh();
 	string getMemoryMax();
 	double getMemorySwapCurrent();
 	string getMemorySwapMax();
 	double getIOWeight();
-	std::map<std::string, string> getIOMax();
+	std::map<std::string, string> getIOMax(int flag);
 	string getPIDSMax();
 	int getPIDSCurrent();
 
 	void setCgroupType(string input);
-	void setCgroupProc(int input);
-	void setCgroupThreads(string int);
+	void setCgroupProc(string input);
+	void setCgroupThreads(string input);
 	void setCgroupSubtreeControl(string input);
 	void setCgroupMaxDesscendants(string input);
 	void setCgroupMaxDepth(string input);
