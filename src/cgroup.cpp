@@ -5,298 +5,388 @@
  **/
 
 #include "cgroup.h"
+#include <regex.h>
 
 using namespace std;
 
-std::map<std::string, int> getCPUAcctStat(){
-	std::map<std::string, int> cpuStat;
+
+string Cgroup::regFound(regex_t reg, string input){
+	regmatch_t found[1];
+	string match;
+	regexec(&reg,input.c_str(),1,found,0);
+	match = input.substr(found[0].rm_so, found[0].rm_eo);
+	return match;
+}
+
+map<string, int> Cgroup::getCPUAcctStat(){
+	map<string, int> cpuStat;
 	string stat;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/cpuacct.stat");
-	stat = Util::readFile(cgroupDirectory + "/cpu/cpuacct.stat");
-	int user = Util::atoi(stat.substr(cpu.find("user")+5, stat.find("\n")));
-	int system = Util::atoi(stat.substr(stat.find("system")+7, stat.length()));
-	cpuStat.insert(std::pair<string,int>("user", user));
-	cpuStat.insert(std::pair<string,int>("system", system));
+	syslog(LOG_DEBUG, "Reading from the file '%s'", (cgroupDirectory + "/cpu/cpuacct.stat").c_str());
+	stat = Util::readFile((cgroupDirectory + "/cpu/cpuacct.stat").c_str());
+	string sUser = regFound(regUser, stat);
+	string sSytem = regFound(regSystem, stat);
+	// Comprobar regexec
+	// Comprobar resultado regcomp sea 0
+	cpuStat["user"] = Util::atoi(sUser);
+	cpuStat["system"] = Util::atoi(sSytem);
 	return cpuStat;
 }
 
-long int getCPUUsage(){
+long int Cgroup::getCPUCfsPeriod(){
+	long int period;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", (cgroupDirectory + "/cpu/cfs_period_us").c_str());
+	period = Util::atol(Util::readFile((cgroupDirectory + "/cpu/cfs_period_us").c_str()));
+	return period;
+}
+
+long int Cgroup::getCPUCfsQuota(){
+	long int quota;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/cfs_quota_us");
+	quota = Util::atol(Util::readFile(cgroupDirectory + "/cpu/cfs_quota_us"));
+	return quota;
+}
+
+long int Cgroup::getCPUUsage(){
 	long int usage;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/cpuacct.usage");
 	usage = Util::atol(Util::readFile(cgroupDirectory + "/cpu/cpuacct.usage"));
 	return usage;
 }
 
-int getNotify(){
+int Cgroup::getNotify(){
 	int flag;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/notify_on_release");
-	threads = Util::readFile(cgroupDirectory + "/cpu/notify_on_release");
+	flag = Util::readFile(cgroupDirectory + "/cpu/notify_on_release");
 	return flag;
 }
 
-string getReleaseAgent(){
+string Cgroup::getReleaseAgent(){
 	string releaseAgent;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/release_agent");
 	releaseAgent = Util::readFile(cgroupDirectory + "/cpu/release_agent");
 	return releaseAgent;
 }
 
-string getCPUTasks(){
-	string tasks;
+string Cgroup::getCPUTasks(){
+	string events;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/tasks");
 	events = Util::readFile(cgroupDirectory + "/cpu/tasks");
-	return tasks;
+	return events;
 }
 
-std::map<std::string, int> getCPUStat(){
-	std::map<std::string, int> cpuStat;
+map<string, int> Cgroup::getCPUStat(){
+	map<string, int> cpuStat;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/cpu.stat");
 	string stat = Util::readFile(cgroupDirectory + "/cpu/cpu.stat");
-	int nrPeriods = Util::atoi(stat.substr(cpu.find("nr_periods")+11, stat.find("\n")));
-	int nrThrottled = Util::atoi(stat.substr(stat.find("nr_throttled")+13, stat.find("\n")));
-	int throttledTime = Util::atoi(stat.substr(stat.find("throttled_time")+15, stat.length()));
-	cpuStat.insert(std::pair<string,int>("nr_periods", nrPeriods));
-	cpuStat.insert(std::pair<string,int>("nr_throttled", nrThrottled));
-	cpuStat.insert(std::pair<string,int>("throttled_time", throttledTime));
+	string nrPeriods = regFound(regPeriods, stat);
+	string nrThrottled = regFound(regThrottled, stat);
+	string throttledTime = regFound(regThrottledTime, stat);
+	cpuStat["nr_periods"] = Util::atoi(nrPeriods);
+	cpuStat["nr_throttled"] = Util::atoi(nrThrottled);
+	cpuStat["throttled_time"] = Util::atoi(throttledTime);
 	return cpuStat;
 }
 
-int getCloneChildren(){
+int Cgroup::getCloneChildren(){
 	int clone;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/cgroup.clone_children");
 	clone = Util::atoi(Util::readFile(cgroupDirectory + "/cpu/cgroup.clone_children"));
 	return clone;
 }
 
-string getMemoryTasks(){
+string Cgroup::getMemoryTasks(){
 	string tasks;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", "/memory/tasks");
 	tasks = Util::readFile(cgroupDirectory + "/memory/tasks");	
 	return tasks;
+}
 
-int getMemCloneChildren(){
+int Cgroup::getMemCloneChildren(){
 	int clone;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/cpu/cgroup.clone_children");
 	clone = Util::atoi(Util::readFile(cgroupDirectory + "/cpu/cgroup.clone_children"));
 	return clone;
 	}
 
-long int getMemoryLimitInBytes(){
+long int Cgroup::getMemoryLimitInBytes(){
 	long int memLimit;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.limit_in_bytes");
-	weight = Util::atol(Util::readFile(cgroupDirectory + "/memory/memory.limit_in_bytes"));
+	memLimit = Util::atol(Util::readFile(cgroupDirectory + "/memory/memory.limit_in_bytes"));
 	return memLimit;
 }
 
-std::map<std::string, long int> getMemoryStat(){
-	std::map<std::string, int> memStat;
+map<string, int> Cgroup::getMemoryStat(){
+	map<string, int> memStat;
 	string stat;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.stat");
 	stat = Util::readFile(cgroupDirectory + "/memory/memory.stat");
-	long int cache = Util::atoi(stat.substr(cpu.find("cache")+6, stat.find("\n")));
-	long int shmem = Util::atoi(stat.substr(stat.find("shmem")+6, stat.find("\n")));
-	long int mappedFile = Util::atoi(stat.substr(stat.find("mapped_file")+12, stat.find("\n")));
-	long int pgfault = Util::atoi(stat.substr(cpu.find("pgfault")+8, stat.find("\n")));
-	long int hierarchicalLimit = Util::atoi(stat.substr(stat.find("hierarchical_memory_limit")+26, stat.find("\n")));	
-	memStat.insert(std::pair<string,long int>("cache", cache));
-	memStat.insert(std::pair<string,long int>("shmem", shmem));
-	memStat.insert(std::pair<string,long int>("mapped_file", mappedFile));
-	memStat.insert(std::pair<string,long int>("pgfault", pgfault));
-	memStat.insert(std::pair<string,long int>("hierarchical_memory_limit", hierarchicalLimit));
+
+	string cache = regFound(regCache, stat);
+	string shmem = regFound(regMem, stat);
+	string mappedFile = regFound(regMapped, stat);
+	string pgfault = regFound(regFault, stat);
+	string hierarchicalLimit = regFound(regHierarchical, stat);
+	memStat["cache"] = Util::atoi(cache);
+	memStat["shmem"] = Util::atoi(shmem);
+	memStat["mapped_file"] = Util::atoi(mappedFile);
+	memStat["pgfault"] = Util::atoi(pgfault);
+	memStat["hierarchical_memory_limit"] = Util::atoi(hierarchicalLimit);
 	return memStat;
 }
 
-int getMemSwappiness(){
+/**
+ * Shows the tendency of the kernel to swap out process memory used by tasks
+ * The default value is 60. Values lower than 60 decrease the kernel's tendency to swap out memory
+ * Values greater than 60 increase the kernel's tendency to swap out memory and values
+ * greater than 100 permit the kernel to swap out pages that are part of the address
+ * space of the processes in this cgroup
+ */
+
+int Cgroup::getMemSwappiness(){
 	int memSwap;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.swappiness");
 	memSwap = Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.swappiness"));
 	return memSwap;
 }
 
-long int getMemoryUsageInBytes(){
+long int Cgroup::getMemoryUsageInBytes(){
 	long int memUsage;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.usage_in_bytes);
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.usage_in_bytes");
 	memUsage = Util::atol(Util::readFile(cgroupDirectory + "/memory/memory.usage_in_bytes"));
 	return memUsage;
 }
 
-int getMemNotify(){
+int Cgroup::getMemNotify(){
 	int flag;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/notify_on_release");
 	flag = Util::atoi(Util::readFile(cgroupDirectory + "/memory/notify_on_release"));
 	return flag;
 }
 
-string getMemReleaseAgent(){
+string Cgroup::getMemReleaseAgent(){
 	string releaseAgent;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/release_agent");
 	releaseAgent = Util::readFile(cgroupDirectory + "/memory/release_agent");
 	return releaseAgent;
 }
 
-//TODO 
-
-double getMemorySwapCurrent(){
-	double currentSwap;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.swap.current");
-	currentSwap = (double) Util::readFile(cgroupDirectory + "cgroup.swap.current");
-	return currentSwap;
-}
-
-string getMemorySwapMax(){
-	string maxSwap;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.swap.max");
-	maxSwap = Util::readFile(cgroupDirectory + "cgroup.swap.max");
-	return maxSwap;
-}
-
-double getIOWeight(){
-	string ioWeight;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.io.weight");
-	ioWeight = Util::readFile(cgroupDirectory + "cgroup.io.weight");
-	return ioWeight;
+long int Cgroup::getMemoryFailCnt(){
+	long int memFail;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.usage_in_bytes");
+	memFail = Util::atol(Util::readFile(cgroupDirectory + "/memory/memory.failcnt"));
+	return memFail;
 }
 
 /**
- * parameter flag:
- * 
- * 0 = get all information
- * 1 = get max read bytes per second
- * 2 = get max write bytes per second
- * 3 = get max read IO operations per second
- * 4 = get max write IO operations per second
+ * Allows moving charges associated with a task along with task migration. Charging is a
+ * way of giving a penalty to cgroups which access shared pages too often.
  */
-std::map<string,string> getIOMax(int flag){
-	string ioMax;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.io.max");
-	ioMax = Util::readFile(cgroupDirectory + "cgroup.io.max");
-	string rbps = cpu.substr(cpu.find("rbytes")+5, cpu.find(" "));
-	string wbps = cpu.substr(cpu.find("wbytes")+5, cpu.find(" "));
-	string riops = cpu.substr(cpu.find("rios")+6, cpu.find(" "));
-	string wiops = cpu.substr(cpu.find("wios")+5, cpu.find(" "));
-	std::map<string,string> ioInfo;
-	switch (flag){
-	case 0:
-		ioInfo.insert(std::pair<string,string>("rbps", rbps));
-		ioInfo.insert(std::pair<string,string>("wbps", wbps));
-		ioInfo.insert(std::pair<string,string>("riops", riops));
-		ioInfo.insert(std::pair<string,string>("wiops", wiops));
-	case 1:
-		ioInfo.insert(std::pair<string,string>("rbps", rbps));
-	case 2:
-		ioInfo.insert(std::pair<string,string>("wbps", wbps));
-	case 3:
-		ioInfo.insert(std::pair<string,string>("riops", riops));
-	case 4:
-		ioInfo.insert(std::pair<string,string>("wiops", wiops));
-	default:
-		break;
-	}
-	return ioInfo;
-}
-
-string getPIDSMax(){
-	string pidsMax;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.pids.max");
-	pidsMax = Util::readFile(cgroupDirectory + "cgroup.pids.max");
-	return pidsMax;
-}
-
-int getPIDSCurrent(){
-	string currentPids;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", "cgroup.pids.current");
-	currentPids = Util::readFile(cgroupDirectory + "cgroup.pids.current");
-	return currentPids;
+int Cgroup::getMemoryMoveChargeImmigrate(){
+	int moveCharge;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.move_charge_at_immigrate");
+	moveCharge = Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.move_charge_at_immigrate"));
+	return moveCharge;
 }
 
 /**
- * option:
- * - "threaded": Turn the cgroup into a member of a threaded subtree
+ * Contains a flag that specifies whether memory usage should be accounted for throughout
+ * a hierarchy of cgroups.
  */
-void setCgroupType(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.type");
-	Util::writeFile(cgroupDirectory + "cgroup.type",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.type");
+int Cgroup::getMemoryUseHierarchy(){
+	int useHierarchy;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.use_hierarchy");
+	useHierarchy = Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.use_hierarchy"));
+	return useHierarchy;
 }
 
 /**
- * param: Insert PID of desired process
+ * Contains a flag that enables or disables the Out of Memory killer for a cgroup.
  */
-void setCgroupProcs(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.procs");
-	Util::writeFile(cgroupDirectory + "cgroup.procs",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.procs");
+int Cgroup::getMemoryOOMControl(){
+	int oomControl;
+	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.oom_control");
+	oomControl = Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.oom_control"));
+	return oomControl;
 }
+
 /**
- * param: Insert TID of desired thread
+ * Specifies a period of time in microseconds for how regularly a cgroup's
+ * access to CPU resources should be reallocated
  */
-void setCgroupThreads(int input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.threads");
-	Util::writeFile(cgroupDirectory + "cgroup.threads",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.threads");
+
+void Cgroup::setCPUCfsPeriod(int period){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpu.cfs_period_us");
+	Util::writeFile(cgroupDirectory + "/cpu/cpu.cfs_period_us",Util::itos(period));
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpu.cfs_period_us");
 }
+
 /**
- * param: Space separated list of controllers prefixed with '+' or '-' can be written
- * to enable or disable controllers. Controllers are 'cpu', 'memory' and 'io'
- * E.g: "+cpu +memory -io"
+ * Specifies the total amount of time in microseconds for which all tasks in a
+ * cgroup can run during one period
  */
-void setCgroupSubtreeControl(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.subtree_control");
-	Util::writeFile(cgroupDirectory + "cgroup.subtree_control",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.subtree_control");
+void Cgroup::setCPUCfsQuota(int quota){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpu.cfs_quota_us");
+	Util::writeFile(cgroupDirectory + "/cpu/cpu.cfs_quota_us",Util::itos(quota));
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpu.cfs_quota_us");
 }
-void setCgroupMaxDesscendants(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.max.descendants");
-	Util::writeFile(cgroupDirectory + "cgroup.max.descendants",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.max.descendants");
+
+
+// 
+
+
+/**
+ * If the clone_children flag is enabled in a cgroup, a new cpuset cgroup
+ * will copy its configuration from the parent during initialization
+ */
+void Cgroup::setCPUCloneChildren(bool flag){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cgroup.clone_children");
+	Util::writeFile(cgroupDirectory + "/cpu/cgroup.clone_children",flag?"1":"0");
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cgroup.clone_children");
 }
-void setCgroupMaxDepth(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.max.depth");
-	Util::writeFile(cgroupDirectory + "cgroup.max.depth",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "max.depth");
+
+/**
+ * Insert a process' PID to allow it to be in the CPU's controllers
+ */
+void Cgroup::setCPUProcs(int pid){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cgroup.procs");
+	Util::writeFile((cgroupDirectory + "/cpu/cgroup.procs"),pid);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cgroup.procs");
 }
-void setCPUWeight(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.cpu.weight");
-	Util::writeFile(cgroupDirectory + "cgroup.cpu.weight",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.cpu.weight");
+
+/**
+ * Contains an integer value that specifies a relative share of CPU time
+ * available to the tasks in a cgroup. The value specified must be 2 or higher
+ * A cgroup with a value set to 200 will receive twice the CPU time of tasks
+ * in a cgroup with value set to 100.
+ */
+void setCPUShares(int share){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpu.shares");
+	Util::writeFile(cgroupDirectory + "/cpu/cpu.shares",share);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpu.shares");
 }
-void setCPUMax(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.cpu.max");
-	Util::writeFile(cgroupDirectory + "cgroup.cpu.max",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.cpu.max");
+
+void Cgroup::setCPUNotify(int flag){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/notify_on_release");
+	Util::writeFile(cgroupDirectory + "/cpu/notify_on_release",flag);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/notify_on_release");
 }
-void setMemoryLow(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.memory.low");
-	Util::writeFile(cgroupDirectory + "cgroup.memory.low",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.memory.low");
+
+void Cgroup::setCPUReleaseAgentPath(int path){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/release_agent");
+	Util::writeFile(cgroupDirectory + "/cpu/release_agent",path);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/release_agent");
 }
-void setMemoryHigh(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.memory.high");
-	Util::writeFile(cgroupDirectory + "cgroup.memory.high",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.memory.high");
+
+/**
+ * Specifies the CPUs that tasks in this cgroup are permitted to access.
+ * This is a comma-separated list, with dashes to represent ranges.
+ * For example: 0-2,16
+ */
+void Cgroup::setCPUs(int cpus){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpuset/cpuset.cpus");
+	Util::writeFile(cgroupDirectory + "/cpuset/cpuset.cpus",cpus);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpuset/cpuset.cpus");
 }
-void setMemoryMax(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.memory.max");
-	Util::writeFile(cgroupDirectory + "cgroup.memory.max",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.memory.max");
+
+/**
+ * Specifies the memory nodes that tasks in this cgroup are permitted to access.
+ * This is a comma-separated list, with dashes to represent ranges.
+ * For example: 0-2,16
+ */
+void Cgroup::setMems(int nodes){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.mems");
+	Util::writeFile(cgroupDirectory + "/cpu/cpuset.mems",nodes);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.mems");
 }
-void setMemorySwapMax(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.swap.max");
-	Util::writeFile(cgroupDirectory + "cgroup.swap.max",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.swap.max");
+
+/**
+ * Contains a flag that specifies whether a page in memory should migrate to a
+ * new node within the ranges if the values in cpuset.mems change. By default,
+ * memory migration is disabled.
+ */
+void Cgroup::setMemoryMigrate(int flag){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.memory_migrate");
+	Util::writeFile(cgroupDirectory + "/cpu/cpuset.memory_migrate",flag);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.memory_migrate");
 }
-void setIOWeight(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.io.weight");
-	Util::writeFile(cgroupDirectory + "cgroup.io.weight",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.io.weight");
+
+/**
+ * Contains a flag that specifies whether cpusets other than this one and its
+ * parents and children can share the CPUs spceified for this cpuset. By default(0),
+ * CPUs are not allocated exclusively to one cpuset
+ */
+void Cgroup::setCPUExclusive(int flag){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.cpu_exclusive");
+	Util::writeFile(cgroupDirectory + "/cpu/cpuset.cpu_exclusive",flag);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.cpu_exclusive");
 }
-void writeIOMax(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.io.max");
-	Util::writeFile(cgroupDirectory + "cgroup.io.max",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.io.max");
+
+/**
+ * Contains a flag that specifies whether cpusets other than this one and its
+ * parents and children can share the memory nodes specified for this cpuset. By default(0),
+ * memory nodes are not allocated exclusively to one cpuset
+ */
+void Cgroup::setMemExclusive(int flag){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.mem_exclusive");
+	Util::writeFile(cgroupDirectory + "/cpu/cpuset.mem_exclusive",flag);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.mem_exclusive");
 }
-void writePIDSMax(string input){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cgroup.pids.max");
-	Util::writeFile(cgroupDirectory + "cgroup.pids.max",input);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cgroup.pids.max");
+
+/**
+ * Contains a flag that specifies whether kernel allocations of memory page and
+ * buffer data should be restricted to the memory nodes specified for the cpuset.
+ */
+void Cgroup::setMemHardwall(int flag){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.mem_hardwall");
+	Util::writeFile(cgroupDirectory + "/cpu/cpuset.mem_hardwall",flag);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.mem_hardwall");
 }
+
+/**
+ * Contains a flag that specifies whether the system should compute the memory
+ * pressure. Computed values are output to cpuset.emmory_pressure and represent
+ * the rate at which processes attempt to free in-use memory, reported as an
+ * integer value of attempts to reclaim memory per second, multiplied by 1000.
+ */
+void Cgroup::setMemoryPressure(int flag){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.memory_pressure_enabled");
+	Util::writeFile(cgroupDirectory + "/cpu/cpuset.memory_pressure_enabled",flag);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.memory_pressure_enabled");
+}
+
+/**
+ * Contains a flag that specifies whether file system buffers should be spread
+ * evenly across the memory nodes allocated to the cpuset.
+ */
+void Cgroup::setMemorySpreadPage(int flag){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.memory_spread_page");
+	Util::writeFile(cgroupDirectory + "/cpu/cpuset.memory_spread_page",flag);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.memory_spread_page");
+}
+
+/**
+ * Contains a flag that specifies whether kernel slab caches for file input/output
+ * operations should be spread evenly across the cpuset.
+ */
+void Cgroup::setMemorySpreadSlab(int flag){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.memory_spread_slab");
+	Util::writeFile(cgroupDirectory + "/cpu/cpuset.spread_slab",flag);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.spread_slab");
+}
+
+/**
+ * Contains a flag that specifies whether the kernel will balance loads across
+ * the CPUs in the cpuset. By default(1), the kernel balances loads by moving
+ * processes from overloaded CPUs to less heavily used CPUs.
+ */
+void Cgroup::setSchedLoadBalance(int flag){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.sched_load_balance");
+	Util::writeFile(cgroupDirectory + "/cpu/cpuset.sched_load_balance",flag);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.sched_load_balance");
+}
+
+
+
+
+
+
