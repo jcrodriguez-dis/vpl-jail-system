@@ -75,17 +75,18 @@ public:
 	void setCPUCloneChildren(bool flag);
 	void setCPUProcs(int pid);
 	void setCPUShares(int share);	
-	void setCPUNotify(int flag);
-	void setCPUReleaseAgentPath(int path);
-	void setCPUs(int cpus);
-	void setMems(int nodes);
-	void setMemoryMigrate(int flag);
-	void setCPUExclusive(int flag);
-	void setMemExclusive(int flag);
-	void setMemHardwall(int flag);
-	void setMemoryPressure(int flag);
-	void setMemorySpreadPage(int flag);
-	void setSchedLoadBalance(int flag);
+	void setCPUNotify(bool flag);
+	void setCPUReleaseAgentPath(string path);
+	void setCPUs(string cpus);
+	void setMems(string nodes);
+	void setMemoryMigrate(bool flag);
+	void setCPUExclusive(bool flag);
+	void setMemExclusive(bool flag);
+	void setMemHardwall(bool flag);
+	void setMemoryPressure(bool flag);
+	void setMemorySpreadPage(bool flag);
+	void setMemorySpreadSlab(bool flag);
+	void setSchedLoadBalance(bool flag);
 	
 	
 	
