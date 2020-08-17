@@ -37,50 +37,45 @@ map<string, int> Cgroup::getCPUAcctStat(){
 }
 
 long int Cgroup::getCPUCfsPeriod(){
-	long int period;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", (cgroupDirectory + "/cpu/cfs_period_us").c_str());
-	period = Util::atol(Util::readFile((cgroupDirectory + "/cpu/cfs_period_us").c_str()));
-	return period;
+	string directory = cgroupDirectory + "/cpu/cfs_period_us";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atol(Util::readFile((cgroupDirectory + "/cpu/cfs_period_us").c_str()));
 }
 
 long int Cgroup::getCPUCfsQuota(){
-	long int quota;
-	syslog(LOG_DEBUG, ("Reading from the file '%s'", cgroupDirectory + "/cpu/cfs_quota_us").c_str());
-	quota = Util::atol(Util::readFile((cgroupDirectory + "/cpu/cfs_quota_us").c_str()));
-	return quota;
+	string directory = cgroupDirectory + "/cpu/cfs_quota_us";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atol(Util::readFile((cgroupDirectory + "/cpu/cfs_quota_us").c_str()));
 }
 
 long int Cgroup::getCPUUsage(){
-	long int usage;
-	syslog(LOG_DEBUG, ("Reading from the file '%s'", cgroupDirectory + "/cpu/cpuacct.usage").c_str());
-	usage = Util::atol(Util::readFile((cgroupDirectory + "/cpu/cpuacct.usage").c_str()));
-	return usage;
+	string directory = cgroupDirectory + "/cpu/cpuacct.usage";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atol(Util::readFile((cgroupDirectory + "/cpu/cpuacct.usage").c_str()));
 }
 
 int Cgroup::getNotify(){
-	int flag;
-	syslog(LOG_DEBUG, ("Reading from the file '%s'", cgroupDirectory + "/cpu/notify_on_release").c_str());
-	flag = Util::atoi(Util::readFile((cgroupDirectory + "/cpu/notify_on_release").c_str()));
-	return flag;
+	string directory = cgroupDirectory + "/cpu/notify_on_release";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atoi(Util::readFile((cgroupDirectory + "/cpu/notify_on_release").c_str()));
 }
 
 string Cgroup::getReleaseAgent(){
-	string releaseAgent;
-	syslog(LOG_DEBUG, ("Reading from the file '%s'", cgroupDirectory + "/cpu/release_agent").c_str());
-	releaseAgent = Util::readFile((cgroupDirectory + "/cpu/release_agent").c_str());
-	return releaseAgent;
+	string directory = cgroupDirectory + "/cpu/release_agent";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::readFile((cgroupDirectory + "/cpu/release_agent").c_str());
 }
 
 string Cgroup::getCPUTasks(){
-	string events;
-	syslog(LOG_DEBUG, ("Reading from the file '%s'", cgroupDirectory + "/cpu/tasks").c_str());
-	events = Util::readFile((cgroupDirectory + "/cpu/tasks").c_str());
-	return events;
+	string directory = cgroupDirectory + "/cpu/tasks";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::readFile((cgroupDirectory + "/cpu/tasks").c_str());
 }
 
 map<string, int> Cgroup::getCPUStat(){
 	map<string, int> cpuStat;
-	syslog(LOG_DEBUG, ("Reading from the file '%s'", cgroupDirectory + "/cpu/cpu.stat").c_str());
+	string directory = cgroupDirectory + "/cpu/cpu.stat";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
 	string stat = Util::readFile((cgroupDirectory + "/cpu/cpu.stat").c_str());
 	string nrPeriods = regFound(regPeriods, stat);
 	string nrThrottled = regFound(regThrottled, stat);
@@ -92,37 +87,34 @@ map<string, int> Cgroup::getCPUStat(){
 }
 
 int Cgroup::getCloneChildren(){
-	int clone;
-	syslog(LOG_DEBUG, ("Reading from the file '%s'", cgroupDirectory + "/cpu/cgroup.clone_children").c_str());
-	clone = Util::atoi(Util::readFile((cgroupDirectory + "/cpu/cgroup.clone_children").c_str()));
-	return clone;
+	string directory = cgroupDirectory + "/cpu/cgroup.clone_children";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atoi(Util::readFile((cgroupDirectory + "/cpu/cgroup.clone_children").c_str()));
 }
 
 string Cgroup::getMemoryTasks(){
-	string tasks;
-	syslog(LOG_DEBUG, ("Reading from the file '%s'", (cgroupDirectory + "/memory/tasks").c_str()));
-	tasks = Util::readFile((cgroupDirectory + "/memory/tasks").c_str());
-	return tasks;
+	string directory = cgroupDirectory + "/memory/tasks";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::readFile((cgroupDirectory + "/memory/tasks").c_str());
 }
 
 int Cgroup::getMemCloneChildren(){
-	int clone;
-	syslog(LOG_DEBUG, ("Reading from the file '%s'", cgroupDirectory + "/cpu/cgroup.clone_children").c_str());
-	clone = Util::atoi(Util::readFile((cgroupDirectory + "/cpu/cgroup.clone_children").c_str()));
-	return clone;
+	string directory = cgroupDirectory + "/cpu/cgroup.clone_children";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atoi(Util::readFile((cgroupDirectory + "/cpu/cgroup.clone_children").c_str()));
 	}
 
 long int Cgroup::getMemoryLimitInBytes(){
-	long int memLimit;
-	syslog(LOG_DEBUG, ("Reading from the file '%s'", cgroupDirectory + "/memory/memory.limit_in_bytes").c_str());
-	memLimit = Util::atol(Util::readFile((cgroupDirectory + "/memory/memory.limit_in_bytes").c_str()));
-	return memLimit;
+	string directory = cgroupDirectory + "/memory/memory.limit_in_bytes";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atol(Util::readFile((cgroupDirectory + "/memory/memory.limit_in_bytes").c_str()));
 }
 
 map<string, int> Cgroup::getMemoryStat(){
 	map<string, int> memStat;
 	string stat;
-	syslog(LOG_DEBUG, ("Reading from the file '%s'", cgroupDirectory + "/memory/memory.stat").c_str());
+	string directory = cgroupDirectory + "/memory/memory.stat";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
 	stat = Util::readFile((cgroupDirectory + "/memory/memory.stat").c_str());
 
 	string cache = regFound(regCache, stat);
@@ -147,38 +139,33 @@ map<string, int> Cgroup::getMemoryStat(){
  */
 
 int Cgroup::getMemSwappiness(){
-	int memSwap;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.swappiness");
-	memSwap = Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.swappiness"));
-	return memSwap;
+	string directory = cgroupDirectory + "/memory/memory.swappiness";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.swappiness"));
 }
 
 long int Cgroup::getMemoryUsageInBytes(){
-	long int memUsage;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.usage_in_bytes");
-	memUsage = Util::atol(Util::readFile(cgroupDirectory + "/memory/memory.usage_in_bytes"));
-	return memUsage;
+	string directory = cgroupDirectory + "/memory/memory.usage_in_bytes";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atol(Util::readFile(cgroupDirectory + "/memory/memory.usage_in_bytes"));
 }
 
 int Cgroup::getMemNotify(){
-	int flag;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/notify_on_release");
-	flag = Util::atoi(Util::readFile(cgroupDirectory + "/memory/notify_on_release"));
-	return flag;
+	string directory = cgroupDirectory + "/memory/notify_on_release";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atoi(Util::readFile(cgroupDirectory + "/memory/notify_on_release"));
 }
 
 string Cgroup::getMemReleaseAgent(){
-	string releaseAgent;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/release_agent");
-	releaseAgent = Util::readFile(cgroupDirectory + "/memory/release_agent");
-	return releaseAgent;
+	string directory = cgroupDirectory + "/memory/release_agent";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::readFile(cgroupDirectory + "/memory/release_agent");
 }
 
 long int Cgroup::getMemoryFailCnt(){
-	long int memFail;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.usage_in_bytes");
-	memFail = Util::atol(Util::readFile(cgroupDirectory + "/memory/memory.failcnt"));
-	return memFail;
+	string directory = cgroupDirectory + "/memory/memory.usage_in_bytes";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atol(Util::readFile(cgroupDirectory + "/memory/memory.failcnt"));
 }
 
 /**
@@ -186,10 +173,9 @@ long int Cgroup::getMemoryFailCnt(){
  * way of giving a penalty to cgroups which access shared pages too often.
  */
 int Cgroup::getMemoryMoveChargeImmigrate(){
-	int moveCharge;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.move_charge_at_immigrate");
-	moveCharge = Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.move_charge_at_immigrate"));
-	return moveCharge;
+	string directory = cgroupDirectory + "/memory/memory.move_charge_at_immigrate";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.move_charge_at_immigrate"));
 }
 
 /**
@@ -197,20 +183,18 @@ int Cgroup::getMemoryMoveChargeImmigrate(){
  * a hierarchy of cgroups.
  */
 int Cgroup::getMemoryUseHierarchy(){
-	int useHierarchy;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.use_hierarchy");
-	useHierarchy = Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.use_hierarchy"));
-	return useHierarchy;
+	string directory = cgroupDirectory + "/memory/memory.use_hierarchy";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.use_hierarchy"));
 }
 
 /**
  * Contains a flag that enables or disables the Out of Memory killer for a cgroup.
  */
 int Cgroup::getMemoryOOMControl(){
-	int oomControl;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", cgroupDirectory + "/memory/memory.oom_control");
-	oomControl = Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.oom_control"));
-	return oomControl;
+	string directory = cgroupDirectory + "/memory/memory.oom_control";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	return Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.oom_control"));
 }
 
 /**
