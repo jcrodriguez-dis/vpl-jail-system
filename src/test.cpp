@@ -6,6 +6,7 @@
 #include <cassert>
 #include <iostream>
 #include "util.h"
+#include "cgroup.h"
 #include "configuration.h"
 #include <assert.h>
 using namespace std;
@@ -102,6 +103,21 @@ void testCleanPATH(){
 	assert(Configuration::generateCleanPATH("/usr","/bin")=="/bin");
 	assert(Configuration::generateCleanPATH("/usr","/bin:/kk:/sbin")=="/bin:/sbin");
 	assert(Configuration::generateCleanPATH("/usr","/bin:/kk:/sbin:/local/bin:/local/nada")=="/bin:/sbin:/local/bin");
+}
+
+void testSetCgroupFileSystem(){
+	Cgroup::setBaseCgroupFileSystem("/sys/fs/cgroup");
+	assert(Cgroup::getBaseCgroupFileSystem() == "/sys/fs/cgroup");
+	assert(Cgroup::getBaseCgroupFileSystem() != "/sys/fs");
+	Cgroup::setBaseCgroupFileSystem("/");
+	assert(Cgroup::getBaseCgroupFileSystem() == "/");
+	assert(Cgroup::getBaseCgroupFileSystem() != "//");
+	Cgroup::setBaseCgroupFileSystem(" ");
+	assert(Cgroup::getBaseCgroupFileSystem() == " ");
+}
+
+void testGetCPUAcctStat(){
+	Cgroup cgroup("test");
 }
 
 int main(){

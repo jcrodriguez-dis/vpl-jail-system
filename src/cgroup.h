@@ -14,7 +14,7 @@ using namespace std;
 
 class Cgroup {
 private:
-	static string baseCgroupFilesystem;
+	static string baseCgroupFileSystem;
 	string cgroupDirectory;
 	regex_t regUser;
 	regex_t regSystem;
@@ -26,11 +26,17 @@ private:
 	regex_t regMapped;
 	regex_t regFault;
 	regex_t regHierarchical;
+	string regFound(regex_t reg, string input);
 
 public:
-	static void setBaseCgroupFilesystem(string fs);
+	static void setBaseCgroupFileSystem(string _baseCgroupFileSystem){
+		baseCgroupFileSystem = _baseCgroupFileSystem;
+	}
+	static string getBaseCgroupFileSystem(){
+		return baseCgroupFileSystem;
+	}
 	Cgroup(string name){
-		cgroupDirectory = baseCgroupFilesystem + "/" + name + "/";
+		cgroupDirectory =  Cgroup::getBaseCgroupFileSystem() + "/" + name + "/";
 		regcomp(&regUser,"^user ([0-9]+)$",REG_EXTENDED);
 		regcomp(&regSystem,"^system ([0-9]+)$",REG_EXTENDED);
 		regcomp(&regPeriods,"^nr_periods ([0-9]+)$",REG_EXTENDED);
@@ -40,10 +46,8 @@ public:
 		regcomp(&regMem,"^shmem ([0-9]+)$",REG_EXTENDED);
 		regcomp(&regMapped,"^mapped_file ([0-9]+)$",REG_EXTENDED);
 		regcomp(&regHierarchical,"^hierarchical_memory_limit ([0-9]+)$",REG_EXTENDED);
-
 	}
 
-	string regFound(regex_t reg, string input);
 	map<string, int> getCPUAcctStat();
 	long int getCPUCfsPeriod();
 	long int getCPUCfsQuota();
@@ -88,7 +92,6 @@ public:
 	void setMemorySpreadSlab(bool flag);
 	void setSchedLoadBalance(bool flag);
 	
-	
-	
-	
 };
+
+

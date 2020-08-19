@@ -8,7 +8,7 @@
 #include <regex.h>
 
 using namespace std;
-
+string Cgroup::baseCgroupFileSystem="/sys/fs/cgroup";
 
 string Cgroup::regFound(regex_t reg, string input){
 	regmatch_t found[1];
@@ -25,8 +25,8 @@ string Cgroup::regFound(regex_t reg, string input){
 map<string, int> Cgroup::getCPUAcctStat(){
 	map<string, int> cpuStat;
 	string stat;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", (cgroupDirectory + "/cpu/cpuacct.stat").c_str());
-	stat = Util::readFile((cgroupDirectory + "/cpu/cpuacct.stat").c_str());
+	syslog(LOG_DEBUG, "Reading from the file '%s'", (cgroupDirectory + "cpu/cpuacct.stat").c_str());
+	stat = Util::readFile((cgroupDirectory + "cpu/cpuacct.stat").c_str());
 	string sUser = regFound(regUser, stat);
 	string sSytem = regFound(regSystem, stat);
 	// Comprobar regexec
@@ -37,46 +37,46 @@ map<string, int> Cgroup::getCPUAcctStat(){
 }
 
 long int Cgroup::getCPUCfsPeriod(){
-	string directory = cgroupDirectory + "/cpu/cfs_period_us";
+	string directory = cgroupDirectory + "cpu/cfs_period_us";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atol(Util::readFile((cgroupDirectory + "/cpu/cfs_period_us").c_str()));
+	return Util::atol(Util::readFile((cgroupDirectory + "cpu/cfs_period_us").c_str()));
 }
 
 long int Cgroup::getCPUCfsQuota(){
-	string directory = cgroupDirectory + "/cpu/cfs_quota_us";
+	string directory = cgroupDirectory + "cpu/cfs_quota_us";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atol(Util::readFile((cgroupDirectory + "/cpu/cfs_quota_us").c_str()));
+	return Util::atol(Util::readFile((cgroupDirectory + "cpu/cfs_quota_us").c_str()));
 }
 
 long int Cgroup::getCPUUsage(){
-	string directory = cgroupDirectory + "/cpu/cpuacct.usage";
+	string directory = cgroupDirectory + "cpu/cpuacct.usage";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atol(Util::readFile((cgroupDirectory + "/cpu/cpuacct.usage").c_str()));
+	return Util::atol(Util::readFile((cgroupDirectory + "cpu/cpuacct.usage").c_str()));
 }
 
 int Cgroup::getNotify(){
-	string directory = cgroupDirectory + "/cpu/notify_on_release";
+	string directory = cgroupDirectory + "cpu/notify_on_release";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atoi(Util::readFile((cgroupDirectory + "/cpu/notify_on_release").c_str()));
+	return Util::atoi(Util::readFile((cgroupDirectory + "cpu/notify_on_release").c_str()));
 }
 
 string Cgroup::getReleaseAgent(){
-	string directory = cgroupDirectory + "/cpu/release_agent";
+	string directory = cgroupDirectory + "cpu/release_agent";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::readFile((cgroupDirectory + "/cpu/release_agent").c_str());
+	return Util::readFile((cgroupDirectory + "cpu/release_agent").c_str());
 }
 
 string Cgroup::getCPUTasks(){
-	string directory = cgroupDirectory + "/cpu/tasks";
+	string directory = cgroupDirectory + "cpu/tasks";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::readFile((cgroupDirectory + "/cpu/tasks").c_str());
+	return Util::readFile((cgroupDirectory + "cpu/tasks").c_str());
 }
 
 map<string, int> Cgroup::getCPUStat(){
 	map<string, int> cpuStat;
-	string directory = cgroupDirectory + "/cpu/cpu.stat";
+	string directory = cgroupDirectory + "cpu/cpu.stat";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	string stat = Util::readFile((cgroupDirectory + "/cpu/cpu.stat").c_str());
+	string stat = Util::readFile((cgroupDirectory + "cpu/cpu.stat").c_str());
 	string nrPeriods = regFound(regPeriods, stat);
 	string nrThrottled = regFound(regThrottled, stat);
 	string throttledTime = regFound(regThrottledTime, stat);
@@ -87,35 +87,35 @@ map<string, int> Cgroup::getCPUStat(){
 }
 
 int Cgroup::getCloneChildren(){
-	string directory = cgroupDirectory + "/cpu/cgroup.clone_children";
+	string directory = cgroupDirectory + "cpu/cgroup.clone_children";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atoi(Util::readFile((cgroupDirectory + "/cpu/cgroup.clone_children").c_str()));
+	return Util::atoi(Util::readFile((cgroupDirectory + "cpu/cgroup.clone_children").c_str()));
 }
 
 string Cgroup::getMemoryTasks(){
-	string directory = cgroupDirectory + "/memory/tasks";
+	string directory = cgroupDirectory + "memory/tasks";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::readFile((cgroupDirectory + "/memory/tasks").c_str());
+	return Util::readFile((cgroupDirectory + "memory/tasks").c_str());
 }
 
 int Cgroup::getMemCloneChildren(){
-	string directory = cgroupDirectory + "/cpu/cgroup.clone_children";
+	string directory = cgroupDirectory + "cpu/cgroup.clone_children";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atoi(Util::readFile((cgroupDirectory + "/cpu/cgroup.clone_children").c_str()));
+	return Util::atoi(Util::readFile((cgroupDirectory + "cpu/cgroup.clone_children").c_str()));
 	}
 
 long int Cgroup::getMemoryLimitInBytes(){
-	string directory = cgroupDirectory + "/memory/memory.limit_in_bytes";
+	string directory = cgroupDirectory + "memory/memory.limit_in_bytes";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atol(Util::readFile((cgroupDirectory + "/memory/memory.limit_in_bytes").c_str()));
+	return Util::atol(Util::readFile((cgroupDirectory + "memory/memory.limit_in_bytes").c_str()));
 }
 
 map<string, int> Cgroup::getMemoryStat(){
 	map<string, int> memStat;
 	string stat;
-	string directory = cgroupDirectory + "/memory/memory.stat";
+	string directory = cgroupDirectory + "memory/memory.stat";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	stat = Util::readFile((cgroupDirectory + "/memory/memory.stat").c_str());
+	stat = Util::readFile((cgroupDirectory + "memory/memory.stat").c_str());
 
 	string cache = regFound(regCache, stat);
 	string shmem = regFound(regMem, stat);
@@ -139,33 +139,33 @@ map<string, int> Cgroup::getMemoryStat(){
  */
 
 int Cgroup::getMemSwappiness(){
-	string directory = cgroupDirectory + "/memory/memory.swappiness";
+	string directory = cgroupDirectory + "memory/memory.swappiness";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.swappiness"));
+	return Util::atoi(Util::readFile(cgroupDirectory + "memory/memory.swappiness"));
 }
 
 long int Cgroup::getMemoryUsageInBytes(){
-	string directory = cgroupDirectory + "/memory/memory.usage_in_bytes";
+	string directory = cgroupDirectory + "memory/memory.usage_in_bytes";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atol(Util::readFile(cgroupDirectory + "/memory/memory.usage_in_bytes"));
+	return Util::atol(Util::readFile(cgroupDirectory + "memory/memory.usage_in_bytes"));
 }
 
 int Cgroup::getMemNotify(){
-	string directory = cgroupDirectory + "/memory/notify_on_release";
+	string directory = cgroupDirectory + "memory/notify_on_release";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atoi(Util::readFile(cgroupDirectory + "/memory/notify_on_release"));
+	return Util::atoi(Util::readFile(cgroupDirectory + "memory/notify_on_release"));
 }
 
 string Cgroup::getMemReleaseAgent(){
-	string directory = cgroupDirectory + "/memory/release_agent";
+	string directory = cgroupDirectory + "memory/release_agent";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::readFile(cgroupDirectory + "/memory/release_agent");
+	return Util::readFile(cgroupDirectory + "memory/release_agent");
 }
 
 long int Cgroup::getMemoryFailCnt(){
-	string directory = cgroupDirectory + "/memory/memory.usage_in_bytes";
+	string directory = cgroupDirectory + "memory/memory.usage_in_bytes";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atol(Util::readFile(cgroupDirectory + "/memory/memory.failcnt"));
+	return Util::atol(Util::readFile(cgroupDirectory + "memory/memory.failcnt"));
 }
 
 /**
@@ -173,9 +173,9 @@ long int Cgroup::getMemoryFailCnt(){
  * way of giving a penalty to cgroups which access shared pages too often.
  */
 int Cgroup::getMemoryMoveChargeImmigrate(){
-	string directory = cgroupDirectory + "/memory/memory.move_charge_at_immigrate";
+	string directory = cgroupDirectory + "memory/memory.move_charge_at_immigrate";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.move_charge_at_immigrate"));
+	return Util::atoi(Util::readFile(cgroupDirectory + "memory/memory.move_charge_at_immigrate"));
 }
 
 /**
@@ -183,18 +183,18 @@ int Cgroup::getMemoryMoveChargeImmigrate(){
  * a hierarchy of cgroups.
  */
 int Cgroup::getMemoryUseHierarchy(){
-	string directory = cgroupDirectory + "/memory/memory.use_hierarchy";
+	string directory = cgroupDirectory + "memory/memory.use_hierarchy";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.use_hierarchy"));
+	return Util::atoi(Util::readFile(cgroupDirectory + "memory/memory.use_hierarchy"));
 }
 
 /**
  * Contains a flag that enables or disables the Out of Memory killer for a cgroup.
  */
 int Cgroup::getMemoryOOMControl(){
-	string directory = cgroupDirectory + "/memory/memory.oom_control";
+	string directory = cgroupDirectory + "memory/memory.oom_control";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atoi(Util::readFile(cgroupDirectory + "/memory/memory.oom_control"));
+	return Util::atoi(Util::readFile(cgroupDirectory + "memory/memory.oom_control"));
 }
 
 /**
@@ -204,7 +204,7 @@ int Cgroup::getMemoryOOMControl(){
 
 void Cgroup::setCPUCfsPeriod(int period){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpu.cfs_period_us");
-	Util::writeFile(cgroupDirectory + "/cpu/cpu.cfs_period_us",Util::itos(period));
+	Util::writeFile(cgroupDirectory + "cpu/cpu.cfs_period_us",Util::itos(period));
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpu.cfs_period_us");
 }
 
@@ -214,7 +214,7 @@ void Cgroup::setCPUCfsPeriod(int period){
  */
 void Cgroup::setCPUCfsQuota(int quota){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpu.cfs_quota_us");
-	Util::writeFile(cgroupDirectory + "/cpu/cpu.cfs_quota_us",Util::itos(quota));
+	Util::writeFile(cgroupDirectory + "cpu/cpu.cfs_quota_us",Util::itos(quota));
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpu.cfs_quota_us");
 }
 
@@ -228,7 +228,7 @@ void Cgroup::setCPUCfsQuota(int quota){
  */
 void Cgroup::setCPUCloneChildren(bool flag){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cgroup.clone_children");
-	Util::writeFile(cgroupDirectory + "/cpu/cgroup.clone_children",flag?"1":"0");
+	Util::writeFile(cgroupDirectory + "cpu/cgroup.clone_children",flag?"1":"0");
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cgroup.clone_children");
 }
 
@@ -237,7 +237,7 @@ void Cgroup::setCPUCloneChildren(bool flag){
  */
 void Cgroup::setCPUProcs(int pid){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cgroup.procs");
-	Util::writeFile(cgroupDirectory + "/cpu/cgroup.procs",Util::itos(pid));
+	Util::writeFile(cgroupDirectory + "cpu/cgroup.procs",Util::itos(pid));
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cgroup.procs");
 }
 
@@ -249,19 +249,19 @@ void Cgroup::setCPUProcs(int pid){
  */
 void Cgroup::setCPUShares(int share){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpu.shares");
-	Util::writeFile(cgroupDirectory + "/cpu/cpu.shares",Util::itos(share));
+	Util::writeFile(cgroupDirectory + "cpu/cpu.shares",Util::itos(share));
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpu.shares");
 }
 
 void Cgroup::setCPUNotify(bool flag){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/notify_on_release");
-	Util::writeFile(cgroupDirectory + "/cpu/notify_on_release",flag?"1":"0");
+	Util::writeFile(cgroupDirectory + "cpu/notify_on_release",flag?"1":"0");
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/notify_on_release");
 }
 
 void Cgroup::setCPUReleaseAgentPath(string path){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/release_agent");
-	Util::writeFile(cgroupDirectory + "/cpu/release_agent",path);
+	Util::writeFile(cgroupDirectory + "cpu/release_agent",path);
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/release_agent");
 }
 
@@ -272,7 +272,7 @@ void Cgroup::setCPUReleaseAgentPath(string path){
  */
 void Cgroup::setCPUs(string cpus){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpuset/cpuset.cpus");
-	Util::writeFile(cgroupDirectory + "/cpuset/cpuset.cpus",cpus);
+	Util::writeFile(cgroupDirectory + "cpuset/cpuset.cpus",cpus);
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpuset/cpuset.cpus");
 }
 
@@ -283,7 +283,7 @@ void Cgroup::setCPUs(string cpus){
  */
 void Cgroup::setMems(string nodes){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.mems");
-	Util::writeFile(cgroupDirectory + "/cpu/cpuset.mems",nodes);
+	Util::writeFile(cgroupDirectory + "cpu/cpuset.mems",nodes);
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.mems");
 }
 
@@ -294,7 +294,7 @@ void Cgroup::setMems(string nodes){
  */
 void Cgroup::setMemoryMigrate(bool flag){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.memory_migrate");
-	Util::writeFile(cgroupDirectory + "/cpu/cpuset.memory_migrate",flag?"1":"0");
+	Util::writeFile(cgroupDirectory + "cpu/cpuset.memory_migrate",flag?"1":"0");
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.memory_migrate");
 }
 
@@ -305,7 +305,7 @@ void Cgroup::setMemoryMigrate(bool flag){
  */
 void Cgroup::setCPUExclusive(bool flag){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.cpu_exclusive");
-	Util::writeFile(cgroupDirectory + "/cpu/cpuset.cpu_exclusive",flag?"1":"0");
+	Util::writeFile(cgroupDirectory + "cpu/cpuset.cpu_exclusive",flag?"1":"0");
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.cpu_exclusive");
 }
 
@@ -315,9 +315,9 @@ void Cgroup::setCPUExclusive(bool flag){
  * memory nodes are not allocated exclusively to one cpuset
  */
 void Cgroup::setMemExclusive(bool flag){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.mem_exclusive");
-	Util::writeFile(cgroupDirectory + "/cpu/cpuset.mem_exclusive",flag?"1":"0");
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.mem_exclusive");
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu/cpuset.mem_exclusive");
+	Util::writeFile(cgroupDirectory + "cpu/cpuset.mem_exclusive",flag?"1":"0");
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cpu/cpuset.mem_exclusive");
 }
 
 /**
@@ -326,7 +326,7 @@ void Cgroup::setMemExclusive(bool flag){
  */
 void Cgroup::setMemHardwall(bool flag){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.mem_hardwall");
-	Util::writeFile(cgroupDirectory + "/cpu/cpuset.mem_hardwall",flag?"1":"0");
+	Util::writeFile(cgroupDirectory + "cpu/cpuset.mem_hardwall",flag?"1":"0");
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.mem_hardwall");
 }
 
@@ -338,7 +338,7 @@ void Cgroup::setMemHardwall(bool flag){
  */
 void Cgroup::setMemoryPressure(bool flag){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.memory_pressure_enabled");
-	Util::writeFile(cgroupDirectory + "/cpu/cpuset.memory_pressure_enabled",flag?"1":"0");
+	Util::writeFile(cgroupDirectory + "cpu/cpuset.memory_pressure_enabled",flag?"1":"0");
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.memory_pressure_enabled");
 }
 
@@ -348,7 +348,7 @@ void Cgroup::setMemoryPressure(bool flag){
  */
 void Cgroup::setMemorySpreadPage(bool flag){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.memory_spread_page");
-	Util::writeFile(cgroupDirectory + "/cpu/cpuset.memory_spread_page",flag?"1":"0");
+	Util::writeFile(cgroupDirectory + "cpu/cpuset.memory_spread_page",flag?"1":"0");
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.memory_spread_page");
 }
 
@@ -358,7 +358,7 @@ void Cgroup::setMemorySpreadPage(bool flag){
  */
 void Cgroup::setMemorySpreadSlab(bool flag){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.memory_spread_slab");
-	Util::writeFile(cgroupDirectory + "/cpu/cpuset.spread_slab",flag?"1":"0");
+	Util::writeFile(cgroupDirectory + "cpu/cpuset.spread_slab",flag?"1":"0");
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.spread_slab");
 }
 
@@ -369,7 +369,7 @@ void Cgroup::setMemorySpreadSlab(bool flag){
  */
 void Cgroup::setSchedLoadBalance(bool flag){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.sched_load_balance");
-	Util::writeFile(cgroupDirectory + "/cpu/cpuset.sched_load_balance",flag?"1":"0");
+	Util::writeFile(cgroupDirectory + "cpu/cpuset.sched_load_balance",flag?"1":"0");
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.sched_load_balance");
 }
 
