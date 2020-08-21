@@ -49,8 +49,8 @@ public:
 	}
 
 	map<string, int> getCPUAcctStat();
-	long int getCPUCfsPeriod();
-	long int getCPUCfsQuota();
+	int getCPUCfsPeriod();
+	int getCPUCfsQuota();
 	long int getCPUUsage();
 	map<string, int> getCPUStat();
 	int getNotify();
@@ -59,20 +59,18 @@ public:
 	int getCloneChildren();
 	string getMemoryTasks();
 	int getMemCloneChildren();
+	bool getMemoryMigrate();
 	long int getMemoryLimitInBytes();
 	map<string, int> getMemoryStat();
 	int getMemSwappiness();
 	long int getMemoryUsageInBytes();
 	int getMemNotify();
+	bool setMemHardwall();
 	string getMemReleaseAgent();
 	long int getMemoryFailCnt();
 	int getMemoryMoveChargeImmigrate();
 	int getMemoryUseHierarchy();
 	int getMemoryOOMControl();
-	map<string, long int> getBlkioThrottleReadBps();
-	map<string, int> getBlkioThrottleReadIops();
-	map<string, int> getBlkioThrottleWriteBps();
-	map<string, int> getBlkioThrottleWriteIops();
 
 	void setCPUCfsPeriod(int period);
 	void setCPUCfsQuota(int quota);

@@ -36,16 +36,16 @@ map<string, int> Cgroup::getCPUAcctStat(){
 	return cpuStat;
 }
 
-long int Cgroup::getCPUCfsPeriod(){
-	string directory = cgroupDirectory + "cpu/cfs_period_us";
+int Cgroup::getCPUCfsPeriod(){
+	string directory = cgroupDirectory + "cpu/cpu.cfs_period_us";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atol(Util::readFile((cgroupDirectory + "cpu/cfs_period_us").c_str()));
+	return Util::atoi(Util::readFile((cgroupDirectory + "cpu/cpu.cfs_period_us").c_str()));
 }
 
-long int Cgroup::getCPUCfsQuota(){
-	string directory = cgroupDirectory + "cpu/cfs_quota_us";
+int Cgroup::getCPUCfsQuota(){
+	string directory = cgroupDirectory + "cpu/cpu.cfs_quota_us";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
-	return Util::atol(Util::readFile((cgroupDirectory + "cpu/cfs_quota_us").c_str()));
+	return Util::atoi(Util::readFile((cgroupDirectory + "cpu/cpu.cfs_quota_us").c_str()));
 }
 
 long int Cgroup::getCPUUsage(){
@@ -102,7 +102,17 @@ int Cgroup::getMemCloneChildren(){
 	string directory = cgroupDirectory + "cpu/cgroup.clone_children";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
 	return Util::atoi(Util::readFile((cgroupDirectory + "cpu/cgroup.clone_children").c_str()));
+}
+
+bool Cgroup::getMemoryMigrate(){
+	string directory = cgroupDirectory + "cpuset/cpuset.memory_migrate";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
+	if (Util::readFile(cgroupDirectory + "cpuset/cpuset.memory_migrate") == "1"){
+		return true;
+	} else {
+		return false;
 	}
+}
 
 long int Cgroup::getMemoryLimitInBytes(){
 	string directory = cgroupDirectory + "memory/memory.limit_in_bytes";
@@ -156,6 +166,16 @@ int Cgroup::getMemNotify(){
 	return Util::atoi(Util::readFile(cgroupDirectory + "memory/notify_on_release"));
 }
 
+bool Cgroup::setMemHardwall(){
+	string directory = cgroupDirectory + "cpu/cpuset.mem_hardwall";
+	syslog(LOG_DEBUG,"Reading from the file '%s'", directory.c_str());
+	if (Util::readFile(cgroupDirectory + "cpu/cpuset.mem_hardwall") == "1"){
+		return true;
+	} else {
+		return false;
+	}
+}
+
 string Cgroup::getMemReleaseAgent(){
 	string directory = cgroupDirectory + "memory/release_agent";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
@@ -172,6 +192,7 @@ long int Cgroup::getMemoryFailCnt(){
  * Allows moving charges associated with a task along with task migration. Charging is a
  * way of giving a penalty to cgroups which access shared pages too often.
  */
+
 int Cgroup::getMemoryMoveChargeImmigrate(){
 	string directory = cgroupDirectory + "memory/memory.move_charge_at_immigrate";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", directory.c_str());
@@ -372,9 +393,3 @@ void Cgroup::setSchedLoadBalance(bool flag){
 	Util::writeFile(cgroupDirectory + "cpu/cpuset.sched_load_balance",flag?"1":"0");
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.sched_load_balance");
 }
-
-
-
-
-
-

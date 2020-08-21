@@ -117,7 +117,82 @@ void testSetCgroupFileSystem(){
 }
 
 void testGetCPUAcctStat(){
-	Cgroup cgroup("test");
+	Cgroup cgroup("cgroup");
+	Cgroup::setBaseCgroupFileSystem("/sys/fs");
+	map<string, int> result = cgroup.getCPUAcctStat();
+	assert(result.count("user"));
+	assert(result.count("system"));
+	assert(!result.count(" "));
+	assert(!result.count("usersystem"));
+	assert(!result.count("user "));
+}
+
+void testGetCPUStat(){
+	Cgroup cgroup("cgroup");
+	map<string, int> result = cgroup.getCPUStat();
+	assert(result.count("nr_throttled"));
+	assert(result.count("nr_periods"));
+	assert(result.count("throttled_time"));
+	assert(!result.count("throttled_time "));
+	assert(!result.count(" nr_periods"));
+}
+
+void testGetMemoryStat(){
+	Cgroup cgroup("cgroup");
+	map<string, int> result = cgroup.getCPUStat();
+	assert(result.count("cache"));
+	assert(result.count("shmem"));
+	assert(result.count("mapped_file"));
+	assert(result.count("pgfault"));
+	assert(result.count("hierarchical_memory_limit"));
+}
+
+void testSetCPUCfsPeriod(){
+	Cgroup cgroup("cgroup");
+	cgroup.setCPUCfsPeriod(100000);
+	string cgroupDirectory = Cgroup::getBaseCgroupFileSystem();
+	assert(cgroup.getCPUCfsPeriod() == 100000);
+	assert(cgroup.getCPUCfsPeriod() == 10000);
+	cgroup.setCPUCfsPeriod(200000);
+	assert(cgroup.getCPUCfsPeriod() != 100000);
+	assert(cgroup.getCPUCfsPeriod() == 200000);
+	assert(cgroup.getCPUCfsPeriod() != 10000);
+}
+
+void testSetCPUCfsQuota(){
+	Cgroup cgroup("cgroup");
+	cgroup.setCPUCfsQuota(100000);
+	string cgroupDirectory = Cgroup::getBaseCgroupFileSystem();
+	assert(cgroup.getCPUCfsQuota() == 100000);
+	assert(cgroup.getCPUCfsQuota() == 10000);
+	cgroup.setCPUCfsQuota(200000);
+	assert(cgroup.getCPUCfsQuota() != 100000);
+	assert(cgroup.getCPUCfsQuota() == 200000);
+	assert(cgroup.getCPUCfsQuota() != 10000);
+}
+
+void testSetMemoryMigrate(){
+	Cgroup cgroup("cgroup");
+	cgroup.setMemoryMigrate(true);
+	string cgroupDirectory = Cgroup::getBaseCgroupFileSystem();
+	assert(cgroup.getMemoryMigrate() == true);
+	assert(cgroup.getMemoryMigrate() != false);
+	cgroup.setMemoryMigrate(false);
+	assert(cgroup.getMemoryMigrate() != true);
+	assert(cgroup.getMemoryMigrate() == false);
+	assert(cgroup.getMemoryMigrate() != true);
+}
+
+void testSetMemHardwall(){
+	Cgroup cgroup("cgroup");
+	cgroup.setMemHardwall(true);
+	string cgroupDirectory = Cgroup::getBaseCgroupFileSystem();
+	assert(cgroup.getMemoryMigrate() == true);
+	assert(cgroup.getMemoryMigrate() != false);
+	cgroup.setMemoryMigrate(false);
+	assert(cgroup.getMemoryMigrate() != true);
+	assert(cgroup.getMemoryMigrate() == false);
+	assert(cgroup.getMemoryMigrate() != true);
 }
 
 int main(){
@@ -130,6 +205,15 @@ int main(){
 	testToUppercase();
 	testCorrectFileName();
 	//Test config
+	//Test cgroup
+	testSetCgroupFileSystem();
+	testGetCPUAcctStat();
+	testGetCPUStat();
+	testGetMemoryStat();
+	testSetCPUCfsPeriod();
+	testSetCPUCfsQuota();
+	testSetMemoryMigrate();
+	testSetMemHardwall();
 }
 
 
