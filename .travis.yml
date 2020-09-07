@@ -2,6 +2,8 @@ language: cpp
 
 install:
   - ./configure
+  - pwd
+  - ls -l src
   - make distcheck
   - tar xvf *.tar.gz
   - cd vpl-jail-system-*.*.*
