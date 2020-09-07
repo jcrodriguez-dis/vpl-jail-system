@@ -101,15 +101,15 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_program_test_OBJECTS = test.$(OBJEXT) configurationFile.$(OBJEXT) \
-	configuration.$(OBJEXT) socket.$(OBJEXT) websocket.$(OBJEXT) \
-	util.$(OBJEXT)
+	configuration.$(OBJEXT) socket.$(OBJEXT) cgroup.$(OBJEXT) \
+	websocket.$(OBJEXT) util.$(OBJEXT)
 program_test_OBJECTS = $(am_program_test_OBJECTS)
 program_test_LDADD = $(LDADD)
 am_vpl_jail_server_OBJECTS = vpl-jail-server.$(OBJEXT) jail.$(OBJEXT) \
 	httpServer.$(OBJEXT) redirector.$(OBJEXT) \
 	configurationFile.$(OBJEXT) configuration.$(OBJEXT) \
 	processMonitor.$(OBJEXT) socket.$(OBJEXT) websocket.$(OBJEXT) \
-	util.$(OBJEXT)
+	util.$(OBJEXT) cgroup.$(OBJEXT)
 vpl_jail_server_OBJECTS = $(am_vpl_jail_server_OBJECTS)
 vpl_jail_server_LDADD = $(LDADD)
 am_websocket_echo_test_OBJECTS = webSocketEchoTest.$(OBJEXT) \
@@ -187,12 +187,12 @@ ETAGS = etags
 CTAGS = ctags
 am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/missing aclocal-1.15
+ACLOCAL = ${SHELL} /home/osboxes/git/vpl-xmlrpc-jail/missing aclocal-1.15
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 1
-AUTOCONF = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/missing autoconf
-AUTOHEADER = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/missing autoheader
-AUTOMAKE = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/missing automake-1.15
+AUTOCONF = ${SHELL} /home/osboxes/git/vpl-xmlrpc-jail/missing autoconf
+AUTOHEADER = ${SHELL} /home/osboxes/git/vpl-xmlrpc-jail/missing autoheader
+AUTOMAKE = ${SHELL} /home/osboxes/git/vpl-xmlrpc-jail/missing automake-1.15
 AWK = mawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -220,25 +220,25 @@ LDFLAGS =
 LIBOBJS = 
 LIBS = -lssl -lcrypto -lutil 
 LTLIBOBJS = 
-MAKEINFO = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/missing makeinfo
+MAKEINFO = ${SHELL} /home/osboxes/git/vpl-xmlrpc-jail/missing makeinfo
 MKDIR_P = /bin/mkdir -p
 OBJEXT = o
 PACKAGE = vpl-jail-system
 PACKAGE_BUGREPORT = 
 PACKAGE_NAME = vpl jail system
-PACKAGE_STRING = vpl jail system 2.5.2
+PACKAGE_STRING = vpl jail system 2.5.4
 PACKAGE_TARNAME = vpl-jail-system
 PACKAGE_URL = 
-PACKAGE_VERSION = 2.5.2
+PACKAGE_VERSION = 2.5.4
 PATH_SEPARATOR = :
 SET_MAKE = 
 SHELL = /bin/bash
 STRIP = 
-VERSION = 2.5.2
-abs_builddir = /home/juanca/git/vpl-xmlrpc-jail/src
-abs_srcdir = /home/juanca/git/vpl-xmlrpc-jail/src
-abs_top_builddir = /home/juanca/git/vpl-xmlrpc-jail
-abs_top_srcdir = /home/juanca/git/vpl-xmlrpc-jail
+VERSION = 2.5.4
+abs_builddir = /home/osboxes/git/vpl-xmlrpc-jail/src
+abs_srcdir = /home/osboxes/git/vpl-xmlrpc-jail/src
+abs_top_builddir = /home/osboxes/git/vpl-xmlrpc-jail
+abs_top_srcdir = /home/osboxes/git/vpl-xmlrpc-jail
 ac_ct_CC = gcc
 ac_ct_CXX = g++
 am__include = include
@@ -258,7 +258,7 @@ host_alias =
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/install-sh
+install_sh = ${SHELL} /home/osboxes/git/vpl-xmlrpc-jail/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -287,13 +287,15 @@ configuration.cpp configuration.h\
 processMonitor.cpp processMonitor.h\
 socket.cpp socket.h\
 websocket.cpp websocket.h\
-util.cpp util.h rpc.h xml.h jail_limits.h lock.h
+util.cpp util.h rpc.h xml.h jail_limits.h lock.h\
+cgroup.cpp cgroup.h
 
 websocket_echo_test_SOURCES = webSocketEchoTest.cpp socket.cpp socket.h\
 websocket.cpp websocket.h\
 util.cpp util.h rpc.h xml.h jail_limits.h lock.h
 
 program_test_SOURCES = test.cpp configurationFile.cpp configuration.cpp socket.cpp socket.h\
+cgroup.cpp cgroup.h\
 websocket.cpp websocket.h\
 util.cpp util.h rpc.h xml.h jail_limits.h lock.h
 
@@ -391,6 +393,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+include ./$(DEPDIR)/cgroup.Po
 include ./$(DEPDIR)/configuration.Po
 include ./$(DEPDIR)/configurationFile.Po
 include ./$(DEPDIR)/httpServer.Po

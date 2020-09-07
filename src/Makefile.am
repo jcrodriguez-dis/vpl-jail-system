@@ -7,13 +7,15 @@ configuration.cpp configuration.h\
 processMonitor.cpp processMonitor.h\
 socket.cpp socket.h\
 websocket.cpp websocket.h\
-util.cpp util.h rpc.h xml.h jail_limits.h lock.h
+util.cpp util.h rpc.h xml.h jail_limits.h lock.h\
+cgroup.cpp cgroup.h
 
 websocket_echo_test_SOURCES= webSocketEchoTest.cpp socket.cpp socket.h\
 websocket.cpp websocket.h\
 util.cpp util.h rpc.h xml.h jail_limits.h lock.h
 
 program_test_SOURCES= test.cpp configurationFile.cpp configuration.cpp socket.cpp socket.h\
+cgroup.cpp cgroup.h\
 websocket.cpp websocket.h\
 util.cpp util.h rpc.h xml.h jail_limits.h lock.h
 
