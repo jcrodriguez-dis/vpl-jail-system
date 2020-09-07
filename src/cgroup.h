@@ -10,6 +10,7 @@
 #include <syslog.h>
 #include <iostream>
 #include <map>
+#include <vector>
 using namespace std;
 
 class Cgroup {
@@ -26,6 +27,9 @@ private:
 	regex_t regMapped;
 	regex_t regFault;
 	regex_t regHierarchical;
+	regex_t regEth0;
+	regex_t regEth1;
+	regex_t regLo;
 	string regFound(regex_t reg, string input);
 
 public:
@@ -46,49 +50,47 @@ public:
 		regcomp(&regMem,"^shmem ([0-9]+)$",REG_EXTENDED);
 		regcomp(&regMapped,"^mapped_file ([0-9]+)$",REG_EXTENDED);
 		regcomp(&regHierarchical,"^hierarchical_memory_limit ([0-9]+)$",REG_EXTENDED);
+		regcomp(&regEth0,"^eth0 ([0-9]+)$",REG_EXTENDED);
+		regcomp(&regEth1,"^eth1 ([0-9]+)$",REG_EXTENDED);
+		regcomp(&regLo,"^lo ([0-9]+)$",REG_EXTENDED);
 	}
 
+	~Cgroup(){
+		syslog(LOG_DEBUG, "Destructor called.");
+	}
 	map<string, int> getCPUAcctStat();
-	int getCPUCfsPeriod();
-	int getCPUCfsQuota();
 	long int getCPUUsage();
 	map<string, int> getCPUStat();
 	int getNotify();
 	string getReleaseAgent();
 	string getCPUTasks();
+	int getNetPrioID();
+	vector<int> getPIDs();
+	map<string, int> getNetPrioMap();
 	int getCloneChildren();
 	string getMemoryTasks();
 	int getMemCloneChildren();
-	bool getMemoryMigrate();
 	long int getMemoryLimitInBytes();
 	map<string, int> getMemoryStat();
-	int getMemSwappiness();
 	long int getMemoryUsageInBytes();
 	int getMemNotify();
-	bool setMemHardwall();
+	bool getMemHardwall();
 	string getMemReleaseAgent();
 	long int getMemoryFailCnt();
-	int getMemoryMoveChargeImmigrate();
 	int getMemoryUseHierarchy();
 	int getMemoryOOMControl();
 
-	void setCPUCfsPeriod(int period);
-	void setCPUCfsQuota(int quota);
+	string setNetPrioMap();
 	void setCPUCloneChildren(bool flag);
 	void setCPUProcs(int pid);
 	void setCPUShares(int share);	
 	void setCPUNotify(bool flag);
 	void setCPUReleaseAgentPath(string path);
 	void setCPUs(string cpus);
-	void setMems(string nodes);
-	void setMemoryMigrate(bool flag);
-	void setCPUExclusive(bool flag);
 	void setMemExclusive(bool flag);
 	void setMemHardwall(bool flag);
 	void setMemoryPressure(bool flag);
 	void setMemorySpreadPage(bool flag);
-	void setMemorySpreadSlab(bool flag);
-	void setSchedLoadBalance(bool flag);
 	
 };
 
