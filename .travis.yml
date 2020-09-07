@@ -2,7 +2,7 @@ language: cpp
 
 install:
   - ./configure
-  - make program-test
+  - make all
 
 script:
   - ./src/program-test
