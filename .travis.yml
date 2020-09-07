@@ -1,0 +1,9 @@
+language: cpp
+
+install:
+  - ./configure
+  - make program-test
+
+script:
+  - ./src/program-test
+
