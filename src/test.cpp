@@ -5,10 +5,10 @@
  **/
 #include <cassert>
 #include <iostream>
+#include <exception>
 #include "util.h"
 #include "cgroup.h"
 #include "configuration.h"
-#include <assert.h>
 
 using namespace std;
 void testBase64Encode(){
@@ -203,21 +203,27 @@ void testGetMemoryLimitInBytes(){
 
 
 int main(){
-	//Test util
-	testBase64Encode();
-	testBase64Decode();
-	testRandom();
-	testTrim();
-	testItos();
-	testToUppercase();
-	testCorrectFileName();
-	//Test config
-	//Test cgroup
-	testSetCgroupFileSystem();
-	testGetCPUAcctStat();
-	testGetCPUStat();
-	testGetMemoryStat();
-	testSetMemHardwall();
+	try {
+		//Test util
+		testBase64Encode();
+		testBase64Decode();
+		testRandom();
+		testTrim();
+		testItos();
+		testToUppercase();
+		testCorrectFileName();
+		//Test config
+		//Test cgroup
+		testSetCgroupFileSystem();
+		testGetCPUAcctStat();
+		testGetCPUStat();
+		testGetMemoryStat();
+		testSetMemHardwall();
+	} catch (exception &e) {
+		cerr << e.what() << endl;
+		return 1;
+	}
+	return 0;
 }
 
 
