@@ -5,8 +5,8 @@ install:
   - pwd
   - ls -l src
   - make distcheck
-  - tar xvf *.tar.gz
-  - cd vpl-jail-system-*.*.*
+  - tar xvf *.tar.gz ./package
+  - cd package
   - make all
 
 script:
