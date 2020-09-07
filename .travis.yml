@@ -2,11 +2,6 @@ language: cpp
 
 install:
   - ./configure
-  - pwd
-  - ls -l src
-  - make distcheck
-  - tar xvf *.tar.gz ./package
-  - cd package
   - make all
 
 script:
