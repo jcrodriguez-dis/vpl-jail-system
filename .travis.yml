@@ -2,6 +2,9 @@ language: cpp
 
 install:
   - ./configure
+  - make distcheck
+  - tar xvf *.tar.gz
+  - cd vpl-jail-system-*.*.*
   - make all
 
 script:
