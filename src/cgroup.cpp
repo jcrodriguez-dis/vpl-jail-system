@@ -20,7 +20,7 @@ string Cgroup::regFound(regex_t reg, string input){
 		match = "";
 	} else {
 		match = input.substr(found[0].rm_so, found[0].rm_eo);
-	}	
+	}
 	return match;
 }
 
@@ -29,20 +29,22 @@ map<string, int> Cgroup::getCPUAcctStat(){
 	string stat;
 	syslog(LOG_DEBUG, "Reading from the file '%s'", (cgroupDirectory + "cpu/cpuacct.stat").c_str());
 	stat = Util::readFile((cgroupDirectory + "cpu/cpuacct.stat").c_str());
+
 	string sUser = regFound(regUser, stat);
-	string sSytem = regFound(regSystem, stat);
-	// Comprobar regexec
-	// Comprobar resultado regcomp sea 0
+	sUser = sUser.substr(sUser.find(" "),sUser.length());
+	string sSystem = regFound(regSystem, stat);
+	sSystem = sSystem.substr(sSystem.find(" "),sSystem.length());
+
 	cpuStat["user"] = Util::atoi(sUser);
-	cpuStat["system"] = Util::atoi(sSytem);
+	cpuStat["system"] = Util::atoi(sSystem);
 	return cpuStat;
 }
 
 
-long int Cgroup::getCPUUsage(){
+int Cgroup::getCPUUsage(){
 	string path = cgroupDirectory + "cpu/cpuacct.usage";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	return Util::atol(Util::readFile((cgroupDirectory + "cpu/cpuacct.usage").c_str()));
+	return Util::atoi(Util::readFile((cgroupDirectory + "cpu/cpuacct.usage").c_str()));
 }
 
 int Cgroup::getNotify(){
@@ -68,9 +70,14 @@ map<string, int> Cgroup::getCPUStat(){
 	string path = cgroupDirectory + "cpu/cpu.stat";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	string stat = Util::readFile((cgroupDirectory + "cpu/cpu.stat").c_str());
+
 	string nrPeriods = regFound(regPeriods, stat);
+	nrPeriods = nrPeriods.substr(nrPeriods.find(" "),nrPeriods.length());
 	string nrThrottled = regFound(regThrottled, stat);
+	nrThrottled = nrThrottled.substr(nrThrottled.find(" "),nrThrottled.length());
 	string throttledTime = regFound(regThrottledTime, stat);
+	throttledTime = throttledTime.substr(throttledTime.find(" "),throttledTime.length());
+
 	cpuStat["nr_periods"] = Util::atoi(nrPeriods);
 	cpuStat["nr_throttled"] = Util::atoi(nrThrottled);
 	cpuStat["throttled_time"] = Util::atoi(throttledTime);
@@ -100,9 +107,9 @@ vector<int> Cgroup::getPIDs(){
 
 map<string, int> Cgroup::getNetPrioMap(){
 	map<string, int> netPrioMap;
-	string path = cgroupDirectory + "net_prio/net_prio.prioidx";
+	string path = cgroupDirectory + "net_prio/net_prio.ifpriomap";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	string stat = Util::readFile((cgroupDirectory + "cpu/cpu.stat").c_str());
+	string stat = Util::readFile((cgroupDirectory + "net_prio/net_prio.ifpriomap").c_str());
 	string eth0 = regFound(regEth0, stat);
 	string eth1 = regFound(regEth1, stat);
 	string lo = regFound(regLo, stat);
@@ -112,22 +119,10 @@ map<string, int> Cgroup::getNetPrioMap(){
 	return netPrioMap;
 }
 
-int Cgroup::getCloneChildren(){
-	string path = cgroupDirectory + "cpu/cgroup.clone_children";
-	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	return Util::atoi(Util::readFile((cgroupDirectory + "cpu/cgroup.clone_children").c_str()));
-}
-
 string Cgroup::getMemoryTasks(){
 	string path = cgroupDirectory + "memory/tasks";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::readFile((cgroupDirectory + "memory/tasks").c_str());
-}
-
-int Cgroup::getMemCloneChildren(){
-	string path = cgroupDirectory + "cpu/cgroup.clone_children";
-	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	return Util::atoi(Util::readFile((cgroupDirectory + "cpu/cgroup.clone_children").c_str()));
 }
 
 long int Cgroup::getMemoryLimitInBytes(){
@@ -144,10 +139,23 @@ map<string, int> Cgroup::getMemoryStat(){
 	stat = Util::readFile((cgroupDirectory + "memory/memory.stat").c_str());
 
 	string cache = regFound(regCache, stat);
+	cache = cache.substr(cache.find(" "),cache.length());
+
 	string shmem = regFound(regMem, stat);
+	shmem = shmem.substr(shmem.find(" "),shmem.length());
+	syslog(LOG_DEBUG, "shmem = '%s'", shmem.c_str());
+
 	string mappedFile = regFound(regMapped, stat);
+	mappedFile = mappedFile.substr(mappedFile.find(" "),mappedFile.length());
+	syslog(LOG_DEBUG, "mappedFile = '%s'", mappedFile.c_str());
+
 	string pgfault = regFound(regFault, stat);
+	pgfault = pgfault.substr(pgfault.find(" "),pgfault.length());
+	syslog(LOG_DEBUG, "pgfault = '%s'", pgfault.c_str());
+
 	string hierarchicalLimit = regFound(regHierarchical, stat);
+	hierarchicalLimit = hierarchicalLimit.substr(hierarchicalLimit.find(" "),hierarchicalLimit.length());
+
 	memStat["cache"] = Util::atoi(cache);
 	memStat["shmem"] = Util::atoi(shmem);
 	memStat["mapped_file"] = Util::atoi(mappedFile);
@@ -168,36 +176,10 @@ int Cgroup::getMemNotify(){
 	return Util::atoi(Util::readFile(cgroupDirectory + "memory/notify_on_release"));
 }
 
-bool Cgroup::getMemHardwall(){
-	string path = cgroupDirectory + "cpu/cpuset.mem_hardwall";
-	syslog(LOG_DEBUG,"Reading from the file '%s'", path.c_str());
-	if (Util::readFile(cgroupDirectory + "cpu/cpuset.mem_hardwall") == "1"){
-		return true;
-	} else {
-		return false;
-	}
-}
-
 string Cgroup::getMemReleaseAgent(){
 	string path = cgroupDirectory + "memory/release_agent";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::readFile(cgroupDirectory + "memory/release_agent");
-}
-
-long int Cgroup::getMemoryFailCnt(){
-	string path = cgroupDirectory + "memory/memory.usage_in_bytes";
-	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	return Util::atol(Util::readFile(cgroupDirectory + "memory/memory.failcnt"));
-}
-
-/**
- * Contains a flag that specifies whether memory usage should be accounted for throughout
- * a hierarchy of cgroups.
- */
-int Cgroup::getMemoryUseHierarchy(){
-	string path = cgroupDirectory + "memory/memory.use_hierarchy";
-	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	return Util::atoi(Util::readFile(cgroupDirectory + "memory/memory.use_hierarchy"));
 }
 
 /**
@@ -274,15 +256,6 @@ void Cgroup::setMemExclusive(bool flag){
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "cpu/cpuset.mem_exclusive");
 }
 
-/**
- * Contains a flag that specifies whether kernel allocations of memory page and
- * buffer data should be restricted to the memory nodes specified for the cpuset.
- */
-void Cgroup::setMemHardwall(bool flag){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "/cpu/cpuset.mem_hardwall");
-	Util::writeFile(cgroupDirectory + "cpu/cpuset.mem_hardwall",flag?"1":"0");
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "/cpu/cpuset.mem_hardwall");
-}
 
 /**
  * Contains a flag that specifies whether the system should compute the memory

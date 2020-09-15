@@ -41,15 +41,16 @@ public:
 	}
 	Cgroup(string name){
 		cgroupDirectory =  Cgroup::getBaseCgroupFileSystem() + "/" + name + "/";
-		regcomp(&regUser,"^user ([0-9]+)$",REG_EXTENDED);
-		regcomp(&regSystem,"^system ([0-9]+)$",REG_EXTENDED);
-		regcomp(&regPeriods,"^nr_periods ([0-9]+)$",REG_EXTENDED);
-		regcomp(&regThrottled,"^nr_throttled ([0-9]+)$",REG_EXTENDED);
-		regcomp(&regThrottledTime,"^throttled_time ([0-9]+)$",REG_EXTENDED);
-		regcomp(&regCache,"^cache ([0-9]+)$",REG_EXTENDED);
-		regcomp(&regMem,"^shmem ([0-9]+)$",REG_EXTENDED);
-		regcomp(&regMapped,"^mapped_file ([0-9]+)$",REG_EXTENDED);
-		regcomp(&regHierarchical,"^hierarchical_memory_limit ([0-9]+)$",REG_EXTENDED);
+		regcomp(&regUser,"^user [0-9]+",REG_EXTENDED); // [0-9]+$
+		regcomp(&regSystem,"[\n]system [0-9]+",REG_EXTENDED);
+		regcomp(&regPeriods,"^nr_periods [0-9]+",REG_EXTENDED);
+		regcomp(&regThrottled,"[\n]nr_throttled [0-9]+",REG_EXTENDED);
+		regcomp(&regThrottledTime,"[\n]throttled_time [0-9]+",REG_EXTENDED);
+		regcomp(&regCache,"^cache [0-9]+",REG_EXTENDED);
+		regcomp(&regMem,"[\n]shmem [0-9]+",REG_EXTENDED);
+		regcomp(&regMapped,"[\n]mapped_file [0-9]+",REG_EXTENDED);
+		regcomp(&regFault,"[\n]pgfault [0-9]+",REG_EXTENDED);
+		regcomp(&regHierarchical,"[\n]hierarchical_memory_limit [0-9]+",REG_EXTENDED);
 		regcomp(&regEth0,"^eth0 ([0-9]+)$",REG_EXTENDED);
 		regcomp(&regEth1,"^eth1 ([0-9]+)$",REG_EXTENDED);
 		regcomp(&regLo,"^lo ([0-9]+)$",REG_EXTENDED);
@@ -58,8 +59,9 @@ public:
 	~Cgroup(){
 		syslog(LOG_DEBUG, "Destructor called.");
 	}
+
 	map<string, int> getCPUAcctStat();
-	long int getCPUUsage();
+	int getCPUUsage();
 	map<string, int> getCPUStat();
 	int getNotify();
 	string getReleaseAgent();
@@ -67,17 +69,12 @@ public:
 	int getNetPrioID();
 	vector<int> getPIDs();
 	map<string, int> getNetPrioMap();
-	int getCloneChildren();
 	string getMemoryTasks();
-	int getMemCloneChildren();
 	long int getMemoryLimitInBytes();
 	map<string, int> getMemoryStat();
 	long int getMemoryUsageInBytes();
 	int getMemNotify();
-	bool getMemHardwall();
 	string getMemReleaseAgent();
-	long int getMemoryFailCnt();
-	int getMemoryUseHierarchy();
 	int getMemoryOOMControl();
 
 	string setNetPrioMap();
@@ -88,7 +85,6 @@ public:
 	void setCPUReleaseAgentPath(string path);
 	void setCPUs(string cpus);
 	void setMemExclusive(bool flag);
-	void setMemHardwall(bool flag);
 	void setMemoryPressure(bool flag);
 	void setMemorySpreadPage(bool flag);
 	
