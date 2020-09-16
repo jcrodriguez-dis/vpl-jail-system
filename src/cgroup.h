@@ -11,26 +11,31 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include <regex>
+
 using namespace std;
 
 class Cgroup {
 private:
 	static string baseCgroupFileSystem;
 	string cgroupDirectory;
-	regex_t regUser;
-	regex_t regSystem;
-	regex_t regPeriods;
-	regex_t regThrottled;
-	regex_t regThrottledTime;
-	regex_t regCache;
-	regex_t regMem;
-	regex_t regMapped;
-	regex_t regFault;
-	regex_t regHierarchical;
-	regex_t regEth0;
-	regex_t regEth1;
-	regex_t regLo;
-	string regFound(regex_t reg, string input);
+	static regex regUser;
+	static regex regSystem;
+	static regex regPeriods;
+	static regex regThrottled;
+	static regex regThrottledTime;
+	static regex regCache;
+	static regex regMem;
+	static regex regMapped;
+	static regex regFault;
+	static regex regHierarchical;
+	static regex regEth0;
+	static regex regEth1;
+	static regex regLo;
+	static regex regOOM;
+	static regex regUnder;
+	static regex regKill;
+	string regFound(regex &reg, string input);
 
 public:
 	static void setBaseCgroupFileSystem(string _baseCgroupFileSystem){
@@ -41,19 +46,7 @@ public:
 	}
 	Cgroup(string name){
 		cgroupDirectory =  Cgroup::getBaseCgroupFileSystem() + "/" + name + "/";
-		regcomp(&regUser,"^user [0-9]+",REG_EXTENDED); // [0-9]+$
-		regcomp(&regSystem,"[\n]system [0-9]+",REG_EXTENDED);
-		regcomp(&regPeriods,"^nr_periods [0-9]+",REG_EXTENDED);
-		regcomp(&regThrottled,"[\n]nr_throttled [0-9]+",REG_EXTENDED);
-		regcomp(&regThrottledTime,"[\n]throttled_time [0-9]+",REG_EXTENDED);
-		regcomp(&regCache,"^cache [0-9]+",REG_EXTENDED);
-		regcomp(&regMem,"[\n]shmem [0-9]+",REG_EXTENDED);
-		regcomp(&regMapped,"[\n]mapped_file [0-9]+",REG_EXTENDED);
-		regcomp(&regFault,"[\n]pgfault [0-9]+",REG_EXTENDED);
-		regcomp(&regHierarchical,"[\n]hierarchical_memory_limit [0-9]+",REG_EXTENDED);
-		regcomp(&regEth0,"^eth0 ([0-9]+)$",REG_EXTENDED);
-		regcomp(&regEth1,"^eth1 ([0-9]+)$",REG_EXTENDED);
-		regcomp(&regLo,"^lo ([0-9]+)$",REG_EXTENDED);
+
 	}
 
 	~Cgroup(){
@@ -61,7 +54,7 @@ public:
 	}
 
 	map<string, int> getCPUAcctStat();
-	int getCPUUsage();
+	long int getCPUUsage();
 	map<string, int> getCPUStat();
 	int getNotify();
 	string getReleaseAgent();
@@ -69,25 +62,22 @@ public:
 	int getNetPrioID();
 	vector<int> getPIDs();
 	map<string, int> getNetPrioMap();
-	string getMemoryTasks();
+	vector<int> getMemoryTasks();
 	long int getMemoryLimitInBytes();
-	map<string, int> getMemoryStat();
-	long int getMemoryUsageInBytes();
-	int getMemNotify();
-	string getMemReleaseAgent();
-	int getMemoryOOMControl();
+	map<string, long int> getMemoryStat();
+	long int getMemoryUsageInBytes(); //
+	int getMemNotify(); //
+	string getMemReleaseAgent(); //
+	map<string, int> getMemoryOOMControl(); //
 
-	string setNetPrioMap();
+	void setNetPrioMap(string interface);
 	void setCPUCloneChildren(bool flag);
 	void setCPUProcs(int pid);
-	void setCPUShares(int share);	
 	void setCPUNotify(bool flag);
 	void setCPUReleaseAgentPath(string path);
 	void setCPUs(string cpus);
-	void setMemExclusive(bool flag);
-	void setMemoryPressure(bool flag);
-	void setMemorySpreadPage(bool flag);
 	
+
 };
 
 

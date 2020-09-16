@@ -11,7 +11,6 @@
 #include "configuration.h"
 #include <syslog.h>
 #include <stdio.h>
-#define GetCurrentDir getcwd
 
 using namespace std;
 void testBase64Encode(){
@@ -120,114 +119,232 @@ void testSetCgroupFileSystem(){
 	assert(Cgroup::getBaseCgroupFileSystem() == " ");
 }
 
-void testGetCPUAcctStat(string currentWorkingDir){
+void testGetCPUAcctStat(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
 	map<string, int> result = cgroup.getCPUAcctStat();
 	assert(result.find("user")->second == 36509);
 	assert(result.find("system")->second == 3764);
-	assert(!result.count(" "));
-	assert(!result.count("usersystem"));
-	assert(!result.count("user "));
 }
 
 void testGetCPUStat(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
 	map<string, int> result = cgroup.getCPUStat();
 	assert(result.find("nr_throttled")->second == 0);
 	assert(result.find("nr_periods")->second == 0);
 	assert(result.find("throttled_time")->second == 0);
-	assert(!result.count("throttled_time "));
-	assert(!result.count(" nr_periods"));
 }
 
 void testGetMemoryStat(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
-	map<string, int> result = cgroup.getMemoryStat();
+	map<string, long int> result = cgroup.getMemoryStat();
 	assert(result.find("cache")->second == 1626644480);
 	assert(result.find("shmem")->second == 26406912);
 	assert(result.find("mapped_file")->second == 351842304);
 	assert(result.find("pgfault")->second == 2448732);
-	//assert(result.find("hierarchical_memory_limit")->second == 9223372036854771712);
+	assert(result.find("hierarchical_memory_limit")->second == 9223372036854771712);
 }
 
 void testGetCPUUsage(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
-	int result = cgroup.getCPUUsage();
+	long int result = cgroup.getCPUUsage();
 	assert(result == 406582887060);
-	assert(result != 0);
-	assert(result != 40658288706);
-	assert(result != 6582887060);
 }
 
 void testGetNotify(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
 	int result = cgroup.getNotify();
 	assert(result == 0);
-	assert(result != 1);
-	assert(result < 2);
-	assert(result >= 0);
 }
 
 void testGetReleaseAgent(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
 	string result = cgroup.getReleaseAgent();
 	assert(result == "0");
-	assert(result != "1");
-	assert(result != "2");
-	assert(result != "");
 }
 
 void testGetCPUTasks(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
 	string tasks = cgroup.getCPUTasks();
-	assert(tasks.find("4") != string::npos);
+	assert(tasks.find("6") != string::npos);
 	assert(tasks.find("2172") != string::npos);
-	assert(tasks.find("5") == string::npos);
+	assert(tasks.find("8") != string::npos);
 	assert(tasks.find("4735") != string::npos);
 }
 
 void testGetNetPrioID(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
 	int prioId = cgroup.getNetPrioID();
 	assert(prioId == 1);
-	assert(prioId != 0);
-	assert(prioId >= 0);
-	assert(prioId < 2);
 }
 
 void testGetPIDs(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
 	vector<int> pids = cgroup.getPIDs();
-
+	assert(count(pids.begin(), pids.end(), 1));
+	assert(count(pids.begin(), pids.end(), 128));
+	assert(count(pids.begin(), pids.end(), 3116));
+	assert(count(pids.begin(), pids.end(), 1366));
 }
 
 void testGetNetPrioMap(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
 	map<string, int> prioMap = cgroup.getNetPrioMap();
-
+	assert(prioMap.find("lo")->second == 0);
 }
 
 void testGetMemoryTasks(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
-	string tasks = cgroup.getMemoryTasks();
-
+	vector<int> tasks = cgroup.getMemoryTasks();
+	assert(count(tasks.begin(), tasks.end(), 4745));
+	assert(count(tasks.begin(), tasks.end(), 4743));
+	assert(count(tasks.begin(), tasks.end(), 1));
+	assert(count(tasks.begin(), tasks.end(), 2));
 }
 
 void testGetMemoryLimitInBytes(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
 	long int limit = cgroup.getMemoryLimitInBytes();
-
+	assert(limit == 9223372036854771712);
 }
 
+void testGetMemoryUsageInBytes(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+	long int usage = cgroup.getMemoryUsageInBytes();
+	assert(usage == 3502428160);
+}
 
+void testGetMemNotify(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+	int notify = cgroup.getMemNotify();
+	assert(notify == 0);
+}
 
+void testGetMemReleaseAgent(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+	int releaseAgent = Util::atoi(cgroup.getReleaseAgent());
+	assert(releaseAgent == 0);
+}
+
+void testGetMemoryOOMControl(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+	map<string, int> oomControl = cgroup.getMemoryOOMControl();
+	assert(oomControl.find("oom_kill_disable")->second == 0);
+	assert(oomControl.find("under_oom")->second == 0);
+	assert(oomControl.find("oom_kill")->second == 0);
+}
+
+void testSetNetPrioMap(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+	cgroup.setNetPrioMap("eth0 1");
+	map<string, int> prioMap = cgroup.getNetPrioMap();
+	assert(prioMap.find("eth0")->second == 1);
+}
+void testSetCPUCloneChildren(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+}
+void testSetCPUProcs(){
+	char buff[FILENAME_MAX];
+		assert(getcwd(buff, FILENAME_MAX) != NULL);
+		string currentWorkingDir(buff);
+		Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+		Cgroup cgroup("cgroup");
+}
+void testSetCPUNotify(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+}
+void testSetCPUReleaseAgentPath(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+}
+void testSetCPUs(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+}
 
 int main(){
 	bool firstTime = true;
-	char buff[FILENAME_MAX];
-	GetCurrentDir(buff, FILENAME_MAX);
-	std::string currentWorkingDir(buff);
 	while(true){
 		try {
 			//Test util
@@ -241,9 +358,28 @@ int main(){
 			//Test config
 			//Test cgroup
 			testSetCgroupFileSystem();
-			testGetCPUAcctStat(currentWorkingDir);
+			testGetCPUAcctStat();
 			testGetCPUStat();
 			testGetMemoryStat();
+			testGetCPUUsage();
+			testGetNotify();
+			testGetReleaseAgent();
+			testGetCPUTasks();
+			testGetNetPrioID();
+			testGetPIDs();
+			testGetNetPrioMap();
+			testGetMemoryTasks();
+			testGetMemoryLimitInBytes();
+			testGetMemoryUsageInBytes();
+			testGetMemNotify();
+			testGetMemReleaseAgent();
+			testGetMemoryOOMControl();
+			testSetNetPrioMap();
+			testSetCPUCloneChildren();
+			testSetCPUProcs();
+			testSetCPUNotify();
+			testSetCPUReleaseAgentPath();
+			testSetCPUs();
 		} catch (exception &e) {
 			cerr << e.what() << endl;
 			if (firstTime){
