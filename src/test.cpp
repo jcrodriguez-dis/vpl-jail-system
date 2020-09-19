@@ -166,14 +166,14 @@ void testGetCPUUsage(){
 	assert(result == 406582887060);
 }
 
-void testGetNotify(){
+void testGetCPUNotify(){
 	char buff[FILENAME_MAX];
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
-	int result = cgroup.getNotify();
-	assert(result == 0);
+	int result = cgroup.getCPUNotify();
+	assert(result == 1);
 }
 
 void testGetReleaseAgent(){
@@ -182,21 +182,21 @@ void testGetReleaseAgent(){
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
-	string result = cgroup.getReleaseAgent();
+	string result = cgroup.getCPUReleaseAgent();
 	assert(result == "0");
 }
 
-void testGetCPUTasks(){
+void testGetCPUProcs(){
 	char buff[FILENAME_MAX];
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
-	string tasks = cgroup.getCPUTasks();
-	assert(tasks.find("6") != string::npos);
-	assert(tasks.find("2172") != string::npos);
-	assert(tasks.find("8") != string::npos);
-	assert(tasks.find("4735") != string::npos);
+	vector<int> pids = cgroup.getCPUProcs();
+	assert(count(pids.begin(), pids.end(), 1));
+	assert(count(pids.begin(), pids.end(), 4735));
+	assert(count(pids.begin(), pids.end(), 4730));
+	assert(count(pids.begin(), pids.end(), 8));
 }
 
 void testGetNetPrioID(){
@@ -232,17 +232,15 @@ void testGetNetPrioMap(){
 	assert(prioMap.find("lo")->second == 0);
 }
 
-void testGetMemoryTasks(){
+void testGetMemoryProcs(){
 	char buff[FILENAME_MAX];
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
-	vector<int> tasks = cgroup.getMemoryTasks();
-	assert(count(tasks.begin(), tasks.end(), 4745));
-	assert(count(tasks.begin(), tasks.end(), 4743));
-	assert(count(tasks.begin(), tasks.end(), 1));
-	assert(count(tasks.begin(), tasks.end(), 2));
+	vector<int> tasks = cgroup.getMemoryProcs();
+	assert(count(tasks.begin(), tasks.end(), 555));
+	assert(count(tasks.begin(), tasks.end(), 7));
 }
 
 void testGetMemoryLimitInBytes(){
@@ -252,7 +250,7 @@ void testGetMemoryLimitInBytes(){
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
 	long int limit = cgroup.getMemoryLimitInBytes();
-	assert(limit == 9223372036854771712);
+	assert(limit == 2147483648);
 }
 
 void testGetMemoryUsageInBytes(){
@@ -281,7 +279,7 @@ void testGetMemReleaseAgent(){
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
-	int releaseAgent = Util::atoi(cgroup.getReleaseAgent());
+	int releaseAgent = Util::atoi(cgroup.getMemReleaseAgent());
 	assert(releaseAgent == 0);
 }
 
@@ -307,26 +305,14 @@ void testSetNetPrioMap(){
 	map<string, int> prioMap = cgroup.getNetPrioMap();
 	assert(prioMap.find("eth0")->second == 1);
 }
-void testSetCPUCloneChildren(){
-	char buff[FILENAME_MAX];
-	assert(getcwd(buff, FILENAME_MAX) != NULL);
-	string currentWorkingDir(buff);
-	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
-}
-void testSetCPUProcs(){
-	char buff[FILENAME_MAX];
-		assert(getcwd(buff, FILENAME_MAX) != NULL);
-		string currentWorkingDir(buff);
-		Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-		Cgroup cgroup("cgroup");
-}
 void testSetCPUNotify(){
 	char buff[FILENAME_MAX];
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
+	cgroup.setCPUNotify(true);
+	assert(cgroup.getCPUNotify() == 1);
 }
 void testSetCPUReleaseAgentPath(){
 	char buff[FILENAME_MAX];
@@ -334,13 +320,60 @@ void testSetCPUReleaseAgentPath(){
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
+	cgroup.setCPUReleaseAgentPath("0");
+	assert(cgroup.getCPUReleaseAgent() == "0");
 }
-void testSetCPUs(){
+
+void testSetCPUProcs(){
 	char buff[FILENAME_MAX];
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup");
+	cgroup.setCPUProcs(999);
+	vector<int> procs = cgroup.getCPUProcs();
+	assert(count(procs.begin(), procs.end(), 999));
+}
+
+void testSetMemoryProcs(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+	cgroup.setMemoryProcs(1);
+	vector<int> procs = cgroup.getMemoryProcs();
+	assert(count(procs.begin(), procs.end(), 1));
+}
+
+void testSetMemoryLimitInBytes(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+	cgroup.setMemoryLimitInBytes(2147483648);
+	assert(cgroup.getMemoryLimitInBytes() == 2147483648);
+}
+
+void testSetMemNotify(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+	cgroup.setMemNotify(false);
+	assert(cgroup.getMemNotify() == 0);
+}
+
+void testSetMemReleaseAgentPath(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup");
+	cgroup.setMemReleaseAgentPath("0");
+	assert(cgroup.getMemReleaseAgent() == "0");
 }
 
 int main(){
@@ -362,24 +395,26 @@ int main(){
 			testGetCPUStat();
 			testGetMemoryStat();
 			testGetCPUUsage();
-			testGetNotify();
+			testGetCPUNotify();
 			testGetReleaseAgent();
-			testGetCPUTasks();
+			testGetCPUProcs();
 			testGetNetPrioID();
 			testGetPIDs();
 			testGetNetPrioMap();
-			testGetMemoryTasks();
+			testGetMemoryProcs();
 			testGetMemoryLimitInBytes();
 			testGetMemoryUsageInBytes();
 			testGetMemNotify();
 			testGetMemReleaseAgent();
 			testGetMemoryOOMControl();
 			testSetNetPrioMap();
-			testSetCPUCloneChildren();
-			testSetCPUProcs();
 			testSetCPUNotify();
 			testSetCPUReleaseAgentPath();
-			testSetCPUs();
+			testSetMemoryProcs();
+			testSetMemoryLimitInBytes();
+			testSetMemNotify();
+			testSetMemReleaseAgentPath();
+			testSetCPUProcs();
 		} catch (exception &e) {
 			cerr << e.what() << endl;
 			if (firstTime){

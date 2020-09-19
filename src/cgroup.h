@@ -12,9 +12,14 @@
 #include <map>
 #include <vector>
 #include <regex>
-
+#include <fstream>
 using namespace std;
 
+/**
+ * Interface designed for a better management of CPU, memory and net resources
+ * Please, note that some of the interface's setters will require the user
+ * to be part of the cgroup that is being modified
+ */
 class Cgroup {
 private:
 	static string baseCgroupFileSystem;
@@ -41,9 +46,11 @@ public:
 	static void setBaseCgroupFileSystem(string _baseCgroupFileSystem){
 		baseCgroupFileSystem = _baseCgroupFileSystem;
 	}
+
 	static string getBaseCgroupFileSystem(){
 		return baseCgroupFileSystem;
 	}
+
 	Cgroup(string name){
 		cgroupDirectory =  Cgroup::getBaseCgroupFileSystem() + "/" + name + "/";
 
@@ -56,28 +63,27 @@ public:
 	map<string, int> getCPUAcctStat();
 	long int getCPUUsage();
 	map<string, int> getCPUStat();
-	int getNotify();
-	string getReleaseAgent();
-	string getCPUTasks();
+	int getCPUNotify();
+	string getCPUReleaseAgent();
+	vector<int> getCPUProcs();
 	int getNetPrioID();
 	vector<int> getPIDs();
 	map<string, int> getNetPrioMap();
-	vector<int> getMemoryTasks();
+	vector<int> getMemoryProcs();
 	long int getMemoryLimitInBytes();
 	map<string, long int> getMemoryStat();
-	long int getMemoryUsageInBytes(); //
-	int getMemNotify(); //
-	string getMemReleaseAgent(); //
-	map<string, int> getMemoryOOMControl(); //
+	long int getMemoryUsageInBytes();
+	int getMemNotify();
+	string getMemReleaseAgent();
+	map<string, int> getMemoryOOMControl();
 
 	void setNetPrioMap(string interface);
-	void setCPUCloneChildren(bool flag);
 	void setCPUProcs(int pid);
 	void setCPUNotify(bool flag);
 	void setCPUReleaseAgentPath(string path);
-	void setCPUs(string cpus);
-	
+	void setMemoryProcs(int pid);
+	void setMemoryLimitInBytes(long int bytes);
+	void setMemNotify(bool flag);
+	void setMemReleaseAgentPath(string path);
 
 };
-
-

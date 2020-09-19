@@ -25,6 +25,7 @@ regex Cgroup::regLo("(^|\\n)lo ([0-9]+)(\\n|$)");
 regex Cgroup::regOOM("(^|\\n)oom_kill_disable ([0-9]+)(\\n|$)");
 regex Cgroup::regUnder("(^|\\n)under_oom ([0-9]+)(\\n|$)");
 regex Cgroup::regKill("(^|\\n)oom_kill ([0-9]+)(\\n|$)");
+
 string Cgroup::regFound(regex &reg, string input){
 	smatch found;
 	string match;
@@ -56,22 +57,30 @@ long int Cgroup::getCPUUsage(){
 	return Util::atol(Util::readFile((cgroupDirectory + "cpu/cpuacct.usage")));
 }
 
-int Cgroup::getNotify(){
+int Cgroup::getCPUNotify(){
 	string path = cgroupDirectory + "cpu/notify_on_release";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::atoi(Util::readFile((cgroupDirectory + "cpu/notify_on_release").c_str()));
 }
 
-string Cgroup::getReleaseAgent(){
+string Cgroup::getCPUReleaseAgent(){
 	string path = cgroupDirectory + "cpu/release_agent";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::readFile((cgroupDirectory + "cpu/release_agent").c_str());
 }
 
-string Cgroup::getCPUTasks(){
+vector<int> Cgroup::getCPUProcs(){
 	string path = cgroupDirectory + "cpu/tasks";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	return Util::readFile((cgroupDirectory + "cpu/tasks").c_str());
+	string procs = Util::readFile((cgroupDirectory + "cpu/tasks").c_str());
+	vector<int> pids;
+	size_t pos = 0;
+	size_t ini = 0;
+	while((pos = procs.find('\n', ini)) != string::npos){
+		pids.push_back(Util::atoi(procs.substr(ini, pos)));
+		ini = pos + 1;
+	}
+	return pids;
 }
 
 map<string, int> Cgroup::getCPUStat(){
@@ -124,7 +133,7 @@ map<string, int> Cgroup::getNetPrioMap(){
 	return netPrioMap;
 }
 
-vector<int> Cgroup::getMemoryTasks(){
+vector<int> Cgroup::getMemoryProcs(){
 	string path = cgroupDirectory + "memory/tasks";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	string file = Util::readFile((cgroupDirectory + "memory/tasks").c_str());
@@ -183,9 +192,6 @@ string Cgroup::getMemReleaseAgent(){
 	return Util::readFile(cgroupDirectory + "memory/release_agent");
 }
 
-/**
- * Contains a flag that enables or disables the Out of Memory killer for a cgroup.
- */
 map<string, int> Cgroup::getMemoryOOMControl(){
 	string path = cgroupDirectory + "memory/memory.oom_control";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
@@ -212,23 +218,19 @@ void Cgroup::setNetPrioMap(string interface){
 	Util::writeFile(cgroupDirectory + "net_prio/net_prio.ifpriomap",interface);
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "net_prio/net_prio.ifpriomap");
 }
+
 /**
- * If the clone_children flag is enabled in a cgroup, a new cpuset cgroup
- * will copy its configuration from the parent during initialization
- */
-void Cgroup::setCPUCloneChildren(bool flag){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu/cgroup.clone_children");
-	Util::writeFile(cgroupDirectory + "cpu/cgroup.clone_children",flag?"1":"0");
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cpu/cgroup.clone_children");
-}
-/**
- * Insert a process' PID to allow it to be in the CPU's controllers
+ * Insert a process' PID to allow it to be in the CPU controllers
  */
 void Cgroup::setCPUProcs(int pid){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu/cgroup.procs");
-	Util::writeFile(cgroupDirectory + "cpu/cgroup.procs",Util::itos(pid));
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "/pu/cgroup.procs");
-}
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu/tasks");
+	ofstream file;
+	file.open(cgroupDirectory + "cpu/tasks", fstream::app);
+	if (file.is_open()){
+		file << Util::itos(pid) + '\n';
+		syslog(LOG_DEBUG,"'%s' has been successfully written", "cpu/tasks");
+	}
+	file.close();}
 
 /**
  * Contains a flag that indicates whether the cgroup will notify when
@@ -242,7 +244,7 @@ void Cgroup::setCPUNotify(bool flag){
 
 /**
  * Specifies the path to the file in which the cgroup will notify
- * when it's empty. This requires the flag in notify_on_release to be set to 1
+ * when the cpu tasks file is empty. This requires the flag in notify_on_release to be set to 1
  */
 void Cgroup::setCPUReleaseAgentPath(string path){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu/release_agent");
@@ -251,12 +253,44 @@ void Cgroup::setCPUReleaseAgentPath(string path){
 }
 
 /**
- * Specifies the CPUs that tasks in this cgroup are permitted to access.
- * This is a comma-separated list, with dashes to represent ranges.
- * For example: 0-2,16
+ * Insert a process' PID to allow it to be in the memory controllers
  */
-void Cgroup::setCPUs(string cpus){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpuset/cpuset.cpus");
-	Util::writeFile(cgroupDirectory + "cpuset/cpuset.cpus",cpus);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cpuset/cpuset.cpus");
+void Cgroup::setMemoryProcs(int pid){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "memory/tasks");
+	ofstream file;
+	file.open(cgroupDirectory + "memory/tasks", fstream::app);
+	if (file.is_open()){
+		file << Util::itos(pid) + '\n';
+		syslog(LOG_DEBUG,"'%s' has been successfully written", "memory/tasks");
+	}
+	file.close();
+}
+
+/**
+ * Set a limit in bytes for the memory controller
+ */
+void Cgroup::setMemoryLimitInBytes(long int bytes){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "memory/memory.limit_in_bytes");
+	Util::writeFile(cgroupDirectory + "memory/memory.limit_in_bytes",Util::itos(bytes));
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "memory/memory.limit_in_bytes");
+}
+
+/**
+ * Contains a flag that indicates whether the cgroup will notify when
+ * the memory controller has no processes in it
+ */
+void Cgroup::setMemNotify(bool flag){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "memory/notify_on_release");
+	Util::writeFile(cgroupDirectory + "memory/notify_on_release",flag?"1":"0");
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "memory/notify_on_release");
+}
+
+/**
+ * Specifies the path to the file in which the cgroup will notify
+ * when the memory tasks file is empty. This requires the flag in notify_on_release to be set to 1
+ */
+void Cgroup::setMemReleaseAgentPath(string path){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "memory/release_agent");
+	Util::writeFile(cgroupDirectory + "memory/release_agent",path);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "memory/release_agent");
 }
