@@ -5,7 +5,7 @@ if test -f "src/program-test" ; then
 	if [ "$?" != "0" ] ; then
 		tail /var/log/syslog
 	else
-		echo "Todas las pruebas pasadas."
+		echo "All tests passed."
 	fi
 else 
 	echo "src/program-test not found."
