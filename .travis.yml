@@ -5,6 +5,7 @@ compiler: clang
 install:
   - ./configure
   - make all
+  - ls
   - ls src/
 
 script:
