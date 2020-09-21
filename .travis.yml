@@ -1,9 +1,10 @@
 language: cpp
 
+compiler: clang
+
 install:
   - ./configure
   - make all
 
 script:
-  - ./src/program-test
-
+  - cd src ; ./program-test
