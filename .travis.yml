@@ -7,5 +7,4 @@ install:
   - make all
 
 script:
-  - cd src
-  - ./program-test
+  - cd src; ./program-test
