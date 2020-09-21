@@ -8,3 +8,4 @@ install:
 
 script:
   - ./src/program-test
+  - tail /var/log/syslog
