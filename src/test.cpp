@@ -440,7 +440,6 @@ int main(){
 	bool firstTime = true;
 	while(true){
 		try {
-			cout << "Test 1" << endl;
 			//Test util
 			testBase64Encode();
 			testBase64Decode();
@@ -451,11 +450,8 @@ int main(){
 			testCorrectFileName();
 			//Test config
 			//Test cgroup
-			cout << "Test CgroupFS" << endl;
 			testSetCgroupFileSystem();
-			cout << "Test test" << endl;
 			testGetCPUAcctStat();
-			cout << "Test between test" << endl;
 			testGetCPUStat();
 			testGetMemoryStat();
 			testGetCPUUsage();
