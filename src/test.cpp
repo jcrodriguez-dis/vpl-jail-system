@@ -473,6 +473,7 @@ int main(){
 			testGetMemoryUsageInBytes();
 			testGetMemNotify();
 			testGetMemReleaseAgent();
+			cout << "Test between test" << endl;
 			testGetMemoryOOMControl();
 			testSetNetPrioMap();
 			testSetNetProcs();
