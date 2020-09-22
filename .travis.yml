@@ -4,7 +4,6 @@ compiler: clang
 
 install:
   - ./configure
-  - make all
 
 script:
-  - cd src ; ./program-test
+  - ./runTest.sh
