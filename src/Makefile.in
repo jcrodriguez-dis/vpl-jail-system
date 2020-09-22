@@ -299,6 +299,13 @@ cgroup.cpp cgroup.h\
 websocket.cpp websocket.h\
 util.cpp util.h rpc.h xml.h jail_limits.h lock.h
 
+
+# set the include path found by configure
+#INCLUDES= $(all_includes)
+
+# the library search path.
+#AM_LDFLAGS = $(all_libraries)
+AM_CXXFLAGS = -std=c++11
 all: all-am
 
 .SUFFIXES:
@@ -627,12 +634,6 @@ uninstall-am: uninstall-binPROGRAMS
 
 .PRECIOUS: Makefile
 
-
-# set the include path found by configure
-#INCLUDES= $(all_includes)
-
-# the library search path.
-#AM_LDFLAGS = $(all_libraries)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

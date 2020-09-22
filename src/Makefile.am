@@ -24,3 +24,5 @@ util.cpp util.h rpc.h xml.h jail_limits.h lock.h
 
 # the library search path.
 #AM_LDFLAGS = $(all_libraries)
+
+AM_CXXFLAGS = -std=c++11
