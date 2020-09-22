@@ -125,7 +125,7 @@ void testGetCPUAcctStat(){
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup.test");
-	cout << Cgroup::getBaseCgroupFileSystem << endl;
+	cout << Cgroup::getBaseCgroupFileSystem() << endl;
 	map<string, int> result = cgroup.getCPUAcctStat();
 	assert(result.find("user")->second == 36509);
 	assert(result.find("system")->second == 3764);
