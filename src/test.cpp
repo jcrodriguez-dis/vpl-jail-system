@@ -124,7 +124,7 @@ void testGetCPUAcctStat(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	map<string, int> result = cgroup.getCPUAcctStat();
 	assert(result.find("user")->second == 36509);
 	assert(result.find("system")->second == 3764);
@@ -135,7 +135,7 @@ void testGetCPUStat(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	map<string, int> result = cgroup.getCPUStat();
 	assert(result.find("nr_throttled")->second == 0);
 	assert(result.find("nr_periods")->second == 0);
@@ -147,7 +147,7 @@ void testGetMemoryStat(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	map<string, long int> result = cgroup.getMemoryStat();
 	assert(result.find("cache")->second == 1626644480);
 	assert(result.find("shmem")->second == 26406912);
@@ -161,7 +161,7 @@ void testGetCPUUsage(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	long int result = cgroup.getCPUUsage();
 	assert(result == 406582887060);
 }
@@ -171,7 +171,7 @@ void testGetCPUNotify(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	int result = cgroup.getCPUNotify();
 	assert(result == 1);
 }
@@ -181,7 +181,7 @@ void testGetReleaseAgent(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	string result = cgroup.getCPUReleaseAgent();
 	assert(result == "0");
 }
@@ -191,7 +191,7 @@ void testGetCPUProcs(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	vector<int> pids = cgroup.getCPUProcs();
 	assert(count(pids.begin(), pids.end(), 1));
 	assert(count(pids.begin(), pids.end(), 4735));
@@ -204,7 +204,7 @@ void testGetNetPrioID(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	int prioId = cgroup.getNetPrioID();
 	assert(prioId == 1);
 }
@@ -214,7 +214,7 @@ void testGetPIDs(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	vector<int> pids = cgroup.getPIDs();
 	assert(count(pids.begin(), pids.end(), 1));
 	assert(count(pids.begin(), pids.end(), 128));
@@ -227,17 +227,47 @@ void testGetNetPrioMap(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	map<string, int> prioMap = cgroup.getNetPrioMap();
 	assert(prioMap.find("lo")->second == 0);
 }
 
+void testGetNetNotify(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup.test");
+	int notify = cgroup.getNetNotify();
+	assert(notify == 0);
+}
+
+void testGetNetReleaseAgent(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup.test");
+	int releaseAgent = Util::atoi(cgroup.getNetReleaseAgent());
+	assert(releaseAgent == 0);
+}
+
+void testGetNetProcs(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup.test");
+	vector<int> tasks = cgroup.getNetProcs();
+	assert(count(tasks.begin(), tasks.end(), 1));
+	assert(count(tasks.begin(), tasks.end(), 4745));
+}
 void testGetMemoryProcs(){
 	char buff[FILENAME_MAX];
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	vector<int> tasks = cgroup.getMemoryProcs();
 	assert(count(tasks.begin(), tasks.end(), 555));
 	assert(count(tasks.begin(), tasks.end(), 7));
@@ -248,7 +278,7 @@ void testGetMemoryLimitInBytes(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	long int limit = cgroup.getMemoryLimitInBytes();
 	assert(limit == 2147483648);
 }
@@ -258,7 +288,7 @@ void testGetMemoryUsageInBytes(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	long int usage = cgroup.getMemoryUsageInBytes();
 	assert(usage == 3502428160);
 }
@@ -268,7 +298,7 @@ void testGetMemNotify(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	int notify = cgroup.getMemNotify();
 	assert(notify == 0);
 }
@@ -278,7 +308,7 @@ void testGetMemReleaseAgent(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	int releaseAgent = Util::atoi(cgroup.getMemReleaseAgent());
 	assert(releaseAgent == 0);
 }
@@ -288,7 +318,7 @@ void testGetMemoryOOMControl(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	map<string, int> oomControl = cgroup.getMemoryOOMControl();
 	assert(oomControl.find("oom_kill_disable")->second == 0);
 	assert(oomControl.find("under_oom")->second == 0);
@@ -300,17 +330,47 @@ void testSetNetPrioMap(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	cgroup.setNetPrioMap("eth0 1");
 	map<string, int> prioMap = cgroup.getNetPrioMap();
 	assert(prioMap.find("eth0")->second == 1);
+}
+
+void testSetNetNotify(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup.test");
+	cgroup.setNetNotify(true);
+	assert(cgroup.getNetNotify() == 1);
+}
+
+void testSetNetReleaseAgent(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup.test");
+	cgroup.setNetReleaseAgent("0");
+	assert(cgroup.getNetReleaseAgent() == "0");
+}
+void testSetNetProcs(){
+	char buff[FILENAME_MAX];
+	assert(getcwd(buff, FILENAME_MAX) != NULL);
+	string currentWorkingDir(buff);
+	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
+	Cgroup cgroup("cgroup.test");
+	cgroup.setNetProcs(999);
+	vector<int> procs = cgroup.getNetProcs();
+	assert(count(procs.begin(), procs.end(), 999));
 }
 void testSetCPUNotify(){
 	char buff[FILENAME_MAX];
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	cgroup.setCPUNotify(true);
 	assert(cgroup.getCPUNotify() == 1);
 }
@@ -319,7 +379,7 @@ void testSetCPUReleaseAgentPath(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	cgroup.setCPUReleaseAgentPath("0");
 	assert(cgroup.getCPUReleaseAgent() == "0");
 }
@@ -329,7 +389,7 @@ void testSetCPUProcs(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	cgroup.setCPUProcs(999);
 	vector<int> procs = cgroup.getCPUProcs();
 	assert(count(procs.begin(), procs.end(), 999));
@@ -340,7 +400,7 @@ void testSetMemoryProcs(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	cgroup.setMemoryProcs(1);
 	vector<int> procs = cgroup.getMemoryProcs();
 	assert(count(procs.begin(), procs.end(), 1));
@@ -351,7 +411,7 @@ void testSetMemoryLimitInBytes(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	cgroup.setMemoryLimitInBytes(2147483648);
 	assert(cgroup.getMemoryLimitInBytes() == 2147483648);
 }
@@ -361,7 +421,7 @@ void testSetMemNotify(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	cgroup.setMemNotify(false);
 	assert(cgroup.getMemNotify() == 0);
 }
@@ -371,7 +431,7 @@ void testSetMemReleaseAgentPath(){
 	assert(getcwd(buff, FILENAME_MAX) != NULL);
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
-	Cgroup cgroup("cgroup");
+	Cgroup cgroup("cgroup.test");
 	cgroup.setMemReleaseAgentPath("0");
 	assert(cgroup.getMemReleaseAgent() == "0");
 }
@@ -399,8 +459,11 @@ int main(){
 			testGetReleaseAgent();
 			testGetCPUProcs();
 			testGetNetPrioID();
+			testGetNetNotify();
+			testGetNetReleaseAgent();
 			testGetPIDs();
 			testGetNetPrioMap();
+			testGetNetProcs();
 			testGetMemoryProcs();
 			testGetMemoryLimitInBytes();
 			testGetMemoryUsageInBytes();
@@ -408,6 +471,9 @@ int main(){
 			testGetMemReleaseAgent();
 			testGetMemoryOOMControl();
 			testSetNetPrioMap();
+			testSetNetProcs();
+			testSetNetNotify();
+			testSetNetReleaseAgent();
 			testSetCPUNotify();
 			testSetCPUReleaseAgentPath();
 			testSetMemoryProcs();

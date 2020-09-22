@@ -40,6 +40,7 @@ private:
 	static regex regOOM;
 	static regex regUnder;
 	static regex regKill;
+	static regex regTrim;
 	string regFound(regex &reg, string input);
 
 public:
@@ -69,6 +70,9 @@ public:
 	int getNetPrioID();
 	vector<int> getPIDs();
 	map<string, int> getNetPrioMap();
+	int getNetNotify();
+	string getNetReleaseAgent();
+	vector<int> getNetProcs();
 	vector<int> getMemoryProcs();
 	long int getMemoryLimitInBytes();
 	map<string, long int> getMemoryStat();
@@ -78,6 +82,9 @@ public:
 	map<string, int> getMemoryOOMControl();
 
 	void setNetPrioMap(string interface);
+	void setNetNotify(bool flag);
+	void setNetReleaseAgent(string path);
+	void setNetProcs(int pid);
 	void setCPUProcs(int pid);
 	void setCPUNotify(bool flag);
 	void setCPUReleaseAgentPath(string path);

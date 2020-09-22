@@ -25,6 +25,7 @@ regex Cgroup::regLo("(^|\\n)lo ([0-9]+)(\\n|$)");
 regex Cgroup::regOOM("(^|\\n)oom_kill_disable ([0-9]+)(\\n|$)");
 regex Cgroup::regUnder("(^|\\n)under_oom ([0-9]+)(\\n|$)");
 regex Cgroup::regKill("(^|\\n)oom_kill ([0-9]+)(\\n|$)");
+regex Cgroup::regTrim("([ \\n\\t]*)([^ \\n\\t]+)([ \\n\\t]*)");
 
 string Cgroup::regFound(regex &reg, string input){
 	smatch found;
@@ -39,8 +40,8 @@ string Cgroup::regFound(regex &reg, string input){
 map<string, int> Cgroup::getCPUAcctStat(){
 	map<string, int> cpuStat;
 	string stat;
-	syslog(LOG_DEBUG, "Reading from the file '%s'", (cgroupDirectory + "cpu/cpuacct.stat").c_str());
-	stat = Util::readFile((cgroupDirectory + "cpu/cpuacct.stat").c_str());
+	syslog(LOG_DEBUG, "Reading from the file '%s'", (cgroupDirectory + "cpu,cpuacct/cpuacct.stat").c_str());
+	stat = Util::readFile((cgroupDirectory + "cpu,cpuacct/cpuacct.stat").c_str());
 
 	string sUser = regFound(regUser, stat);
 	string sSystem = regFound(regSystem, stat);
@@ -52,27 +53,28 @@ map<string, int> Cgroup::getCPUAcctStat(){
 
 
 long int Cgroup::getCPUUsage(){
-	string path = cgroupDirectory + "cpu/cpuacct.usage";
+	string path = cgroupDirectory + "cpu,cpuacct/cpuacct.usage";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	return Util::atol(Util::readFile((cgroupDirectory + "cpu/cpuacct.usage")));
+	return Util::atol(Util::readFile((cgroupDirectory + "cpu,cpuacct/cpuacct.usage")));
 }
 
 int Cgroup::getCPUNotify(){
-	string path = cgroupDirectory + "cpu/notify_on_release";
+	string path = cgroupDirectory + "cpu,cpuacct/notify_on_release";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	return Util::atoi(Util::readFile((cgroupDirectory + "cpu/notify_on_release").c_str()));
+	return Util::atoi(Util::readFile((cgroupDirectory + "cpu,cpuacct/notify_on_release").c_str()));
 }
 
 string Cgroup::getCPUReleaseAgent(){
-	string path = cgroupDirectory + "cpu/release_agent";
+	string path = cgroupDirectory + "cpu,cpuacct/release_agent";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	return Util::readFile((cgroupDirectory + "cpu/release_agent").c_str());
+	string result = Util::readFile((cgroupDirectory + "cpu,cpuacct/release_agent").c_str());
+	return regFound(regTrim, result);
 }
 
 vector<int> Cgroup::getCPUProcs(){
-	string path = cgroupDirectory + "cpu/tasks";
+	string path = cgroupDirectory + "cpu,cpuacct/tasks";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	string procs = Util::readFile((cgroupDirectory + "cpu/tasks").c_str());
+	string procs = Util::readFile((cgroupDirectory + "cpu,cpuacct/tasks").c_str());
 	vector<int> pids;
 	size_t pos = 0;
 	size_t ini = 0;
@@ -85,9 +87,9 @@ vector<int> Cgroup::getCPUProcs(){
 
 map<string, int> Cgroup::getCPUStat(){
 	map<string, int> cpuStat;
-	string path = cgroupDirectory + "cpu/cpu.stat";
+	string path = cgroupDirectory + "cpu,cpuacct/cpu.stat";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	string stat = Util::readFile((cgroupDirectory + "cpu/cpu.stat").c_str());
+	string stat = Util::readFile((cgroupDirectory + "cpu,cpuacct/cpu.stat").c_str());
 
 	string nrPeriods = regFound(regPeriods, stat);
 	string nrThrottled = regFound(regThrottled, stat);
@@ -100,9 +102,9 @@ map<string, int> Cgroup::getCPUStat(){
 }
 
 int Cgroup::getNetPrioID(){
-	string path = cgroupDirectory + "net_prio/net_prio.prioidx";
+	string path = cgroupDirectory + "net_cls,net_prio/net_prio.prioidx";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	return Util::atoi(Util::readFile((cgroupDirectory + "net_prio/net_prio.prioidx").c_str()));
+	return Util::atoi(Util::readFile((cgroupDirectory + "net_cls,net_prio/net_prio.prioidx").c_str()));
 }
 
 vector<int> Cgroup::getPIDs(){
@@ -121,9 +123,9 @@ vector<int> Cgroup::getPIDs(){
 
 map<string, int> Cgroup::getNetPrioMap(){
 	map<string, int> netPrioMap;
-	string path = cgroupDirectory + "net_prio/net_prio.ifpriomap";
+	string path = cgroupDirectory + "net_cls,net_prio/net_prio.ifpriomap";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
-	string stat = Util::readFile((cgroupDirectory + "net_prio/net_prio.ifpriomap").c_str());
+	string stat = Util::readFile((cgroupDirectory + "net_cls,net_prio/net_prio.ifpriomap").c_str());
 	string eth0 = regFound(regEth0, stat);
 	string eth1 = regFound(regEth1, stat);
 	string lo = regFound(regLo, stat);
@@ -131,6 +133,32 @@ map<string, int> Cgroup::getNetPrioMap(){
 	netPrioMap["eth1"] = Util::atoi(eth1);
 	netPrioMap["lo"] = Util::atoi(lo);
 	return netPrioMap;
+}
+
+int Cgroup::getNetNotify(){
+	string path = cgroupDirectory + "net_cls,net_prio/notify_on_release";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
+	return Util::atoi(Util::readFile(cgroupDirectory + "net_cls,net_prio/notify_on_release"));
+}
+
+string Cgroup::getNetReleaseAgent(){
+	string path = cgroupDirectory + "net_cls,net_prio/release_agent";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
+	return Util::readFile(cgroupDirectory + "net_cls,net_prio/release_agent");
+}
+
+vector<int> Cgroup::getNetProcs(){
+	string path = cgroupDirectory + "net_cls,net_prio/tasks";
+	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
+	string file = Util::readFile((cgroupDirectory + "net_cls,net_prio/tasks").c_str());
+	vector<int> tasks;
+	size_t pos = 0;
+	size_t ini = 0;
+	while((pos = file.find('\n', ini)) != string::npos){
+		tasks.push_back(Util::atoi(file.substr(ini, pos)));
+		ini = pos + 1;
+	}
+	return tasks;
 }
 
 vector<int> Cgroup::getMemoryProcs(){
@@ -214,32 +242,55 @@ map<string, int> Cgroup::getMemoryOOMControl(){
  *	1 being the top priority. E.g: eth0 2
  */
 void Cgroup::setNetPrioMap(string interface){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "net_prio/net_prio.ifpriomap");
-	Util::writeFile(cgroupDirectory + "net_prio/net_prio.ifpriomap",interface);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "net_prio/net_prio.ifpriomap");
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "net_cls,net_prio/net_prio.ifpriomap");
+	Util::writeFile(cgroupDirectory + "net_cls,net_prio/net_prio.ifpriomap",interface);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "net_cls,net_prio/net_prio.ifpriomap");
 }
 
+void Cgroup::setNetNotify(bool flag){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "net_cls,net_prio/notify_on_release");
+	Util::writeFile(cgroupDirectory + "net_cls,net_prio/notify_on_release",flag?"1":"0");
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "net_cls,net_prio/notify_on_release");
+}
+
+void Cgroup::setNetReleaseAgent(string path){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "net_cls,net_prio/release_agent");
+	Util::writeFile(cgroupDirectory + "net_cls,net_prio/release_agent",path);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "net_cls,net_prio/release_agent");
+}
+
+void Cgroup::setNetProcs(int pid){
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "net_cls,net_prio/tasks");
+	ofstream file;
+	file.open(cgroupDirectory + "net_cls,net_prio/tasks", fstream::app);
+	if (file.is_open()){
+		file << Util::itos(pid) + '\n';
+		syslog(LOG_DEBUG,"'%s' has been successfully written", "net_cls,net_prio/tasks");
+	}
+	file.close();
+}
 /**
  * Insert a process' PID to allow it to be in the CPU controllers
  */
 void Cgroup::setCPUProcs(int pid){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu/tasks");
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu,cpuacct/tasks");
 	ofstream file;
-	file.open(cgroupDirectory + "cpu/tasks", fstream::app);
+	file.open(cgroupDirectory + "cpu,cpuacct/tasks", fstream::app);
 	if (file.is_open()){
 		file << Util::itos(pid) + '\n';
-		syslog(LOG_DEBUG,"'%s' has been successfully written", "cpu/tasks");
+		syslog(LOG_DEBUG,"'%s' has been successfully written", "cpu,cpuacct/tasks");
 	}
-	file.close();}
+	file.close();
+}
 
 /**
  * Contains a flag that indicates whether the cgroup will notify when
  * the CPU controller has no processes in it
  */
 void Cgroup::setCPUNotify(bool flag){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu/notify_on_release");
-	Util::writeFile(cgroupDirectory + "cpu/notify_on_release",flag?"1":"0");
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cpu/notify_on_release");
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu,cpuacct/notify_on_release");
+	Util::writeFile(cgroupDirectory + "cpu,cpuacct/notify_on_release",flag?"1":"0");
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cpu,cpuacct/notify_on_release");
 }
 
 /**
@@ -247,9 +298,9 @@ void Cgroup::setCPUNotify(bool flag){
  * when the cpu tasks file is empty. This requires the flag in notify_on_release to be set to 1
  */
 void Cgroup::setCPUReleaseAgentPath(string path){
-	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu/release_agent");
-	Util::writeFile(cgroupDirectory + "cpu/release_agent",path);
-	syslog(LOG_DEBUG,"'%s' has been successfully written", "cpu/release_agent");
+	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu,cpuacct/release_agent");
+	Util::writeFile(cgroupDirectory + "cpu,cpuacct/release_agent",path);
+	syslog(LOG_DEBUG,"'%s' has been successfully written", "cpu,cpuacct/release_agent");
 }
 
 /**
