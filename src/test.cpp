@@ -454,8 +454,8 @@ int main(){
 			cout << "Test CgroupFS" << endl;
 			testSetCgroupFileSystem();
 			cout << "Test test" << endl;
-
 			testGetCPUAcctStat();
+			cout << "Test between test" << endl;
 			testGetCPUStat();
 			testGetMemoryStat();
 			testGetCPUUsage();
@@ -473,7 +473,6 @@ int main(){
 			testGetMemoryUsageInBytes();
 			testGetMemNotify();
 			testGetMemReleaseAgent();
-			cout << "Test between test" << endl;
 			testGetMemoryOOMControl();
 			testSetNetPrioMap();
 			testSetNetProcs();
