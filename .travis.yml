@@ -6,4 +6,5 @@ install:
   - ./configure
 
 script:
+  - ll cgroup/cpu,cpuacct
   - ./runTest.sh
