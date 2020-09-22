@@ -440,6 +440,7 @@ int main(){
 	bool firstTime = true;
 	while(true){
 		try {
+			cout << "Test 1" << endl;
 			//Test util
 			testBase64Encode();
 			testBase64Decode();
@@ -450,7 +451,9 @@ int main(){
 			testCorrectFileName();
 			//Test config
 			//Test cgroup
+			cout << "Test CgroupFS" << endl;
 			testSetCgroupFileSystem();
+			cout << "Test test" << endl;
 			testGetCPUAcctStat();
 			testGetCPUStat();
 			testGetMemoryStat();
@@ -481,6 +484,7 @@ int main(){
 			testSetMemNotify();
 			testSetMemReleaseAgentPath();
 			testSetCPUProcs();
+			cout << "Test Finish" << endl;
 		} catch (exception &e) {
 			cerr << e.what() << endl;
 			if (firstTime){
