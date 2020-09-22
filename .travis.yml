@@ -4,7 +4,7 @@ compiler: clang
 
 install:
   - ./configure
-
-script:
   - ll cgroup/cpu,cpuacct
+
+script: 
   - ./runTest.sh
