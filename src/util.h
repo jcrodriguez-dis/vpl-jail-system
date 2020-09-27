@@ -7,6 +7,7 @@
 
 #ifndef VPL_UTIL_INC_H
 #define VPL_UTIL_INC_H
+#include <limits>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -237,7 +238,11 @@ public:
 	 * return an string as int
 	 */
 	static int atoi(const string &s){
-		return ::atoi(s.c_str());
+		long int longValue = atol(s);
+		if ( longValue >  numeric_limits<int>::max()) {
+			return numeric_limits<int>::max();
+		}
+		return longValue;
 	}
 
 	/**
