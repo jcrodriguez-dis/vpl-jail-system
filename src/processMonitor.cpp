@@ -405,6 +405,8 @@ void processMonitor::monitorize(){
 }
 
 void processMonitor::setExtraInfo(ExecutionLimits el, bool ri, string lang){
+	Lock lock(getProcessControlPath());
+	readInfo();
 	executionLimits = el;
 	interactive = ri;
 	this->lang = lang;
