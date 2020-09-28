@@ -233,4 +233,5 @@ public:
 	virtual bool isSecure() { return true;}
 };
 
+
 #endif /* SOCKET_H_ */
