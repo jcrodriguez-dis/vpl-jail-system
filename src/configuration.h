@@ -53,9 +53,9 @@ public:
 	int getSecurePort(){ return sport;}
 	int getLogLevel(){ return logLevel;}
 	int getFail2Ban(){ return fail2ban;}
-	string getSSLCipherList(){ return SSLCipherList;}
-	string getSSLCertFile(){ return SSLCertFile;}
-	string getSSLKeyFile(){ return SSLKeyFile;}
+	const string & getSSLCipherList() const { return SSLCipherList;}
+	const string & getSSLCertFile() const { return SSLCertFile;}
+	const string & getSSLKeyFile() const { return SSLKeyFile;}
 };
 #endif
 

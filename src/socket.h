@@ -52,7 +52,12 @@ class SSLBase{
 			_exit(EXIT_FAILURE);
 		}
 		SSL_CTX_set_cipher_list(context, cipherList);
-		SSL_CTX_set_options(context,SSL_OP_NO_SSLv2|SSL_OP_NO_TLSv1_1|SSL_OP_NO_TLSv1);
+		long int options = 0;
+		options |= SSL_OP_NO_SSLv2;
+		options |= SSL_OP_NO_SSLv3;
+		options |= SSL_OP_NO_TLSv1_1;
+		options |= SSL_OP_NO_TLSv1;
+		SSL_CTX_set_options(context,options);
 		SSL_CTX_set_mode(context,SSL_MODE_ENABLE_PARTIAL_WRITE|
 								SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 	}
