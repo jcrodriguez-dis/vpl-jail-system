@@ -175,6 +175,24 @@ function vpl_installq {
    fi
 }
 
+function vpl_install_letsencrypt {
+	vpl_install "Let's Encrypt" certbot	
+	echo "Please, enter your domain name in order to install the Certbot's certificates."
+	read A
+	HNAME=$A
+	certbot certonly --standalone --preferred-challenges http -d $HNAME
+	systemctl enable --now certbot-renew.timer
+	systemctl status certbot-renew.timer
+	echo "pre_hook = systemctl stop vpl-jail-system" >> /etc/letsencrypt/renewal/$HNAME.conf
+	echo "post_hook = systemctl start vpl-jail-system" >> /etc/letsencrypt/renewal/$HNAME.conf
+	ln -s /etc/letsencrypt/live/$HNAME/fullchain.pem /etc/vpl/cert.pem
+	ln -s /etc/letsencrypt/live/$HNAME/privkey.pem /etc/vpl/key.pem
+}
+
+function vpl_install_ssl_version {
+	vpl_install "SSL API 1.0.2" openssl1.0.2
+}
+
 function vpl_install_jgrasp {
 	local URLBASE="https://www.jgrasp.org/dl4g/jgrasp/"
 	local VERSION="205_04"
@@ -257,8 +275,8 @@ if [ "$PMTYPE" == "1" ] ; then
 	vpl_install "make" make
 	vpl_install "C compiler" gcc
 	vpl_install "C++ compiler" gcc-c++
-	vpl_install "SSL library" openssl
-	vpl_install "SSL library" openssl-devel
+	vpl_install "SSL library" openssl		
+	vpl_install "SSL library" openssl-devel	
 	vpl_install "Firewall" iptables
 	vpl_install "Window manager" metacity
 	vpl_install "xterm" xterm
@@ -273,6 +291,7 @@ else
 	vpl_install "C++ compiler" g++
 	vpl_install "SSL library" openssl
 	vpl_install "SSL library" libssl-dev
+	vpl_install "SSL API 1.0.2" openssl1.0.2
 	vpl_install "Firewall" iptables
 	vpl_install "X system" xorg
 	vpl_install "dbus-x11" dbus-x11
@@ -336,20 +355,27 @@ if [ ! -d /var/vpl-jail-system ] ; then
 fi
 chmod 0600 /var/vpl-jail-system
 
-if [ ! -f $VPLJAIL_INSTALL_DIR/cert.pem ] ; then
+if [ ! -f $VPLJAIL_INSTALL_DIR/*.pem ] ; then
 	echo "VPL execution server needs SSL certificates to accept https:"
 	echo "and wss: requests."
 	echo "If you have certificates then copy the key and the certificate file"
 	echo "in pem format to $VPLJAIL_INSTALL_DIR/key.pem and $VPLJAIL_INSTALL_DIR/cert.pem"
 	echo "If you don't have certificate the intaller can generate one selfsigned for you"
 	echo -n "Generate the certificate?"
-    read A
-    if [ "$A" != "n" ] ; then
+	read A
+	if [ "$A" != "n" ] ; then
 		vpl_generate_selfsigned_certificate
 		cp key.pem $VPLJAIL_INSTALL_DIR
 		cp cert.pem $VPLJAIL_INSTALL_DIR
 		chmod 600 $VPLJAIL_INSTALL_DIR/*.pem
 		rm key.pem keyini.pem certini.pem cert.pem
+	else
+		echo -n "Do you want to use Let's Encrypt certificates?"
+		echo -n "(y/n)"
+		read A	
+		if [ "$A" != "n" ] ; then
+			vpl_install_letsencrypt	
+		fi
 	fi
 else
 	echo "Found SSL certificate => Don't create a new one"
@@ -411,6 +437,7 @@ else
         vpl_install "JavaScript (Nodejs-legacy)" nodejs-legacy
         vpl_install_npm "TypeScript" typescript
         vpl_install_npm "Sass" sass
+        vpl_install_npm "Sass" sass
         vpl_install "Octave (GNU)" octave
         vpl_install "Pascal compiler" fp-compiler
         vpl_install "Perl interpreter" perl
@@ -465,6 +492,7 @@ else
     if [ "$A3" != "n" ] ; then
     	vpl_install_jgrasp
     fi
+
     if [ -f /etc/init.d/apache2 ] ; then
     	echo "If you are planning to use apache2 or other service in this system,"
     	echo "notice that you must use different ports that in vpl-jail-system"
@@ -483,6 +511,7 @@ else
     	fi
     fi
 fi
+
 vpl_check_selinux
 echo "Starting the service (vpl-jail-system)"
 vpl_start_service

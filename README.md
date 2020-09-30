@@ -1,5 +1,7 @@
 # VPL-JAIL-SYSTEM 2.5.3
 
+[![Build Status](https://travis-ci.org/aitorSDL/vpl-xmlrpc-jail.svg?branch=2.5.4)](https://travis-ci.org/github/aitorSDL/vpl-xmlrpc-jail)
+
 ![VPL Logo](https://vpl.dis.ulpgc.es/images/logo2.png)
 
 The VPL-Jail-System serves an execution sandbox for the VPL Moodle plugin. This sandbox provides interactive execution, textual by xterm and graphical by VNC, and non-iterative execution for code evaluation purposes.

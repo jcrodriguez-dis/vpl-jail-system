@@ -27,6 +27,9 @@ private:
 	int port, sport; //Server ports
 	int logLevel; //Log level 0 to 8, 0 = no log, 8 += do not remove home dir.
 	int fail2ban; //Fail to ban configuration. Relation fail / success to ban IP
+	string SSLCipherList;
+	string SSLCertFile;
+	string SSLKeyFile;
 	regex_t reg;
 	void checkConfigFile(string fileName, string men);
 	Configuration();
@@ -37,19 +40,22 @@ public:
 	}
 	void readConfigFile();
 	static string generateCleanPATH(string jailPath, string dirtyPATH);
-	ExecutionLimits getLimits(){ return jailLimits;}
-	string getJailPath(){ return jailPath;}
-	string getCleanPATH(){ return cleanPATH;}
-	string getControlPath(){ return controlPath;}
-	size_t getMinPrisoner(){ return minPrisoner;}
-	size_t getMaxPrisoner(){ return maxPrisoner;}
-	const vector<string> & getTaskOnlyFrom(){ return taskOnlyFrom;}
-	string getInterface(){ return interface;}
-	string getURLPath(){ return URLPath;}
-	int getPort(){ return port;}
-	int getSecurePort(){ return sport;}
-	int getLogLevel(){ return logLevel;}
-	int getFail2Ban(){ return fail2ban;}
+	const ExecutionLimits & getLimits() const { return jailLimits;}
+	const string & getJailPath() const { return jailPath;}
+	const string &  getCleanPATH() const { return cleanPATH;}
+	const string &  getControlPath() const { return controlPath;}
+	size_t getMinPrisoner() const { return minPrisoner;}
+	size_t getMaxPrisoner() const { return maxPrisoner;}
+	const vector<string> & getTaskOnlyFrom() const { return taskOnlyFrom;}
+	const string &  getInterface() const { return interface;}
+	const string &  getURLPath() const { return URLPath;}
+	int getPort() const { return port;}
+	int getSecurePort() const { return sport;}
+	int getLogLevel() const { return logLevel;}
+	int getFail2Ban() const { return fail2ban;}
+	const string &  getSSLCipherList() const { return SSLCipherList;}
+	const string &  getSSLCertFile() const { return SSLCertFile;}
+	const string &  getSSLKeyFile() const { return SSLKeyFile;}
 };
 #endif
 

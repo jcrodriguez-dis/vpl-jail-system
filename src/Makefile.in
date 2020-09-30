@@ -101,15 +101,15 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_program_test_OBJECTS = test.$(OBJEXT) configurationFile.$(OBJEXT) \
-	configuration.$(OBJEXT) socket.$(OBJEXT) websocket.$(OBJEXT) \
-	util.$(OBJEXT)
+	configuration.$(OBJEXT) socket.$(OBJEXT) cgroup.$(OBJEXT) \
+	websocket.$(OBJEXT) util.$(OBJEXT)
 program_test_OBJECTS = $(am_program_test_OBJECTS)
 program_test_LDADD = $(LDADD)
 am_vpl_jail_server_OBJECTS = main.$(OBJEXT) vpl-jail-server.$(OBJEXT) \
 	jail.$(OBJEXT) httpServer.$(OBJEXT) redirector.$(OBJEXT) \
 	configurationFile.$(OBJEXT) configuration.$(OBJEXT) \
 	processMonitor.$(OBJEXT) socket.$(OBJEXT) websocket.$(OBJEXT) \
-	util.$(OBJEXT)
+	util.$(OBJEXT) cgroup.$(OBJEXT)
 vpl_jail_server_OBJECTS = $(am_vpl_jail_server_OBJECTS)
 vpl_jail_server_LDADD = $(LDADD)
 am_websocket_echo_test_OBJECTS = webSocketEchoTest.$(OBJEXT) \
@@ -291,16 +291,25 @@ configuration.cpp configuration.h\
 processMonitor.cpp processMonitor.h\
 socket.cpp socket.h\
 websocket.cpp websocket.h\
-util.cpp util.h rpc.h xml.h jail_limits.h lock.h
+util.cpp util.h rpc.h xml.h jail_limits.h lock.h\
+cgroup.cpp cgroup.h
 
 websocket_echo_test_SOURCES = webSocketEchoTest.cpp socket.cpp socket.h\
 websocket.cpp websocket.h\
 util.cpp util.h rpc.h xml.h jail_limits.h lock.h
 
 program_test_SOURCES = tests/test.cpp configurationFile.cpp configuration.cpp socket.cpp socket.h\
+cgroup.cpp cgroup.h\
 websocket.cpp websocket.h\
 util.cpp util.h rpc.h xml.h jail_limits.h lock.h
 
+
+# set the include path found by configure
+#INCLUDES= $(all_includes)
+
+# the library search path.
+#AM_LDFLAGS = $(all_libraries)
+AM_CXXFLAGS = -std=c++11
 all: all-am
 
 .SUFFIXES:
@@ -395,6 +404,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cgroup.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/configuration.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/configurationFile.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httpServer.Po@am__quote@
@@ -643,12 +653,6 @@ uninstall-am: uninstall-binPROGRAMS
 
 .PRECIOUS: Makefile
 
-
-# set the include path found by configure
-#INCLUDES= $(all_includes)
-
-# the library search path.
-#AM_LDFLAGS = $(all_libraries)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
