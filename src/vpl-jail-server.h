@@ -27,6 +27,9 @@ class Daemon{
 	int listenSocket;
 	int secureListenSocket;
 	int actualSocket;
+	int nSockets;
+	struct pollfd sockets[2];
+	bool isSecureSocket[2];
 	string interface;
 	//Access statistics
 	struct {
@@ -177,28 +180,28 @@ class Daemon{
 	}
 	void launch(int listen, bool sec){
 		struct sockaddr_in client;
-		socklen_t slen=sizeof(client);
-		actualSocket = ::accept(listen,(struct sockaddr *)&client,&slen);
-		if(actualSocket < 0){
+		socklen_t slen = sizeof(client);
+		actualSocket = ::accept(listen, (struct sockaddr *)&client, &slen);
+		if (actualSocket < 0) {
 			syslog(LOG_ERR,"accept() Error:%d  %m", actualSocket);
 			return;
 		}
 		string IP;
 		char dst[INET_ADDRSTRLEN];
-		const char *d=inet_ntop(client.sin_family,&client.sin_addr,dst,INET_ADDRSTRLEN);
+		const char *d = inet_ntop(client.sin_family, &client.sin_addr, dst, INET_ADDRSTRLEN);
 		if(d != NULL)
 			IP=d;
-		if(isBanned(IP)){
+		if (isBanned(IP)) {
 			close(actualSocket);
 			statistics.rejected++;
 			countRequest(IP,internalError);
 			syslog(LOG_ERR,"%s: Request rejected: IP banned", IP.c_str());
 			return;
 		}
-		fcntl(actualSocket,FD_CLOEXEC); //Close socket on execve
-		pid_t pid=fork();
-		if(pid==0){ //new process
-			Socket *socket=NULL;
+		fcntl(actualSocket, FD_CLOEXEC); //Close socket on execve
+		pid_t pid = fork();
+		if (pid == 0) { //new process
+			Socket *socket = NULL;
 			close(listenSocket);
 			if(sec)
 				socket= new SSLSocket(actualSocket);
@@ -218,69 +221,61 @@ class Daemon{
 	}
 	//Accept and launch son
 	void accept(){
-		int ndev=1; 
-		struct pollfd devices[2];
-		devices[0].fd=listenSocket;
-		devices[0].events=POLLIN;
-		if(sport){
-			devices[1].fd=secureListenSocket;
-			devices[1].events=POLLIN;
-			ndev++;
-		}
-		int res=poll(devices, ndev, JAIL_ACCEPT_WAIT);
-		if(res==-1) {
+		int res=poll(sockets, nSockets, JAIL_ACCEPT_WAIT);
+		if ( res == -1 ) {
 			if (errno == EINTR) {
 				return;
 			}
 			throw string("Error poll sockets in accept: ") + strerror(errno);
 		}
-		if(res==0) return; //No request
-		if(devices[0].revents & POLLIN){ //is http or ws
-			launch(listenSocket,false);
-		}
-		if(devices[1].revents & POLLIN){ //is https or wss
-			launch(secureListenSocket,true);
+		if (res==0) return; //No request
+		for ( int port = 0; port < nSockets; port++ ) {
+			if (sockets[port].revents & POLLIN) { // Any type http/https or ws/wss
+				launch(sockets[port].fd, isSecureSocket[port]);
+			}
 		}
 	}
 
 	void initSocketServer(){
-		port = configuration->getPort();
-		sport = configuration->getSecurePort();
-		interface = configuration->getInterface();
-		listenSocket = socket(AF_INET, SOCK_STREAM, 0);
-		if (listenSocket == -1)
-			throw "socket() error";
-		int on=1;
-		if(setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ) {
-			syslog(LOG_ERR,"setsockopt(SO_REUSEADDR) failed: %m");
-		}
-		#ifdef SO_REUSEPORT
-	    if (setsockopt(listenSocket, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
-			syslog(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
-	    }
-		#endif
+		this->port = configuration->getPort();
+		this->sport = configuration->getSecurePort();
+		this->interface = configuration->getInterface();
+		this->listenSocket = -1;
+		this->secureListenSocket = -1;
+		this->nSockets = 0;
 		struct sockaddr_in local;
 		memset(&local, 0, sizeof(local));
 		local.sin_family = AF_INET;
-		if(interface>"")
+		if(this->interface>"")
 			local.sin_addr.s_addr = inet_addr(interface.c_str());
 		else
 			local.sin_addr.s_addr = INADDR_ANY;
-		local.sin_port = htons(port);
-		if (bind(listenSocket, (struct sockaddr *) &local, sizeof(local)) == -1)
-			throw string("bind() error: ") + strerror(errno);
-		if (listen(listenSocket, 100) == -1) //100 queue size
-			throw "listen() error";
-		syslog(LOG_INFO,"Listen at %s:%d",inet_ntoa(local.sin_addr), port);
-		secureListenSocket = -1;
-		if(sport){
+		if (this->port) {
+			listenSocket = socket(AF_INET, SOCK_STREAM, 0);
+			if (listenSocket == -1)
+				throw "socket() error";
+			#ifdef SO_REUSEPORT
+			int on=1;
+			if (setsockopt(listenSocket, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
+				syslog(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
+			}
+			#endif
+			local.sin_port = htons(port);
+			if (bind(listenSocket, (struct sockaddr *) &local, sizeof(local)) == -1)
+				throw string("bind() error: ") + strerror(errno);
+			if (listen(listenSocket, 100) == -1) //100 queue size
+				throw "listen() error";
+			syslog(LOG_INFO,"Listen at port %s:%d",inet_ntoa(local.sin_addr), port);
+	    } else {
+	    	syslog(LOG_INFO,"No plain http port used");
+	    }
+
+		if(this->sport){
 			secureListenSocket = socket(AF_INET, SOCK_STREAM, 0);
 			if (secureListenSocket == -1)
 				throw "socket() error";
-			if(setsockopt(secureListenSocket, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ) {
-				syslog(LOG_ERR,"setsockopt(SO_REUSEADDR) failed: %m");
-			}
 			#ifdef SO_REUSEPORT
+			int on=1;
 		    if (setsockopt(secureListenSocket, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
 				syslog(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
 		    }
@@ -290,7 +285,25 @@ class Daemon{
 				throw "bind() secure port error";
 			if (listen(secureListenSocket, 100) == -1) //100 queue size
 				throw "listen() secure port error";
-			syslog(LOG_INFO,"Listen secure port at %s:%d",inet_ntoa(local.sin_addr), sport);
+			syslog(LOG_INFO,"Listen at secure port %s:%d",inet_ntoa(local.sin_addr), sport);
+		} else {
+		   	syslog(LOG_INFO,"No https secure port used");
+		}
+		if ( !this->port && !this->sport ) {
+			syslog(LOG_CRIT,"No PORT or SECURE_PORT defined");
+			_exit(EXIT_FAILURE);
+		}
+		if (this->listenSocket >= 0) {
+			sockets[nSockets].fd = this->listenSocket;
+			sockets[nSockets].events = POLLIN;
+			isSecureSocket[nSockets] = false;
+			nSockets++;
+		}
+		if (this->sport >= 0) {
+			sockets[nSockets].fd = this->secureListenSocket;
+			sockets[nSockets].events = POLLIN;
+			isSecureSocket[nSockets] = true;
+			nSockets++;
 		}
 		actualSocket=-1;
 	}
@@ -318,8 +331,8 @@ class Daemon{
 	Daemon(){
 		signal(SIGPIPE,SIG_IGN);
 		signal(SIGTERM,SIGTERMHandler);
-		listenSocket=-1;
-		secureListenSocket=-1;
+		this->listenSocket=-1;
+		this->secureListenSocket=-1;
 		configuration=Configuration::getConfiguration();
 		checkJail();
 		checkControlDir();
@@ -334,7 +347,11 @@ public:
 	}
 	static void closeSockets(){
 		Daemon* daemon=getDaemon();
-		close(daemon->listenSocket);
+		daemon->nSockets = 0;
+		if(daemon->listenSocket>0){
+			close(daemon->listenSocket);
+			daemon->listenSocket=-1;
+		}
 		if(daemon->secureListenSocket>0){
 			close(daemon->secureListenSocket);
 			daemon->secureListenSocket=-1;
@@ -344,7 +361,7 @@ public:
 			daemon->actualSocket=-1;
 		}
 	}
-	void cleanTasks() {
+	void periodicTasks() {
 		static int checkPoint = 5 * 60 * 1000 / JAIL_ACCEPT_WAIT; // 5 minutes.
 		static int loops = 0;
 		loops++;
@@ -353,6 +370,7 @@ public:
 			int pid = fork();
 			if (pid == 0) {
 				try {
+					SSLBase::getSSLBase()->updateCertificatesIfNeeded();
 					processMonitor::cleanZombieTasks();
 				} catch(...) {
 				}
@@ -367,9 +385,9 @@ public:
 	//Main loop: receive requests/dispatch and control child
 	void loop(){ //FIXME implement e adequate exit
 		while(!finishRequest){
-			accept(); //Accept one request waiting 20 msec
+			accept(); //Accept one request waiting JAIL_ACCEPT_WAIT msec
 			harvest(); //Process all dead childrens
-			cleanTasks();
+			periodicTasks();
 		}
 		closeSockets();
 	}
