@@ -1,6 +1,9 @@
 /* config.h.  Generated from config.h.in by configure.  */
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
+/* Define to 1 if you have the <arpa/inet.h> header file. */
+#define HAVE_ARPA_INET_H 1
+
 /* Define to 1 if your system has a working `chown' function. */
 #define HAVE_CHOWN 1
 
@@ -8,8 +11,14 @@
    */
 #define HAVE_DIRENT_H 1
 
+/* Define to 1 if you have the <fcntl.h> header file. */
+#define HAVE_FCNTL_H 1
+
 /* Define to 1 if you have the `fork' function. */
 #define HAVE_FORK 1
+
+/* Define to 1 if you have the `getcwd' function. */
+#define HAVE_GETCWD 1
 
 /* Define to 1 if you have the `inet_ntoa' function. */
 #define HAVE_INET_NTOA 1
@@ -29,6 +38,9 @@
 /* Define to 1 if you have the `util' library (-lutil). */
 #define HAVE_LIBUTIL 1
 
+/* Define to 1 if you have the <limits.h> header file. */
+#define HAVE_LIMITS_H 1
+
 /* Define to 1 if your system has a GNU libc compatible `malloc' function, and
    to 0 otherwise. */
 #define HAVE_MALLOC 1
@@ -44,6 +56,9 @@
 
 /* Define to 1 if you have the <ndir.h> header file, and it defines `DIR'. */
 /* #undef HAVE_NDIR_H */
+
+/* Define to 1 if you have the <netinet/in.h> header file. */
+#define HAVE_NETINET_IN_H 1
 
 /* Define to 1 if you have the `regcomp' function. */
 #define HAVE_REGCOMP 1
@@ -72,6 +87,9 @@
 /* Define to 1 if you have the <string.h> header file. */
 #define HAVE_STRING_H 1
 
+/* Define to 1 if you have the <syslog.h> header file. */
+#define HAVE_SYSLOG_H 1
+
 /* Define to 1 if you have the <sys/dir.h> header file, and it defines `DIR'.
    */
 /* #undef HAVE_SYS_DIR_H */
@@ -79,6 +97,9 @@
 /* Define to 1 if you have the <sys/ndir.h> header file, and it defines `DIR'.
    */
 /* #undef HAVE_SYS_NDIR_H */
+
+/* Define to 1 if you have the <sys/socket.h> header file. */
+#define HAVE_SYS_SOCKET_H 1
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
@@ -88,6 +109,9 @@
 
 /* Define to 1 if you have <sys/wait.h> that is POSIX.1 compatible. */
 #define HAVE_SYS_WAIT_H 1
+
+/* Define to 1 if you have the `TLS_server_method' function. */
+#define HAVE_TLS_SERVER_METHOD 1
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #define HAVE_UNISTD_H 1
@@ -115,7 +139,7 @@
 #define PACKAGE "vpl-jail-system"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT ""
+#define PACKAGE_BUGREPORT "jcrodriguez@dis.ulpgc.es"
 
 /* Define to the full name of this package. */
 #define PACKAGE_NAME "vpl jail system"
