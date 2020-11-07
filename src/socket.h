@@ -6,6 +6,9 @@
 
 #ifndef SOCKET_H_INC
 #define SOCKET_H_INC
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <regex.h>
 #include <string>
 #include <map>
@@ -15,46 +18,76 @@
 #include <sys/socket.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include "util.h"
 #include "configuration.h"
 
 using namespace std;
 class SSLBase{
 	static SSLBase* singlenton;
-	const SSL_METHOD *method;
 	SSL_CTX *context;
+	time_t timePrivateKeyFileModification;
+	time_t timeCertificateFileModification;
 	SSLBase(){
+		this->context = NULL;
+		this->timePrivateKeyFileModification = 0;
+		this->timeCertificateFileModification = 0;
+		SSL_library_init();
+		OpenSSL_add_all_algorithms();
+		SSL_load_error_strings();
+		this->createContext();
+	}
+
+	void createContext() {
 		Configuration* configuration = Configuration::getConfiguration();
 		const char *cipherList = configuration->getSSLCipherList().c_str();
 		const char *certFile = configuration->getSSLCertFile().c_str();
 		const char *keyFile = configuration->getSSLKeyFile().c_str();
-		SSL_library_init();
-		OpenSSL_add_all_algorithms();
-		SSL_load_error_strings();
-		method = SSLv23_server_method();
-		if(method == NULL){
+		#ifdef HAVE_TLS_SERVER_METHOD
+		const SSL_METHOD *method = TLS_server_method();
+		if (method == NULL) {
+			syslog(LOG_EMERG,"TLS_server_method() fail: %s",getError());
+			_exit(EXIT_FAILURE);
+		}
+		#else
+		const SSL_METHOD *method = SSLv23_server_method();
+		if (method == NULL) {
 			syslog(LOG_EMERG,"SSLv23_server_method() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
-		if((context = SSL_CTX_new((SSL_METHOD *)method)) == NULL){ //Conversion for backward compatibility
-			syslog(LOG_EMERG,"SSL_CTX_new() fail: %s",getError());
-			_exit(EXIT_FAILURE);
+		#endif
+		bool fail = false;
+		SSL_CTX *newContext;
+		if ((newContext = SSL_CTX_new((SSL_METHOD *)method)) == NULL) { //Conversion for backward compatibility
+			syslog(LOG_EMERG,"SSL_CTX_new() fail: %s", getError());
+			fail = true;
+		} else if (SSL_CTX_use_certificate_chain_file(newContext, certFile) != 1) {
+			syslog(LOG_EMERG,"SSL_CTX_use_certificate_chain_file() fail: %s", getError());
+			fail = true;
+		} else if (SSL_CTX_use_PrivateKey_file(newContext, keyFile, SSL_FILETYPE_PEM) != 1) {
+			syslog(LOG_EMERG,"SSL_CTX_use_PrivateKey_file() fail: %s", getError());
+			fail = true;
+		} else if ( !SSL_CTX_check_private_key(newContext) ) {
+			syslog(LOG_EMERG,"SSL_CTX_check_private_key() fail: %s", getError());
+			fail = true;
+		} else if ( cipherList[0] && SSL_CTX_set_cipher_list(newContext, cipherList) == 0) {
+			syslog(LOG_EMERG,"SSL_CTX_set_cipher_list() fail: %s", getError());
+			fail = true;
 		}
-		if(SSL_CTX_use_certificate_chain_file(context, certFile) != 1){
-			syslog(LOG_EMERG,"SSL_CTX_use_certificate_chain_file() fail: %s",getError());
-			_exit(EXIT_FAILURE);
+		if ( fail ) {
+			if (this->context == NULL) {
+				_exit(EXIT_FAILURE);
+			} else {
+				return;
+			}
 		}
-		if(SSL_CTX_use_PrivateKey_file(context, keyFile, SSL_FILETYPE_PEM) != 1){
-			syslog(LOG_EMERG,"SSL_CTX_use_PrivateKey_file() fail: %s",getError());
-			_exit(EXIT_FAILURE);
+		SSL_CTX_set_options(newContext,SSL_OP_NO_SSLv2|SSL_OP_NO_TLSv1_1|SSL_OP_NO_TLSv1);
+		SSL_CTX_set_mode(newContext, SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+		this->timePrivateKeyFileModification = Util::timeOfFileModification(keyFile);
+		this->timeCertificateFileModification = Util::timeOfFileModification(certFile);
+		if (this->context != NULL) {
+			SSL_CTX_free(this->context);
 		}
-		if( !SSL_CTX_check_private_key(context) ){
-			syslog(LOG_EMERG,"SSL_CTX_check_private_key() fail: %s",getError());
-			_exit(EXIT_FAILURE);
-		}
-		SSL_CTX_set_cipher_list(context, cipherList);
-		SSL_CTX_set_options(context,SSL_OP_NO_SSLv2|SSL_OP_NO_TLSv1_1|SSL_OP_NO_TLSv1);
-		SSL_CTX_set_mode(context,SSL_MODE_ENABLE_PARTIAL_WRITE|
-								SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+		this->context = newContext;
 	}
 public:
 	static SSLBase* getSSLBase(){
@@ -74,6 +107,15 @@ public:
 	}
 	SSL_CTX *getContext(){
 		return context; 
+	}
+	void updateCertificatesIfNeeded() {
+		Configuration* configuration = Configuration::getConfiguration();
+		const char *certFile = configuration->getSSLCertFile().c_str();
+		const char *keyFile = configuration->getSSLKeyFile().c_str();
+		if ( this->timePrivateKeyFileModification != Util::timeOfFileModification(keyFile) ||
+		     this->timeCertificateFileModification != Util::timeOfFileModification(certFile) ) {
+			createContext();
+		}
 	}
 };
 
