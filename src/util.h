@@ -7,6 +7,9 @@
 
 #ifndef VPL_UTIL_INC_H
 #define VPL_UTIL_INC_H
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <limits>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -21,7 +24,6 @@
 #include <string.h>
 #include <string>
 #include <map>
-#include "../config.h"
 #include "jail_limits.h"
 #include "httpException.h"
 
@@ -502,6 +504,18 @@ public:
 		else flags |=O_NONBLOCK;
 		if(fcntl(fd, F_SETFL, flags)<0){
 			syslog(LOG_ERR,"fcntl F_SETFL: %m");
+		}
+	}
+
+	/**
+ 	* Get the time of last modification of a file
+ 	*/
+	static time_t timeOfFileModification(const string filePath){
+		struct stat fileInfo;
+		if(stat(filePath.c_str(), &fileInfo)>=0) {
+			return fileInfo.st_mtime;
+		} else {
+			return 0;
 		}
 	}
 
