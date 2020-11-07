@@ -44,12 +44,10 @@ public:
 		int fd;
 		while ( (fd=open(filePath.c_str(),O_CREAT|O_EXCL|O_WRONLY, 0x600)) == -1
 				&& ntry <1000){
-			struct stat fileInfo;
-			if(stat(filePath.c_str(), &fileInfo)>=0) {
-				if(fileInfo.st_mtime + 2 < time(NULL)){
-					unlink(filePath.c_str());
-					syslog(LOG_DEBUG,"locking timeout %s",filePath.c_str());
-				}
+			time_t lastModification = Util::timeOfFileModification(filePath);
+			if (lastModification &&  (lastModification + 2 < time(NULL))) {
+				unlink(filePath.c_str());
+				syslog(LOG_DEBUG,"locking timeout %s",filePath.c_str());
 			}
 			usleep(5000);
 			ntry++;
