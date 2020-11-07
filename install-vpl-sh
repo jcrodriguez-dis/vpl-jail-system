@@ -176,21 +176,24 @@ function vpl_installq {
 }
 
 function vpl_install_letsencrypt {
-	vpl_install "Let's Encrypt" certbot	
-	echo "Please, enter your domain name in order to install the Certbot's certificates."
-	read A
-	HNAME=$A
+	vpl_install "Let's Encrypt" certbot
+	local DETECTEDFQDN=""
+	local HNAME=""
+	if [ "$(command -pv dnsdomainname)" != "" ] ; then
+		DETECTEDFQDN=$(dnsdomainname -A)
+	fi
+	echo "Please, enter the domain name (FQDN) of this machine in order to install the configure Certbot."
+	echo -n "($DETECTEDFQDN): "
+	read HNAME
+	if [ "$HNAME" == "" ] ; then
+		HNAME=$DETECTEDFQDN
+	fi
 	certbot certonly --standalone --preferred-challenges http -d $HNAME
 	systemctl enable --now certbot-renew.timer
-	systemctl status certbot-renew.timer
 	echo "pre_hook = systemctl stop vpl-jail-system" >> /etc/letsencrypt/renewal/$HNAME.conf
 	echo "post_hook = systemctl start vpl-jail-system" >> /etc/letsencrypt/renewal/$HNAME.conf
-	ln -s /etc/letsencrypt/live/$HNAME/fullchain.pem /etc/vpl/cert.pem
-	ln -s /etc/letsencrypt/live/$HNAME/privkey.pem /etc/vpl/key.pem
-}
-
-function vpl_install_ssl_version {
-	vpl_install "SSL API 1.0.2" openssl1.0.2
+	ln -s /etc/letsencrypt/live/$HNAME/fullchain.pem /etc/vpl/cert.pem 2> /dev/null 
+	ln -s /etc/letsencrypt/live/$HNAME/privkey.pem /etc/vpl/key.pem 2> /dev/null
 }
 
 function vpl_install_jgrasp {
@@ -291,7 +294,6 @@ else
 	vpl_install "C++ compiler" g++
 	vpl_install "SSL library" openssl
 	vpl_install "SSL library" libssl-dev
-	vpl_install "SSL API 1.0.2" openssl1.0.2
 	vpl_install "Firewall" iptables
 	vpl_install "X system" xorg
 	vpl_install "dbus-x11" dbus-x11
@@ -355,26 +357,28 @@ if [ ! -d /var/vpl-jail-system ] ; then
 fi
 chmod 0600 /var/vpl-jail-system
 
-if [ ! -f $VPLJAIL_INSTALL_DIR/*.pem ] ; then
+if [ ! -f $VPLJAIL_INSTALL_DIR/key.pem ] ; then
 	echo "VPL execution server needs SSL certificates to accept https:"
 	echo "and wss: requests."
 	echo "If you have certificates then copy the key and the certificate file"
 	echo "in pem format to $VPLJAIL_INSTALL_DIR/key.pem and $VPLJAIL_INSTALL_DIR/cert.pem"
-	echo "If you don't have certificate the intaller can generate one selfsigned for you"
-	echo -n "Generate the certificate?"
-	read A
+	echo "If you don't have certificate the intaller can install and configure Let's Encrypt for you."
+	echo "Notice that this machine must be accesible from internet and has port 80 available."
+	echo -n "Install Let's Encrypt to get free certificates?"
+	echo -n "(y/n)"
+	read A	
 	if [ "$A" != "n" ] ; then
-		vpl_generate_selfsigned_certificate
-		cp key.pem $VPLJAIL_INSTALL_DIR
-		cp cert.pem $VPLJAIL_INSTALL_DIR
-		chmod 600 $VPLJAIL_INSTALL_DIR/*.pem
-		rm key.pem keyini.pem certini.pem cert.pem
+		vpl_install_letsencrypt	
 	else
-		echo -n "Do you want to use Let's Encrypt certificates?"
-		echo -n "(y/n)"
-		read A	
+		echo "If you want the intaller can generate a selfsigned certificate for you."
+		echo -n "Generate the certificate?"
+		read A
 		if [ "$A" != "n" ] ; then
-			vpl_install_letsencrypt	
+			vpl_generate_selfsigned_certificate
+			cp key.pem $VPLJAIL_INSTALL_DIR
+			cp cert.pem $VPLJAIL_INSTALL_DIR
+			chmod 600 $VPLJAIL_INSTALL_DIR/*.pem
+			rm key.pem keyini.pem certini.pem cert.pem
 		fi
 	fi
 else
@@ -437,7 +441,6 @@ else
         vpl_install "JavaScript (Nodejs-legacy)" nodejs-legacy
         vpl_install_npm "TypeScript" typescript
         vpl_install_npm "Sass" sass
-        vpl_install_npm "Sass" sass
         vpl_install "Octave (GNU)" octave
         vpl_install "Pascal compiler" fp-compiler
         vpl_install "Perl interpreter" perl
@@ -459,6 +462,7 @@ else
         vpl_install "Python3 pandas" python3-pandas
         vpl_install "Python3 Matplotlib" python3-matplotlib
         vpl_install "Python3 pudb" python3-pudb
+        vpl_install "Python3 pycodestyle" python3-pycodestyle
         vpl_install "Ruby interpreter" ruby
         vpl_install "Scala programming language" scala
         vpl_install "Scheme interpreter" plt-scheme racket
@@ -480,6 +484,7 @@ else
         vpl_install "JQuery-UI JavaScript Lib" libjs-jquery-ui 
         vpl_install "Lua compiler 5.1" lua5.1
         vpl_install "R statistical computation and graphics system (GNU)" r-base
+        vpl_install "MIPS R2000/R3000 emulator" spim 
         vpl_install "XQuery interpreter" galax
         vpl_install "Verilog compiler" iverilog
         vpl_install "VHDL compiler" freehdl
