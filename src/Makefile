@@ -86,8 +86,7 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-bin_PROGRAMS = vpl-jail-server$(EXEEXT) websocket-echo-test$(EXEEXT) \
-	program-test$(EXEEXT)
+bin_PROGRAMS = vpl-jail-server$(EXEEXT)
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -100,11 +99,6 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_program_test_OBJECTS = test.$(OBJEXT) configurationFile.$(OBJEXT) \
-	configuration.$(OBJEXT) socket.$(OBJEXT) cgroup.$(OBJEXT) \
-	websocket.$(OBJEXT) util.$(OBJEXT)
-program_test_OBJECTS = $(am_program_test_OBJECTS)
-program_test_LDADD = $(LDADD)
 am_vpl_jail_server_OBJECTS = main.$(OBJEXT) vpl-jail-server.$(OBJEXT) \
 	jail.$(OBJEXT) httpServer.$(OBJEXT) redirector.$(OBJEXT) \
 	configurationFile.$(OBJEXT) configuration.$(OBJEXT) \
@@ -112,10 +106,6 @@ am_vpl_jail_server_OBJECTS = main.$(OBJEXT) vpl-jail-server.$(OBJEXT) \
 	util.$(OBJEXT) cgroup.$(OBJEXT)
 vpl_jail_server_OBJECTS = $(am_vpl_jail_server_OBJECTS)
 vpl_jail_server_LDADD = $(LDADD)
-am_websocket_echo_test_OBJECTS = webSocketEchoTest.$(OBJEXT) \
-	socket.$(OBJEXT) websocket.$(OBJEXT) util.$(OBJEXT)
-websocket_echo_test_OBJECTS = $(am_websocket_echo_test_OBJECTS)
-websocket_echo_test_LDADD = $(LDADD)
 AM_V_P = $(am__v_P_$(V))
 am__v_P_ = $(am__v_P_$(AM_DEFAULT_VERBOSITY))
 am__v_P_0 = false
@@ -132,10 +122,6 @@ DEFAULT_INCLUDES = -I. -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
 am__mv = mv -f
-AM_V_lt = $(am__v_lt_$(V))
-am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
-am__v_lt_0 = --silent
-am__v_lt_1 = 
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
 AM_V_CXX = $(am__v_CXX_$(V))
@@ -161,10 +147,8 @@ AM_V_CCLD = $(am__v_CCLD_$(V))
 am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(program_test_SOURCES) $(vpl_jail_server_SOURCES) \
-	$(websocket_echo_test_SOURCES)
-DIST_SOURCES = $(program_test_SOURCES) $(vpl_jail_server_SOURCES) \
-	$(websocket_echo_test_SOURCES)
+SOURCES = $(vpl_jail_server_SOURCES)
+DIST_SOURCES = $(vpl_jail_server_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -228,7 +212,7 @@ MAKEINFO = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/missing makeinfo
 MKDIR_P = /bin/mkdir -p
 OBJEXT = o
 PACKAGE = vpl-jail-system
-PACKAGE_BUGREPORT = 
+PACKAGE_BUGREPORT = jcrodriguez@dis.ulpgc.es
 PACKAGE_NAME = vpl jail system
 PACKAGE_STRING = vpl jail system 2.6.0
 PACKAGE_TARNAME = vpl-jail-system
@@ -293,15 +277,6 @@ socket.cpp socket.h\
 websocket.cpp websocket.h\
 util.cpp util.h rpc.h xml.h jail_limits.h lock.h\
 cgroup.cpp cgroup.h
-
-websocket_echo_test_SOURCES = webSocketEchoTest.cpp socket.cpp socket.h\
-websocket.cpp websocket.h\
-util.cpp util.h rpc.h xml.h jail_limits.h lock.h
-
-program_test_SOURCES = tests/test.cpp configurationFile.cpp configuration.cpp socket.cpp socket.h\
-cgroup.cpp cgroup.h\
-websocket.cpp websocket.h\
-util.cpp util.h rpc.h xml.h jail_limits.h lock.h
 
 
 # set the include path found by configure
@@ -386,17 +361,9 @@ uninstall-binPROGRAMS:
 clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
 
-program-test$(EXEEXT): $(program_test_OBJECTS) $(program_test_DEPENDENCIES) $(EXTRA_program_test_DEPENDENCIES) 
-	@rm -f program-test$(EXEEXT)
-	$(AM_V_CXXLD)$(CXXLINK) $(program_test_OBJECTS) $(program_test_LDADD) $(LIBS)
-
 vpl-jail-server$(EXEEXT): $(vpl_jail_server_OBJECTS) $(vpl_jail_server_DEPENDENCIES) $(EXTRA_vpl_jail_server_DEPENDENCIES) 
 	@rm -f vpl-jail-server$(EXEEXT)
 	$(AM_V_CXXLD)$(CXXLINK) $(vpl_jail_server_OBJECTS) $(vpl_jail_server_LDADD) $(LIBS)
-
-websocket-echo-test$(EXEEXT): $(websocket_echo_test_OBJECTS) $(websocket_echo_test_DEPENDENCIES) $(EXTRA_websocket_echo_test_DEPENDENCIES) 
-	@rm -f websocket-echo-test$(EXEEXT)
-	$(AM_V_CXXLD)$(CXXLINK) $(websocket_echo_test_OBJECTS) $(websocket_echo_test_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -413,39 +380,25 @@ include ./$(DEPDIR)/main.Po
 include ./$(DEPDIR)/processMonitor.Po
 include ./$(DEPDIR)/redirector.Po
 include ./$(DEPDIR)/socket.Po
-include ./$(DEPDIR)/test.Po
 include ./$(DEPDIR)/util.Po
 include ./$(DEPDIR)/vpl-jail-server.Po
-include ./$(DEPDIR)/webSocketEchoTest.Po
 include ./$(DEPDIR)/websocket.Po
 
 .cpp.o:
-	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+	$(am__mv) $$depbase.Tpo $$depbase.Po
 #	$(AM_V_CXX)source='$<' object='$@' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) \
 #	$(AM_V_CXX_no)$(CXXCOMPILE) -c -o $@ $<
 
 .cpp.obj:
-	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+	$(am__mv) $$depbase.Tpo $$depbase.Po
 #	$(AM_V_CXX)source='$<' object='$@' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) \
 #	$(AM_V_CXX_no)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
-
-test.o: tests/test.cpp
-	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT test.o -MD -MP -MF $(DEPDIR)/test.Tpo -c -o test.o `test -f 'tests/test.cpp' || echo '$(srcdir)/'`tests/test.cpp
-	$(AM_V_at)$(am__mv) $(DEPDIR)/test.Tpo $(DEPDIR)/test.Po
-#	$(AM_V_CXX)source='tests/test.cpp' object='test.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) \
-#	$(AM_V_CXX_no)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o test.o `test -f 'tests/test.cpp' || echo '$(srcdir)/'`tests/test.cpp
-
-test.obj: tests/test.cpp
-	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT test.obj -MD -MP -MF $(DEPDIR)/test.Tpo -c -o test.obj `if test -f 'tests/test.cpp'; then $(CYGPATH_W) 'tests/test.cpp'; else $(CYGPATH_W) '$(srcdir)/tests/test.cpp'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/test.Tpo $(DEPDIR)/test.Po
-#	$(AM_V_CXX)source='tests/test.cpp' object='test.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) \
-#	$(AM_V_CXX_no)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o test.obj `if test -f 'tests/test.cpp'; then $(CYGPATH_W) 'tests/test.cpp'; else $(CYGPATH_W) '$(srcdir)/tests/test.cpp'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
