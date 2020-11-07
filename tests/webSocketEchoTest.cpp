@@ -11,8 +11,8 @@
 #include <syslog.h>
 using namespace std;
 
-#include "websocket.h"
-#include "httpServer.h"
+#include "../src/websocket.h"
+#include "../src/httpServer.h"
 
 int main()
 {

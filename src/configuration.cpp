@@ -64,7 +64,7 @@ void Configuration::readConfigFile(){
 	configDefault["ENVPATH"]=Util::getEnv("PATH");
 	configDefault["LOGLEVEL"]="0";
 	configDefault["FAIL2BAN"]="0";
-	configDefault["SSL_CIPHER_LIST"]="DEFAULT";
+	configDefault["SSL_CIPHER_LIST"]="";
 	configDefault["SSL_CERT_FILE"]="/etc/vpl/cert.pem";
 	configDefault["SSL_KEY_FILE"]="/etc/vpl/key.pem";
 	ConfigData data=ConfigurationFile::readConfiguration(configPath,configDefault);

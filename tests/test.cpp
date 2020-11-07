@@ -6,9 +6,9 @@
 #include <cassert>
 #include <iostream>
 #include <exception>
-#include "../util.h"
-#include "../cgroup.h"
-#include "../configuration.h"
+#include "../src/util.h"
+#include "../src/cgroup.h"
+#include "../src/configuration.h"
 #include <syslog.h>
 #include <stdio.h>
 
@@ -119,15 +119,28 @@ void testCleanPATH(){
 	assert(Configuration::generateCleanPATH("/usr","/bin:/kk:/sbin:/local/bin:/local/nada")=="/bin:/sbin:/local/bin");
 }
 
+void testTimeOfFileModification(){
+	string fileName = "timeOfFileModification.test_file";
+	time_t now = time(NULL);
+	Util::writeFile(fileName, fileName, geteuid());
+	time_t modification = Util::timeOfFileModification(fileName);
+	Util::deleteFile(fileName);
+	assert(now <= modification &&  (modification - now) < 3 );
+}
+
+void testWriteReadRemoveFile(){
+	Util::writeFile("/tmp/to_be_or_not_to_be", "mi texto único", getuid());
+	assert( Util::fileExists("/tmp/to_be_or_not_to_be") );
+	assert( Util::readFile("/tmp/to_be_or_not_to_be") == "mi texto único" );
+	Util::deleteFile("/tmp/to_be_or_not_to_be");
+	assert( ! Util::fileExists("/tmp/to_be_or_not_to_be") );
+}
+
 void testSetCgroupFileSystem(){
 	Cgroup::setBaseCgroupFileSystem("/sys/fs/cgroup");
 	assert(Cgroup::getBaseCgroupFileSystem() == "/sys/fs/cgroup");
-	assert(Cgroup::getBaseCgroupFileSystem() != "/sys/fs");
 	Cgroup::setBaseCgroupFileSystem("/");
 	assert(Cgroup::getBaseCgroupFileSystem() == "/");
-	assert(Cgroup::getBaseCgroupFileSystem() != "//");
-	Cgroup::setBaseCgroupFileSystem(" ");
-	assert(Cgroup::getBaseCgroupFileSystem() == " ");
 }
 
 void testGetCPUAcctStat(){
@@ -136,7 +149,6 @@ void testGetCPUAcctStat(){
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup.test");
-	cout << Cgroup::getBaseCgroupFileSystem() << endl;
 	map<string, int> result = cgroup.getCPUAcctStat();
 	assert(result.find("user")->second == 36509);
 	assert(result.find("system")->second == 3764);
@@ -165,7 +177,7 @@ void testGetMemoryStat(){
 	assert(result.find("shmem")->second == 26406912);
 	assert(result.find("mapped_file")->second == 351842304);
 	assert(result.find("pgfault")->second == 2448732);
-	assert(result.find("hierarchical_memory_limit")->second == 9223372036854771712);
+	assert(result.find("hierarchical_memory_limit")->second == 9223372036854771712L);
 }
 
 void testGetCPUUsage(){
@@ -175,7 +187,7 @@ void testGetCPUUsage(){
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup.test");
 	long int result = cgroup.getCPUUsage();
-	assert(result == 406582887060);
+	assert(result == 406582887060L);
 }
 
 void testGetCPUNotify(){
@@ -448,14 +460,6 @@ void testSetMemReleaseAgentPath(){
 	assert(cgroup.getMemReleaseAgent() == "0");
 }
 
-void testWriteReadRemoveFile(){
-	Util::writeFile("/tmp/to_be_or_not_to_be", "mi texto único", getuid());
-	assert( Util::fileExists("/tmp/to_be_or_not_to_be") );
-	assert( Util::readFile("/tmp/to_be_or_not_to_be") == "mi texto único" );
-	Util::deleteFile("/tmp/to_be_or_not_to_be");
-	assert( ! Util::fileExists("/tmp/to_be_or_not_to_be") );
-}
-
 int main(){
 	bool firstTime = true;
 	while(true){
@@ -467,6 +471,8 @@ int main(){
 			testItos();
 			testToUppercase();
 			testCorrectFileName();
+			testWriteReadRemoveFile();
+			testTimeOfFileModification();
 			//Test cgroup
 			testSetCgroupFileSystem();
 			testGetCPUAcctStat();
