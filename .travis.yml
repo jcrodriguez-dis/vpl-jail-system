@@ -1,8 +1,4 @@
 language: cpp
 
-install:
-  - ./configure
-  - ls -l cgroup/cpu,cpuacct
-
 script: 
   - ./runTest.sh
