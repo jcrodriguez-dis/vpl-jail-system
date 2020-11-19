@@ -16,6 +16,7 @@
 using namespace std;
 
 /**
+ * @class Cgroup
  * Interface designed for a better management of CPU, memory and net resources
  * Please, note that some of the interface's setters will require the user
  * to be part of the cgroup that is being modified

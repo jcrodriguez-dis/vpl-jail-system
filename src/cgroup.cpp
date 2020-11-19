@@ -27,6 +27,11 @@ regex Cgroup::regUnder("(^|\\n)under_oom ([0-9]+)(\\n|$)");
 regex Cgroup::regKill("(^|\\n)oom_kill ([0-9]+)(\\n|$)");
 regex Cgroup::regTrim("([ \\n\\t]*)([^ \\n\\t]+)([ \\n\\t]*)");
 
+/**
+ * Private function used to find a pattern in a given text.
+ * @param [in] reg. Pattern to be searched.
+ * @param [in] input. Text in which to search the pattern.
+*/
 string Cgroup::regFound(regex &reg, string input){
 	smatch found;
 	string match;
@@ -37,6 +42,9 @@ string Cgroup::regFound(regex &reg, string input){
 	return match;
 }
 
+/**
+ * @return A list with the CPU usage by the current user and the system in milliseconds
+*/
 map<string, int> Cgroup::getCPUAcctStat(){
 	map<string, int> cpuStat;
 	string stat;
@@ -51,19 +59,27 @@ map<string, int> Cgroup::getCPUAcctStat(){
 	return cpuStat;
 }
 
-
+/**
+ * @return The total usage of the CPU time in milliseconds.
+*/
 long int Cgroup::getCPUUsage(){
 	string path = cgroupDirectory + "cpu,cpuacct/cpuacct.usage";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::atol(Util::readFile((cgroupDirectory + "cpu,cpuacct/cpuacct.usage")));
 }
 
+/**
+ * @return The value stored in the notify file. 0 means it's disabled and 1 means it's enabled.
+*/
 int Cgroup::getCPUNotify(){
 	string path = cgroupDirectory + "cpu,cpuacct/notify_on_release";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::atoi(Util::readFile((cgroupDirectory + "cpu,cpuacct/notify_on_release").c_str()));
 }
 
+/**
+ * @return The path in which the notifications will be put.
+*/
 string Cgroup::getCPUReleaseAgent(){
 	string path = cgroupDirectory + "cpu,cpuacct/release_agent";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
@@ -71,6 +87,9 @@ string Cgroup::getCPUReleaseAgent(){
 	return regFound(regTrim, result);
 }
 
+/**
+ * @return The PIDs of the processors controlled by the CPU controller.
+*/
 vector<int> Cgroup::getCPUProcs(){
 	string path = cgroupDirectory + "cpu,cpuacct/tasks";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
@@ -85,6 +104,9 @@ vector<int> Cgroup::getCPUProcs(){
 	return pids;
 }
 
+/**
+ * @return The PIDs of the processors controlled by the CPU controller.
+*/
 map<string, int> Cgroup::getCPUStat(){
 	map<string, int> cpuStat;
 	string path = cgroupDirectory + "cpu,cpuacct/cpu.stat";
@@ -101,12 +123,18 @@ map<string, int> Cgroup::getCPUStat(){
 	return cpuStat;
 }
 
+/**
+ * @return 1 if net priority is enabled, 0 if disabled.
+*/
 int Cgroup::getNetPrioID(){
 	string path = cgroupDirectory + "net_cls,net_prio/net_prio.prioidx";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::atoi(Util::readFile((cgroupDirectory + "net_cls,net_prio/net_prio.prioidx").c_str()));
 }
 
+/**
+ * @return The PIDs of the processors controlled by the current cgroup.
+*/
 vector<int> Cgroup::getPIDs(){
 	string path = cgroupDirectory + "pids/cgroup.procs";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
@@ -121,6 +149,9 @@ vector<int> Cgroup::getPIDs(){
 	return pids;
 }
 
+/**
+ * @return A list with the net interfaces and their current priority.
+*/
 map<string, int> Cgroup::getNetPrioMap(){
 	map<string, int> netPrioMap;
 	string path = cgroupDirectory + "net_cls,net_prio/net_prio.ifpriomap";
@@ -135,18 +166,27 @@ map<string, int> Cgroup::getNetPrioMap(){
 	return netPrioMap;
 }
 
+/**
+ * @return The value stored in the notify file. 0 means it's disabled and 1 means it's enabled.
+*/
 int Cgroup::getNetNotify(){
 	string path = cgroupDirectory + "net_cls,net_prio/notify_on_release";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::atoi(Util::readFile(cgroupDirectory + "net_cls,net_prio/notify_on_release"));
 }
 
+/**
+ * @return The path in which the notifications will be put.
+*/
 string Cgroup::getNetReleaseAgent(){
 	string path = cgroupDirectory + "net_cls,net_prio/release_agent";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::readFile(cgroupDirectory + "net_cls,net_prio/release_agent");
 }
 
+/**
+ * @return The PIDs of the processors controlled by the net controller.
+*/
 vector<int> Cgroup::getNetProcs(){
 	string path = cgroupDirectory + "net_cls,net_prio/tasks";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
@@ -161,6 +201,9 @@ vector<int> Cgroup::getNetProcs(){
 	return tasks;
 }
 
+/**
+ * @return The PIDs of the processors controlled by the memory controller.
+*/
 vector<int> Cgroup::getMemoryProcs(){
 	string path = cgroupDirectory + "memory/tasks";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
@@ -175,12 +218,18 @@ vector<int> Cgroup::getMemoryProcs(){
 	return tasks;
 }
 
+/**
+ * @return The total memory limit of the processes in bytes.
+*/
 long int Cgroup::getMemoryLimitInBytes(){
 	string path = cgroupDirectory + "memory/memory.limit_in_bytes";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::atol(Util::readFile((cgroupDirectory + "memory/memory.limit_in_bytes").c_str()));
 }
 
+/**
+ * @return A list with several memory usage information parameters such as cache usage, mapped files and others.
+*/
 map<string, long int> Cgroup::getMemoryStat(){
 	map<string, long int> memStat;
 	string stat;
@@ -202,24 +251,37 @@ map<string, long int> Cgroup::getMemoryStat(){
 	return memStat;
 }
 
+/**
+ * @return Current memory usage in bytes.
+*/
 long int Cgroup::getMemoryUsageInBytes(){
 	string path = cgroupDirectory + "memory/memory.usage_in_bytes";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::atol(Util::readFile(cgroupDirectory + "memory/memory.usage_in_bytes"));
 }
 
+/**
+ * @return The value stored in the notify file. 0 means it's disabled and 1 means it's enabled.
+*/
 int Cgroup::getMemNotify(){
 	string path = cgroupDirectory + "memory/notify_on_release";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::atoi(Util::readFile(cgroupDirectory + "memory/notify_on_release"));
 }
 
+/**
+ * @return The path in which the notifications will be put.
+*/
 string Cgroup::getMemReleaseAgent(){
 	string path = cgroupDirectory + "memory/release_agent";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
 	return Util::readFile(cgroupDirectory + "memory/release_agent");
 }
 
+/**
+ * @return A list with the OOM control. The value of the parameters will be 1 or 0, depending on wether they are enabled
+ * or disabled respectively.
+*/
 map<string, int> Cgroup::getMemoryOOMControl(){
 	string path = cgroupDirectory + "memory/memory.oom_control";
 	syslog(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
@@ -240,6 +302,8 @@ map<string, int> Cgroup::getMemoryOOMControl(){
 /**
  *	Specify an internet interface with a number to set its priority
  *	1 being the top priority. E.g: eth0 2
+ *  @param [in] interface. Specifies the interface for which we want to change the priority and the priority
+ *  we want to stablish
  */
 void Cgroup::setNetPrioMap(string interface){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "net_cls,net_prio/net_prio.ifpriomap");
@@ -247,18 +311,31 @@ void Cgroup::setNetPrioMap(string interface){
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "net_cls,net_prio/net_prio.ifpriomap");
 }
 
+/**
+ *	Sets a flag for wether we want to get notifications when the net_cls,net_prio group is empty or not.
+ *	True being enabling and False, disabling.
+ *  @param [in] flag. Sets the flag with True or False.
+ */
 void Cgroup::setNetNotify(bool flag){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "net_cls,net_prio/notify_on_release");
 	Util::writeFile(cgroupDirectory + "net_cls,net_prio/notify_on_release",flag?"1":"0");
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "net_cls,net_prio/notify_on_release");
 }
-
+/**
+ *	Specifies the absolute path for where we want to receive the notifications.
+ *  NetNotify needs to be active for this feature to work.
+ *  @param [in] path. Specifies the desired path.
+ */
 void Cgroup::setNetReleaseAgent(string path){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "net_cls,net_prio/release_agent");
 	Util::writeFile(cgroupDirectory + "net_cls,net_prio/release_agent",path);
 	syslog(LOG_DEBUG,"'%s' has been successfully written", "net_cls,net_prio/release_agent");
 }
-
+/**
+ *	Specifies the PIDs of the processes that are inteded to be controlled by
+ *  the net controller.
+ *  @param [in] pid. PID of the desired process.
+ */
 void Cgroup::setNetProcs(int pid){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "net_cls,net_prio/tasks");
 	ofstream file;
@@ -271,6 +348,7 @@ void Cgroup::setNetProcs(int pid){
 }
 /**
  * Insert a process' PID to allow it to be in the CPU controllers
+ * @param [in] pid. PID of the desired process.
  */
 void Cgroup::setCPUProcs(int pid){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu,cpuacct/tasks");
@@ -286,6 +364,7 @@ void Cgroup::setCPUProcs(int pid){
 /**
  * Contains a flag that indicates whether the cgroup will notify when
  * the CPU controller has no processes in it
+ * @param [in] flag. Boolean variable. If set to True, notifications will be enabled, if False, they will be disabled.
  */
 void Cgroup::setCPUNotify(bool flag){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu,cpuacct/notify_on_release");
@@ -295,7 +374,8 @@ void Cgroup::setCPUNotify(bool flag){
 
 /**
  * Specifies the path to the file in which the cgroup will notify
- * when the cpu tasks file is empty. This requires the flag in notify_on_release to be set to 1
+ * when the cpu tasks file is empty. This requires the flag in notify_on_release to be set to 1.
+ * @param [in] path. Specifies the desired path.
  */
 void Cgroup::setCPUReleaseAgentPath(string path){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "cpu,cpuacct/release_agent");
@@ -304,7 +384,8 @@ void Cgroup::setCPUReleaseAgentPath(string path){
 }
 
 /**
- * Insert a process' PID to allow it to be in the memory controllers
+ * Insert a process' PID to allow it to be in the memory controllers.
+ * @param [in] pid. PID of the desired process.
  */
 void Cgroup::setMemoryProcs(int pid){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "memory/tasks");
@@ -319,6 +400,7 @@ void Cgroup::setMemoryProcs(int pid){
 
 /**
  * Set a limit in bytes for the memory controller
+ * @param [in] bytes. Long int variable that will set the limit.
  */
 void Cgroup::setMemoryLimitInBytes(long int bytes){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "memory/memory.limit_in_bytes");
@@ -329,6 +411,7 @@ void Cgroup::setMemoryLimitInBytes(long int bytes){
 /**
  * Contains a flag that indicates whether the cgroup will notify when
  * the memory controller has no processes in it
+ * @param [in] flag. Boolean variable. If set to True, notifications will be enabled, if False, they will be disabled.
  */
 void Cgroup::setMemNotify(bool flag){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "memory/notify_on_release");
@@ -339,6 +422,7 @@ void Cgroup::setMemNotify(bool flag){
 /**
  * Specifies the path to the file in which the cgroup will notify
  * when the memory tasks file is empty. This requires the flag in notify_on_release to be set to 1
+ * @param [in] path. Specifies the desired path.
  */
 void Cgroup::setMemReleaseAgentPath(string path){
 	syslog(LOG_DEBUG,"Writing to the file '%s'", "memory/release_agent");
