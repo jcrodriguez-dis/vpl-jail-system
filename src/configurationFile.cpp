@@ -13,8 +13,8 @@ void ConfigurationFile::parseConfigLine(ConfigData &data,const string &line){
 	static bool init=false;
 	static regex_t reg,comment;
 	if(!init){
-		regcomp(&reg, "^[ \\t]*([^ \\t]+)[ \\t]*=[ \\t]*([^#]*)", REG_EXTENDED);
-		regcomp(&comment, "^[ \\t]*(\\#.*)?$", REG_EXTENDED);
+		regcomp(&reg, "^[ \t]*([^ \t]+)[ \t]*=[ \t]*([^#]*)", REG_EXTENDED);
+		regcomp(&comment, "^[ \t]*(#.*)?$", REG_EXTENDED);
 		init=true;
 	}
 	regmatch_t match[3];
