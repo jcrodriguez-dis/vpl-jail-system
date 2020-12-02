@@ -1,9 +1,11 @@
 #!/bin/bash
 ./configure
-make distcheck
-if [ "$?" != "0" ] ; then
-	echo "Error: make distcheck fails."
-	exit 1
+if [ "$1" == "" ] ; then
+	make distcheck
+	if [ "$?" != "0" ] ; then
+		echo "Error: make distcheck fails."
+		exit 1
+	fi
 fi
 cd tests
 make program-test
