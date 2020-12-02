@@ -21,22 +21,102 @@ void testBase64Encode(){
 	assert(Base64::encode("ñáÑ=")=="w7HDocORPQ=="||(cerr <<Base64::encode("ñáÑ=")<<endl,0));
 }
 void testBase64Decode(){
+	const int ibyte = 256;
 	assert(Base64::decode("SGVsbG8=")=="Hello"||(cerr <<Base64::decode("SGVsbG8=")<<endl,0));
 	assert(Base64::decode("YWJjZGU=")=="abcde"||(cerr <<Base64::decode("YWJjZGU=")<<endl,0));
 	assert(Base64::decode("w7HDocOR")=="ñáÑ"||(cerr <<Base64::decode("w7HDocOR")<<endl,0));
 	assert(Base64::decode("w7HDocORPQ==")=="ñáÑ="||(cerr <<Base64::decode("w7HDocORPQ==")<<endl,0));
 	assert(Base64::decode(Base64::encode("RFB 003.008\n"))=="RFB 003.008\n");
-	string test(256,'\0');
-	unsigned char *buf=(unsigned char *)test.data();
-	for(int i=0; i<256;i++)
+	string test(ibyte, '\0');
+	unsigned char *buf = (unsigned char *)test.data();
+	for(int i = 0; i < ibyte;i++)
 		buf[i]=i;
 	string enc=Base64::encode(test);
 	string dec=Base64::decode(enc);
-	assert(dec.size()==256);
-	unsigned char *raw= (unsigned char *)dec.data();
-	for(int i=0; i<256;i++)
-		assert(i==raw[i]);
+	assert(dec.size() == ibyte);
+	unsigned char *raw = (unsigned char *)dec.data();
+	for(int i=0; i < ibyte;i++)
+		assert(i == raw[i]);
 
+}
+
+class ConfigurationTestFull: public Configuration {
+protected:
+	ConfigurationTestFull(): Configuration("./configfiles/full.txt") {
+}
+public:
+	static Configuration* getConfiguration(){
+		singlenton = new ConfigurationTestFull();
+		return singlenton;
+	}
+};
+
+class ConfigurationTestEmpty: public Configuration {
+protected:
+	ConfigurationTestEmpty(): Configuration("./configfiles/empty.txt") {
+}
+public:
+	static Configuration* getConfiguration(){
+		singlenton = new ConfigurationTestEmpty();
+		return singlenton;
+	}
+};
+
+void testConfigurationEmpty() {
+	Configuration *config = ConfigurationTestEmpty::getConfiguration();
+	ExecutionLimits limits = config->getLimits();
+	assert(limits.maxfilesize == Util::memSizeToBytesi("64 mb"));
+	assert(limits.maxmemory == Util::memSizeToBytesi("2000 mb"));
+	assert(limits.maxprocesses == 500);
+	assert(limits.maxtime == 1200);
+	assert(config->getJailPath() == "/jail");
+	assert(config->getControlPath() == "/var/vpl-jail-system");
+	assert(config->getMinPrisoner() == 10000);
+	assert(config->getMaxPrisoner() == 20000);
+	vector<string> taskOnly = config->getTaskOnlyFrom();
+	assert(taskOnly.size() == 0);
+	assert(config->getInterface() == "");
+	assert(config->getURLPath() == "/");
+	assert(config->getPort() == 80);
+	assert(config->getSecurePort() == 443);
+	assert(config->getLogLevel() == 0);
+	assert(config->getFail2Ban() == 0);
+	assert(config->getSSLCipherList() == "");
+	assert(config->getSSLCertFile() == "/etc/vpl/cert.pem");
+	assert(config->getSSLKeyFile() == "/etc/vpl/key.pem");
+	assert(config->getUseCGroup() == false);
+	assert(config->getRequestMaxSize() == Util::memSizeToBytesi("128 mb"));
+	assert(config->getResultMaxSize() == Util::memSizeToBytesi("32 Kb"));
+}
+
+void testConfigurationFull() {
+	Configuration *config = ConfigurationTestFull::getConfiguration();
+	ExecutionLimits limits = config->getLimits();
+	assert(limits.maxfilesize == Util::memSizeToBytesi("65 mb"));
+	assert(limits.maxmemory == Util::memSizeToBytesi("1998 mb"));
+	assert(limits.maxprocesses == 500);
+	assert(limits.maxtime == 88888);
+	assert(config->getJailPath() == "/rejail/algo");
+	assert(config->getControlPath() == "/mnt/opt/var/vpl-jail-system");
+	assert(config->getMinPrisoner() == 11111);
+	assert(config->getMaxPrisoner() == 11222);
+	vector<string> taskOnly = config->getTaskOnlyFrom();
+	assert(taskOnly.size() == 3);
+	assert(taskOnly[0] == "10.10.3.");
+	assert(taskOnly[1] == "193.22.144.23");
+	assert(taskOnly[2] == "196.23.");
+	assert(config->getInterface() == "128.1.1.7");
+	assert(config->getURLPath() == "/secr$et$");
+	assert(config->getPort() == 8081);
+	assert(config->getSecurePort() == 44300);
+	assert(config->getLogLevel() == 1);
+	assert(config->getFail2Ban() == 7);
+	assert(config->getSSLCipherList() == "EDFG");
+	assert(config->getSSLCertFile() == "/etc/ssl/public/cert.pem");
+	assert(config->getSSLKeyFile() == "/etc/ssl/private/key.pem");
+	assert(config->getUseCGroup() == true);
+	assert(config->getRequestMaxSize() == Util::memSizeToBytesi("333 Mb"));
+	assert(config->getResultMaxSize() == Util::memSizeToBytesi("524 Mb"));
 }
 
 void testTrim(){
@@ -136,6 +216,41 @@ void testWriteReadRemoveFile(){
 	assert( ! Util::fileExists("/tmp/to_be_or_not_to_be") );
 }
 
+void testMemSizeToBytesl() {
+	int long l1234 = 1234;
+	int long kb1219 = 1219 * 1024;
+	int long mb435 = 435 * 1024 * 1024;
+	int long gb8 = 8l * 1024 * 1024 * 1024;
+	assert(Util::memSizeToBytesl("nada") == 0);
+	assert(Util::memSizeToBytesl("-10") == 0);
+	assert(Util::memSizeToBytesl("0") == 0);
+	assert(Util::memSizeToBytesl("0 Mb") == 0);
+	assert(Util::memSizeToBytesl("1234") == l1234);
+	assert(Util::memSizeToBytesl("1219 kbytes") == kb1219);
+	assert(Util::memSizeToBytesl("1219K") == kb1219);
+	assert(Util::memSizeToBytesl("435 Mbytes") == mb435);
+	assert(Util::memSizeToBytesl("435m") == mb435);
+	assert(Util::memSizeToBytesl("8gbytes") == gb8);
+	assert(Util::memSizeToBytesl("8     G") == gb8);
+}
+
+void testMemSizeToBytesi() {
+	int l1234 = 1234;
+	int kb1219 = 1219 * 1024;
+	int mb435 = 435 * 1024 * 1024;
+	int gb1 = 1024 * 1024 * 1024;
+	assert(Util::memSizeToBytesi("nada") == 0);
+	assert(Util::memSizeToBytesi("-10") == 0);
+	assert(Util::memSizeToBytesi("0") == 0);
+	assert(Util::memSizeToBytesi("0 Mb") == 0);
+	assert(Util::memSizeToBytesi("1234") == l1234);
+	assert(Util::memSizeToBytesi("1219 kbytes") == kb1219);
+	assert(Util::memSizeToBytesi("1219K") == kb1219);
+	assert(Util::memSizeToBytesi("435 Mbytes") == mb435);
+	assert(Util::memSizeToBytesi("435m") == mb435);
+	assert(Util::memSizeToBytesi("1gbytes") == gb1);
+	assert(Util::memSizeToBytesi("1     G") == gb1);
+}
 void testSetCgroupFileSystem(){
 	Cgroup::setBaseCgroupFileSystem("/sys/fs/cgroup");
 	assert(Cgroup::getBaseCgroupFileSystem() == "/sys/fs/cgroup");
@@ -385,9 +500,10 @@ void testSetNetProcs(){
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup.test");
-	cgroup.setNetProcs(999);
+	const int netProcs = 999;
+	cgroup.setNetProcs(netProcs);
 	vector<int> procs = cgroup.getNetProcs();
-	assert(count(procs.begin(), procs.end(), 999));
+	assert(count(procs.begin(), procs.end(), netProcs));
 }
 void testSetCPUNotify(){
 	char buff[FILENAME_MAX];
@@ -414,9 +530,10 @@ void testSetCPUProcs(){
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup.test");
-	cgroup.setCPUProcs(999);
+	const int netProcs = 999;
+	cgroup.setCPUProcs(netProcs);
 	vector<int> procs = cgroup.getCPUProcs();
-	assert(count(procs.begin(), procs.end(), 999));
+	assert(count(procs.begin(), procs.end(), netProcs));
 }
 
 void testSetMemoryProcs(){
@@ -436,8 +553,9 @@ void testSetMemoryLimitInBytes(){
 	string currentWorkingDir(buff);
 	Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 	Cgroup cgroup("cgroup.test");
-	cgroup.setMemoryLimitInBytes(2147483648);
-	assert(cgroup.getMemoryLimitInBytes() == 2147483648);
+	const int memoryLimit = 2147483648;
+	cgroup.setMemoryLimitInBytes(memoryLimit);
+	assert(cgroup.getMemoryLimitInBytes() == memoryLimit);
 }
 
 void testSetMemNotify(){
@@ -473,6 +591,10 @@ int main(){
 			testCorrectFileName();
 			testWriteReadRemoveFile();
 			testTimeOfFileModification();
+			testMemSizeToBytesl();
+			testMemSizeToBytesi();
+			testConfigurationEmpty();
+			testConfigurationFull();
 			//Test cgroup
 			testSetCgroupFileSystem();
 			testGetCPUAcctStat();
