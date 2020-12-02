@@ -50,7 +50,7 @@ string HttpJailServer::receive(){
 	}
 	int sizeToRead=atoi(socket->getHeader("Content-Length").c_str());
 	if(sizeToRead != 0){
-		if(sizeToRead > JAIL_REQUEST_MAX_SIZE){
+		if(sizeToRead > Configuration::getConfiguration()->getRequestMaxSize()){
 			throw HttpException(requestEntityTooLargeCode
 					,"http Request size too large"
 					,socket->getHeader("Content-Length"));

@@ -414,10 +414,10 @@ void processMonitor::setExtraInfo(ExecutionLimits el, bool ri, string lang){
 }
 
 void processMonitor::limitResultSize(string &r){
-	if(r.size()>= JAIL_RESULT_MAX_SIZE){
-		string men="\nThis output has been cut to "+Util::itos(JAIL_RESULT_MAX_SIZE/1024)+"Kb"
+	if(r.size() >= configuration->getRequestMaxSize()){
+		string men="\nThis output has been cut to "+Util::itos(configuration->getRequestMaxSize()/1024)+"Kb"
 				+", its original size was "+Util::itos(r.size()/1024)+"Kb\n";
-		r = men+r.substr(0,JAIL_RESULT_MAX_SIZE/2)+men+r.substr(r.size()-JAIL_RESULT_MAX_SIZE/2);
+		r = men+r.substr(0,configuration->getRequestMaxSize()/2)+men+r.substr(r.size()-configuration->getRequestMaxSize()/2);
 	}
 }
 void processMonitor::getResult(string &compilation, string &execution, bool &executed){
