@@ -11,19 +11,20 @@
 #include <config.h>
 #endif
 #include <limits>
+#include <regex>
+#include <map>
+#include <iostream>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <syslog.h>
 #include <stdio.h>
-#include <regex.h>
 #include <stdlib.h>
 #include <dirent.h>
 #include <signal.h>
 #include <string.h>
 #include <string>
-#include <map>
 #include "jail_limits.h"
 #include "httpException.h"
 
@@ -164,15 +165,13 @@ public:
 		return s.substr(boffset,eoffset-boffset);
 	}
 
-
-
 	/**
 	 * return a random int take from /dev/random
 	 */
 	static int random(){
 		int randomFile = open("/dev/urandom", O_RDONLY);
 		int ret;
-		ssize_t r=read(randomFile, ((char*)&ret), (sizeof (int)));
+		ssize_t r = read(randomFile, ((void*) (&ret)), (sizeof(int)));
 		return abs(ret+r);
 	}
 	/**
@@ -231,7 +230,8 @@ public:
 	 * return an int/long int as string
 	 */
 	static string itos(const long int value){
-		char buf[30];
+		const int maxIntChars = 31;
+		char buf[maxIntChars];
 		sprintf(buf,"%ld",value);
 		return buf;
 	}
@@ -252,6 +252,54 @@ public:
 	 */
 	static long int atol(const string &s){
 		return ::atol(s.c_str());
+	}
+
+	/**
+	 * return the value of Kb, Mb or Gb
+	 */
+	static long int memAbbreviation(const string &abbreviation){
+		const long int kb = 1024;
+		const long int mb = 1024 * kb;
+		const long int gb = 1024 * mb;
+		if (abbreviation.size() == 0) {
+			return 1;
+		}
+		char abb = abbreviation.at(0);
+		if ( abb == 'K' || abb == 'k' ) {
+			return kb;
+		} else if (abb == 'M' || abb == 'm') {
+			return mb;
+		} else if (abb == 'G' || abb == 'g') {
+			return gb;
+		}
+		return 1;
+	}
+
+	/**
+	 * return a memory size in Gb, Mb or Kb to as bytes int
+	 */
+	static int memSizeToBytesi(const string &s){
+		long int longValue = memSizeToBytesl(s);
+		if ( longValue >  numeric_limits<int>::max()) {
+			return numeric_limits<int>::max();
+		}
+		return longValue;
+	}
+
+	/**
+	 * return a memory size in Gb, Mb or Kb to as bytes long int
+	 */
+	static long int memSizeToBytesl(const string &memSize){
+		static regex regMemSize("^[ \t]*([0-9]+)[ \t]*([GgMmKk]?)");
+		const int numberGroup = 1;
+		const int abbrebiationGroup = 2;
+		smatch found;
+		bool matchFound = regex_search(memSize, found, regMemSize);
+		if (matchFound) {
+			return atol(found[numberGroup]) * memAbbreviation(found[abbrebiationGroup]);
+		} else {
+			return 0;
+		}
 	}
 
 	/**
@@ -289,43 +337,31 @@ public:
 	}
 
 	static bool correctFileName(const string &fn){
-		static bool init=false;
-		static regex_t reg;
-		if(!init){
-			const char *sreg="[[:cntrl:]]|[!-,]|[:-@]|[{-~]|\\\\|\\[|\\]|[\\/\\^`]|^ | $|^\\-|\\.\\.";
-			int res;
-			if((res=regcomp(&reg,sreg , REG_EXTENDED))){
-				char men[100];
-				regerror(res,&reg,men,100);
-				syslog(LOG_ERR,"Error: regcomp '%s' %s",sreg,men);
-				throw "regcomp error";
-			}
-			init=true;
-		}
+		static regex reg("[[:cntrl:]]|[!-,]|[:-@]|[{-~]|\\\\|\\[|\\]|[\\/\\^`]|^ | $|^\\-|\\.\\.");
 		if(fn.size() <1) return false;
 		if(fn.size() >JAIL_FILENAME_SIZE_LIMIT) return false;
-		regmatch_t match[1];
-		match[0].rm_so=0;
-		match[0].rm_eo=0;
-		int nomatch=regexec(&reg, fn.c_str(),1, match, 0);
-		if(nomatch){
-			syslog(LOG_DEBUG,"correctFile %d '%s' %d:%d"
-					,nomatch,fn.c_str(),match[0].rm_so,match[0].rm_eo);
+		smatch found;
+		bool correct = ! regex_search(fn, found, reg);
+		if( ! correct){
+			string incorrect = found[0];
+			syslog(LOG_DEBUG,"incorrectFile '%s' found '%s'"
+					,fn.c_str(), incorrect.c_str());
 		}
-		return nomatch==REG_NOMATCH;
+		return correct;
 	}
 
 	static bool correctPath(const string &path){ //No trailing /
 		if(path.size()==0) return false;
 		if(path.size() > JAIL_PATH_SIZE_LIMIT) return false;
-		size_t pos=0,found;
+		size_t pos=0;
+		size_t found;
 		string fn;
 		if(path[0] == '/') pos=1; //skip absolute path
 		while((found=path.find('/',pos)) != string::npos){
-			fn=path.substr(pos,found-pos);
+			fn = path.substr(pos, found - pos);
 			if(!correctFileName(fn))
 				return false;
-			pos=found+1;
+			pos = found + 1;
 		}
 		fn=path.substr(pos);
 		return correctFileName(fn);

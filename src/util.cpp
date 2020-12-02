@@ -7,3 +7,4 @@
 
 int Base64::C642int[256];
 static Base64 nothingBase64; 
+
