@@ -106,9 +106,9 @@ Socket::Socket(int socket){
 		unsigned char *CIP=(unsigned char *)&(this->clientip);
 		syslog(LOG_INFO,"Client: %d.%d.%d.%d",(int)CIP[0],(int)CIP[1],(int)CIP[2],(int)CIP[3]);
 	}
-	this->maxDataSize=JAIL_REQUEST_MAX_SIZE;
-	this->socket=socket;
-	this->closed=false;
+	this->maxDataSize = Configuration::getConfiguration()->getRequestMaxSize();
+	this->socket = socket;
+	this->closed = false;
 	regcomp(&regRequestLine, "^([^ ]+) ([^ ]+) ([^ ]+)$", REG_EXTENDED);
 	regcomp(&regHeader, "^[ \t]*([^ \t:]+):[ \t]*(.*)$", REG_EXTENDED);
 	regcomp(&regURL, "^([a-zA-Z]+)?(:\\/\\/[^\\/]+)?(.*)$", REG_EXTENDED);
@@ -127,8 +127,8 @@ void Socket::readHeaders(){
 
 string Socket::receive(int sizeToReceive){ //=0 async read
 	if(closed) {
-		string ret=readBuffer;
-		readBuffer="";
+		string ret = readBuffer;
+		readBuffer = "";
 		if(ret.size()){
 			syslog(LOG_INFO,"Received %lu",(long unsigned int)ret.size());
 		}
