@@ -34,8 +34,10 @@
 #          |___ run       #Real dir by mount --bind
 #          |     |___ lock #Real dir by mount --bind
 
-LOGFILE=/etc/vpl/vpl-jail-service.log
-DEAMON=/etc/vpl/vpl-jail-server
+LOGFILE=/var/log/vpl-jail-service.log
+VPL_PROGRAMS_DIR=/usr/sbin/vpl
+VPL_CONFIG_DIR=/etc/vpl
+DAEMON=$VPL_PROGRAMS_DIR/vpl-jail-server
 PIDFILE=/run/vpl-jail-server.pid
 NOMOUNT="^vpl|^init|^ldap|^udev|grub|^rc[0-6S]|^pam|^cron|^apm|^logrotate"
 NOMOUNT="$NOMOUNT|^mail|^rsyslog|^shadow|^security|^ssl|^ssh|^update"
@@ -112,10 +114,10 @@ function run_root_script {
 }
 
 function pre_start {
-	run_root_script /etc/vpl/pre_start.sh
+	run_root_script $VPL_PROGRAMS_DIR/pre_start.sh
 }
 function post_stop {
-	run_root_script /etc/vpl/post_stop.sh
+	run_root_script $VPL_PROGRAMS_DIR/post_stop.sh
 }
 
 function set_etc {
@@ -259,18 +261,17 @@ function unset_firewall {
 }
 
 function read_config {
-	local VPLJAIL_INSTALL_DIR=/etc/vpl
 	case "$1" in
   		start)
-			local CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf"
+			local CONFIG_FILE="$VPL_CONFIG_DIR/vpl-jail-system.conf"
 			cp "$CONFIG_FILE" "$CONFIG_FILE.LAST"
         ;;
   		stop)
-        	local CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf.LAST"
+        	local CONFIG_FILE="$VPL_CONFIG_DIR/vpl-jail-system.conf.LAST"
         ;;
 	esac
 	if [ ! -f "$CONFIG_FILE" ] ; then
-		CONFIG_FILE="$VPLJAIL_INSTALL_DIR/vpl-jail-system.conf"
+		CONFIG_FILE="$VPL_CONFIG_DIR/vpl-jail-system.conf"
 	fi
 	#Load config file
 	if [ -f "$CONFIG_FILE" ] ; then
@@ -372,7 +373,7 @@ function start_vpl {
 		set_other /run/lock
 		set_snap
 	} 2>> $LOGFILE
-	start_daemon /etc/vpl/vpl-jail-server $1 $2
+	start_daemon $DAEMON $1 $2
 	sleep 1
 	if [ -f $PIDFILE ] ; then
 		set_firewall $1
@@ -385,7 +386,7 @@ function stop_vpl {
 	{
 		read_config stop
 		if [ "$(command -v killproc)" != "" ] ; then
-			killproc /etc/vpl/vpl-jail-server 15
+			killproc $DAEMON 15
 		fi
 		if [ -f $PIDFILE ] ; then
 			kill -15 $(cat $PIDFILE) &> /dev/null
@@ -450,7 +451,7 @@ case "$1" in
         start_vpl
         ;;
   status)
-        pidof /etc/vpl/vpl-jail-server
+        pidof $DAEMON
 	    exit $? 
         ;;
 *)

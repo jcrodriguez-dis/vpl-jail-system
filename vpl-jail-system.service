@@ -8,9 +8,9 @@ Documentation=https://vpl.dis.ulpgc.es
 [Service]
 Type=forking
 PIDFile=/run/vpl-jail-server.pid
-ExecStart=/etc/vpl/vpl-jail-system start
-ExecStopPost=/etc/vpl/vpl-jail-system stop
-ExecReload=/etc/vpl/vpl-jail-system restart
+ExecStart=/usr/sbin/vpl/vpl-jail-system start
+ExecStopPost=/usr/sbin/vpl/vpl-jail-system stop
+ExecReload=/usr/sbin/vpl/vpl-jail-system restart
 
 [Install]
 WantedBy=multi-user.target

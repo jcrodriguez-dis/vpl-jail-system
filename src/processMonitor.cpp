@@ -316,8 +316,8 @@ void processMonitor::deleteFile(string name){
 }
 
 bool processMonitor::installScript(string to, string from){
-	if(Util::fileExists("/etc/vpl/" + from)){
-		string scriptCode=Util::readFile("/etc/vpl/" + from);
+	if(Util::fileExists("/usr/sbin/vpl/" + from)){
+		string scriptCode=Util::readFile("/usr/sbin/vpl/" + from);
 		syslog(LOG_DEBUG, "Installing %s in %s", to.c_str(), from.c_str());
 		writeFile(to, scriptCode);
 		return true;
@@ -422,7 +422,7 @@ void processMonitor::limitResultSize(string &r){
 }
 void processMonitor::getResult(string &compilation, string &execution, bool &executed){
 	if(security != admin)
-		throw HttpException(internalServerErrorCode,"Security: requiere admin ticket for request");
+		throw HttpException(internalServerErrorCode,"Security: required admin ticket for request");
 	if(isInteractive())
 		throw HttpException(internalServerErrorCode,"Security: process in bad state");
 	{
@@ -448,7 +448,7 @@ void processMonitor::getResult(string &compilation, string &execution, bool &exe
 
 string processMonitor::getCompilation(){
 	if(security != monitor)
-		throw HttpException(internalServerErrorCode,"Security: requiere monitor ticket for getCompilation");
+		throw HttpException(internalServerErrorCode,"Security: required monitor ticket for getCompilation");
 	{
 		Lock lock(getProcessControlPath());
 		string fileName = getProcessControlPath("compilation");
@@ -534,7 +534,7 @@ bool processMonitor::isOutOfMemory(){
 }
 
 string processMonitor::getMemoryLimit(){
-	if(executionLimits.maxmemory==0) return "umlimited";
+	if(executionLimits.maxmemory==0) return "unlimited";
 	return Util::itos(executionLimits.maxmemory/(1024*1024))+"MiB";
 }
 
@@ -547,13 +547,15 @@ uint64_t processMonitor::getMemoryUsed(){
 		return INT_MAX; //
 	}
 	static bool init=false;
-	static regex_t reg_uid,reg_mem;
+	static regex_t reg_uid;
+	static regex_t reg_mem;
 	if(!init){
 		regcomp(&reg_uid, ".*^Uid:[ \t]+([0-9]+)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
 		regcomp(&reg_mem, ".*^VmHWM:[ \t]+([0-9]+)[ \\t]+(.*)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
 		init=true;
 	}
-	regmatch_t match[3];
+	const int matchSize = 3;
+	regmatch_t match[matchSize];
 	uint64_t s=0;
 	while((ent=readdir(dirfd))!=NULL){
 		const string name(ent->d_name);
@@ -561,16 +563,17 @@ uint64_t processMonitor::getMemoryUsed(){
 		if(Util::itos(PID) != name ) continue;
 		const string statusFile = dir + "/" + name + "/status";
 		string status = Util::readFile(statusFile, false);
-		int nomatch=regexec(&reg_uid, status.c_str(), 3, match, 0);
+		int nomatch=regexec(&reg_uid, status.c_str(), matchSize, match, 0);
 		if(nomatch==0){
 			string UIDF=status.substr(match[1].rm_so, match[1].rm_eo - match[1].rm_so);
 			if(Util::atoi(UIDF) == (int) prisoner){
-				nomatch = regexec(&reg_mem, status.c_str(),3, match, 0);
+				nomatch = regexec(&reg_mem, status.c_str(), matchSize, match, 0);
 				if(nomatch == 0){
 					string MEM = status.substr(match[1].rm_so, match[1].rm_eo - match[1].rm_so);
 					string MUL = status.substr(match[2].rm_so, match[2].rm_eo - match[2].rm_so);
-					int mul=1024; //Default kB 1024
-					if(MUL == "mB") mul *= 1024;
+					const int onek = 1024;
+					int mul = onek; //Default kB 1024
+					if(MUL == "mB") mul *= onek;
 					s += Util::atol(MEM) * mul;
 				}
 			}
@@ -686,5 +689,4 @@ void processMonitor::cleanZombieTasks() {
 			}
 		}
 	}
-	// TODO remove orphan tickets
 }
