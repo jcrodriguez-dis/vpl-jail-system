@@ -17,13 +17,13 @@ To apply the new configuration value you must restart the service (as user root)
 
 Using systemd
 
-.. code:: console
+.. code:: bash
 
 	systemctl restart vpl-jail-system
 
 or using system V
 
-.. code:: console
+.. code:: bash
 
 	service vpl-jail-system restart
 
@@ -40,16 +40,13 @@ Format PARAMETER=VALUE.
 
 Example:
 
-.. code:: python
+.. code:: bash
 
 	# This is a comment line
 	PARM=value
 
-Configuration parameters
-========================
-
 Network parameters
-------------------
+==================
 
 PORT
 ^^^^
@@ -58,7 +55,7 @@ The value 0 indicates no use of unciphered connections.
 
 Example:
 
-.. code:: python
+.. code:: bash
 
 	PORT=8080
 
@@ -73,7 +70,7 @@ Notice that the files with the server public certificate and secret key
 must exist and have proper content.
 Example:
 
-.. code:: python
+.. code:: bash
 
 	SECURE_PORT=4430
 
@@ -86,7 +83,7 @@ Sets the network interface that the server will use.
 Use this parameter when your server has multiple IPs and you want to control which to use.
 The default value is empty, meaning the use of all network interfaces in the system.
 
-.. code:: python
+.. code:: bash
 
 	INTERFACE=128.1.1.1
 
@@ -100,7 +97,7 @@ The default value is SSL_CIPHER_LIST=
 
 Example:
 
-.. code:: python
+.. code:: bash
 
 	SSL_CIPHER_LIST=ECDHE
 
@@ -115,7 +112,7 @@ The default value is SSL_CERT_FILE=/etc/vpl/cert.pem
 
 Example:
 
-.. code:: python
+.. code:: bash
 
 	SSL_CERT_FILE=/ssl/certs/mycert.pem
 
@@ -126,12 +123,12 @@ SSL_KEY_FILE
 Indicates the path to the server's private key in PEM format.
 The default value is SSL_KEY_FILE=/etc/vpl/key.pem.
 
-.. code:: python
+.. code:: bash
 
 	SSL_KEY_FILE=/ssl/certs/private/mykey.pem
 
 Security parameters
--------------------
+===================
 
 URLPATH
 ^^^^^^^
@@ -140,7 +137,7 @@ This parameter acts as a password to access the execution server.
 If the PATH of the URL request no matches URLPATH, the request is rejected.
 The default value is "/". Example:
 
-.. code:: python
+.. code:: bash
 
 	URLPATH=secret
 
@@ -157,7 +154,7 @@ The network format is the incomplete dot notation ending with a dot. Example: 10
 The default value is empty, accepting task requests from all servers.
 Example:
 
-.. code:: python
+.. code:: bash
 
 	# Accepts tasks from networt 10.10.3.X and IP 192.168.1.56
 	TASK_ONLY_FROM=10.10.3. 192.168.1.56
@@ -175,7 +172,7 @@ The default value is ALLOWSUID=false.
 
 Example:
 
-.. code:: python
+.. code:: bash
 
 	ALLOWSUID=false
 
@@ -192,7 +189,7 @@ the offending network IP is banned until the next period.
 The FAIL2BAN set to 0 stops these checks.
 The default value of FAIL2BAN is 0. Examples:
 
-.. code:: python
+.. code:: bash
 
 	FAIL2BAN=10
 
@@ -214,7 +211,7 @@ Accepted values are 0, 1, 2, 3, or 4. The preset value is 0.
 
 Example:
 
-.. code:: python
+.. code:: bash
 
 	FIREWALL=1
 
@@ -228,7 +225,7 @@ The default value is 3.
 Commonly the log is written to the file "/var/log/syslog".
 Example:
 
-.. code:: python
+.. code:: bash
 
 	LOGLEVEL=1
 	
@@ -236,7 +233,7 @@ Example:
     you may get a low performance and run out of disk space.
 
 File system parameters
-----------------------
+======================
 
 JAILPATH
 ^^^^^^^^
@@ -245,7 +242,7 @@ Sets the path to the jail directory.
 The system will use this directory as a fake clone of the root directory.
 The preset value is JAILPATH=/jail.
 
-.. code:: python
+.. code:: bash
 
 	JAILPATH=/myjail
 
@@ -256,7 +253,7 @@ Path to control directory.
 The system saves here information on requests in progress.
 The preset value is CONTROLPATH="/var/vpl-jail-system
 
-.. code:: python
+.. code:: bash
 
 	CONTROLPATH="/vplcontrol"
 
@@ -270,7 +267,7 @@ The preset value is USETMPFS=true.
 If your system memory is low you may use this switch,
 but changing this switch to "false" can reduce the performance of the jail system.
 
-.. code:: python
+.. code:: bash
 
 	USETMPFS=false
 
@@ -294,13 +291,13 @@ The value may be a percent of the system memory or a fixed value in megabyte (M)
 The default value is 30% of the system memory.
 If USETMPFS is set to false, you must use a fixed value. Examples:
 
-.. code:: python
+.. code:: bash
 
 	HOMESIZE=25%
 
 or
 
-.. code:: python
+.. code:: bash
 
 	HOMESIZE=1400M
 
@@ -313,12 +310,12 @@ This option sets the size of the "/dev/shm" directory.
 The preset value is 30% of the system memory.
 This option is applicable if using tmpfs file system for the "/dev/shm" directory. Example:
 
-.. code:: python
+.. code:: bash
 
 	SHMSIZE=10%
 
 Parameters for limiting the resources used by the requested tasks
------------------------------------------------------------------
+=================================================================
 
 These parameters set resource limits the requested task can not exceed.
 
@@ -346,8 +343,38 @@ The maximum number of processes.
 No running task can exceed this number of processes/threads.
 The default value is MAXPROCESSES=500.
 
+REQUEST_MAX_SIZE
+^^^^^^^^^^^^^^^^
+
+.. versionadded:: 2.7
+
+The máximum size of data in the request.
+The value can be written in bytes, kilobytes, megabytes and gigabytes
+The default value is 128 Mb.
+
+Example:
+
+.. code:: bash
+
+	REQUEST_MAX_SIZE=64 Mb
+
+RESULT_MAX_SIZE
+^^^^^^^^^^^^^^^
+
+.. versionadded:: 2.7
+
+The máximum size of data in the evaluation result.
+The value can be written in bytes, kilobytes, megabytes and gigabytes
+The default value is 32 Kb.
+
+Example:
+
+.. code:: bash
+
+	RESULT_MAX_SIZE=16 Mb  
+
 Other parameters
-----------------
+================
 
 MIN_PRISONER_UGID
 ^^^^^^^^^^^^^^^^^
@@ -355,7 +382,7 @@ MIN_PRISONER_UGID
 This parameter sets the start value for the range of user/group ids selected randomly for prisoners.
 The preset value is MIN_PRISONER_UGID=10000. Example:
 
-.. code:: python
+.. code:: bash
 
  MIN_PRISONER_UGID=11000
 
@@ -365,7 +392,7 @@ MAX_PRISONER_UGID
 This parameter sets the end value for the range of user/group selected randomly for prisoners.
 The preset value is MAX_PRISONER_UGID=12000.  Example:
 
-.. code:: python
+.. code:: bash
 
  MAX_PRISONER_UGID=11200
 
@@ -377,7 +404,7 @@ IMPORTANT: If you are using RedHat or derived OSes you must set this parameter
 to the PATH environment variable of common users (not root).
 The default value is empty. Example:
 
-.. code:: python
+.. code:: bash
 
 	ENVPATH=/usr/bin:/bin
 

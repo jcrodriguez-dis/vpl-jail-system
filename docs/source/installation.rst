@@ -37,14 +37,14 @@ Getting VPL-Jail-System
 VPL-Jail-System is distributed only as source files.
 You must get the source package from https://vpl.dis.ulpgc.es/, e.g., using
 
-.. code:: console
+.. code:: bash
 
     wget https://vpl.dis.ulpgc.es/releases/vpl-jail-system-[version].tar.gz
 
 
 or from the GitHub repository, generating the package with
 
-.. code:: console
+.. code:: bash
 
     make distcheck
 
@@ -55,7 +55,7 @@ Running the installer
 
 After getting the package, you must decompress it and run the installer.
 
-.. code:: console
+.. code:: bash
 
 	tar xvf vpl-jail-system-[version].tar.gz
 	cd vpl-jail-system-[version]
@@ -85,7 +85,7 @@ Adding the jail/execution server to the VPL plugin at Moodle
 The URL of the service is
 \https://yourservername:SECURE_PORT/URLPATH or \http://yourservername:PORT/URLPATH 
 
-:SECURE_PORT and :PORTcan be omitted if using the standard ports numbers.
+:SECURE_PORT and :PORT can be omitted if using the standard ports numbers.
 
 You can use the jail server URL in the VPL plugin configuration (requiere administration rigths)
 and, in the *local execution server* settings of a VPL activity.
@@ -101,7 +101,7 @@ Updating the software in the jail
 
 After installing or updating packages or files in the host system, you must restart the service with
 
-.. code: console
+.. code:: bash
 
    systemctl restart vpl-jail-system
 
@@ -110,7 +110,7 @@ If you don't want to restart the service,
 you can drop the kernel caches to do the overlayFS file system aware of the changes.
 To drop the kernel caches run as root 
 
-.. code: console
+.. code:: bash
 
    sync; echo 7 > /proc/sys/vm/dropcaches
 
