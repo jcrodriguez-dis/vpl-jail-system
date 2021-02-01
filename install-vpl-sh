@@ -238,6 +238,36 @@ function vpl_install_jgrasp {
 		fi
 	done
 }
+function vpl_install_kotlin {
+	local URLBASE="https://github.com/JetBrains/kotlin/releases/download/"
+	local VERSION="1.4.21"
+	local FILENAME=""
+	local CDIR=""
+	while true ; do
+		echo -n "Version number of Kotlin to install e.g. 1.4.21 (0 to exit)"
+		read VERSION
+		if [ "$VERSION" == "0" ] ; then
+			break
+		fi
+		SUBDIR="v$VERSION/"
+		FILENAME="kotlin-compiler-$VERSION.zip"
+		wget -q $URLBASE$SUBDIR$FILENAME
+		if [ "$?" == "0" -a -f "$FILENAME" ] ; then
+			unzip $FILENAME > /dev/null
+			if [ -d "kotlinc" ] ; then
+				DESTINATION=/opt/kotlin
+				rm -R $DESTINATION 2> /dev/null
+				mv kotlinc $DESTINATION
+				ln -s $DESTINATION/bin/kotlinc /usr/bin/kotlinc
+				break
+			else
+				echo "Error uncompressing package, jgrasp dir not found. Try again"
+			fi
+		else
+			echo "Version not found. Try gain."
+		fi
+	done
+}
 
 function vpl_generate_selfsigned_certificate {
 	local A=""
@@ -496,10 +526,18 @@ else
         vpl_install "libtool required for VHDL" libtool-bin
         #vpl_install "Groovy programming language" groovy
     fi
-    echo "Do you want to try to install JGrasp?"
+
+    echo "Do you want to try to install Kotlin?"
     echo -n "(y/n)"
     read A3
     if [ "$A3" != "n" ] ; then
+    	vpl_install_kotlin
+    fi
+
+    echo "Do you want to try to install JGrasp?"
+    echo -n "(y/n)"
+    read A4
+    if [ "$A4" != "n" ] ; then
     	vpl_install_jgrasp
     fi
 
