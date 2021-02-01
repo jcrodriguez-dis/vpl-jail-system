@@ -9,3 +9,10 @@
 /config.h
 /configure
 /Makefile
+*.h.in?
+*.log
+vpl-jail-system-*.tar.gz
+src/*.o
+*/.deps
+src/vpl-jail-server
+.dirstamp
