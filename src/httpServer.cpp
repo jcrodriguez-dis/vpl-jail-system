@@ -120,44 +120,39 @@ void HttpJailServer::send200(const string &response, const bool headMethod){
  */
 void HttpJailServer::sendCode(CodeNumber code, string text){
 	string codeText;
-	int cnumber=500;
-	switch(code){
+	int cnumber = code;
+	switch(code) {
 	case continueCode:
-		cnumber=100;
-		codeText="Continue";
+		codeText = "Continue";
 		break;
 	case badRequestCode:
-		cnumber=400;
-		codeText="Bad Request";
+		codeText = "Bad Request";
 		break;
 	case notFoundCode:
-		cnumber=404;
-		codeText="Not found";
+		codeText = "Not found";
 		break;
 	case methodNotAllowedCode:
-		cnumber=405;
-		codeText="Method not allowed";
+		codeText = "Method not allowed";
 		break;
 	case requestTimeoutCode:
-		cnumber=408;
-		codeText="Request Time-out";
+		codeText = "Request Time-out";
 		break;
 	case requestEntityTooLargeCode:
-		cnumber=413;
-		codeText="Request Entity Too Large";
+		codeText = "Request Entity Too Large";
 		break;
 	case internalServerErrorCode:
-		cnumber=500;
-		codeText="Internal Server Error";
+		codeText = "Internal Server Error";
 		break;
 	case notImplementedCode:
-		cnumber=501;
-		codeText="Not Implemented";
+		codeText = "Not Implemented";
+		break;
+	default:
+		codeText = "Other internal Server Error";
 		break;
 	};
 	string html;
 	if(code!=continueCode){
-		html="<html><body><h2>"+codeText+"</h2><h3>"+text+"</h3></body></html>";
+		html = "<html><body><h2>"+codeText+"</h2><h3>"+text+"</h3></body></html>";
 	}
 	send(cnumber,codeText,html);
 }

@@ -8,18 +8,18 @@
 #define HTTPSERVER_INC_H
 #include <string>
 #include <map>
-using namespace std;
 #include <stdint.h>
 #include "socket.h"
+using namespace std;
 
 /**
  * class HttpJailServer
- * Read http request from an open socket
+ * Read HTTP request from an open socket
  * Process headers
  * Send response
  */
 
-class HttpJailServer{
+class HttpJailServer {
 	Socket *socket;
 public:
 	HttpJailServer(Socket *s):socket(s){}

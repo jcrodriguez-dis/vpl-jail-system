@@ -414,7 +414,8 @@ void processMonitor::setExtraInfo(ExecutionLimits el, bool ri, string lang){
 }
 
 void processMonitor::limitResultSize(string &r){
-	if(r.size() >= configuration->getRequestMaxSize()){
+	if (r.size()
+			>= static_cast<unsigned int>(configuration->getRequestMaxSize())) {
 		string men="\nThis output has been cut to "+Util::itos(configuration->getRequestMaxSize()/1024)+"Kb"
 				+", its original size was "+Util::itos(r.size()/1024)+"Kb\n";
 		r = men+r.substr(0,configuration->getRequestMaxSize()/2)+men+r.substr(r.size()-configuration->getRequestMaxSize()/2);
