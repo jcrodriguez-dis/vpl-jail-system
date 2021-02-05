@@ -498,6 +498,7 @@ else
         vpl_install "Python3 Matplotlib" python3-matplotlib
         vpl_install "Python3 pudb" python3-pudb
         vpl_install "Python3 pycodestyle" python3-pycodestyle
+        vpl_install "Python3 NetworkX" python3-networkx
         vpl_install "Ruby interpreter" ruby
         vpl_install "Scala programming language" scala
         vpl_install "Scheme interpreter" plt-scheme racket
@@ -519,12 +520,13 @@ else
         vpl_install "JQuery-UI JavaScript Lib" libjs-jquery-ui 
         vpl_install "Lua compiler 5.1" lua5.1
         vpl_install "R statistical computation and graphics system (GNU)" r-base
-        vpl_install "MIPS R2000/R3000 emulator" spim 
+        vpl_install "MIPS R2000/R3000 emulator" spim
+		vpl_install "MiniZinc constraint modeling language" minizinc
         vpl_install "XQuery interpreter" galax
         vpl_install "Verilog compiler" iverilog
         vpl_install "VHDL compiler" freehdl
         vpl_install "libtool required for VHDL" libtool-bin
-        #vpl_install "Groovy programming language" groovy
+        vpl_install "Groovy programming language" groovy
     fi
 
     echo "Do you want to try to install Kotlin?"
