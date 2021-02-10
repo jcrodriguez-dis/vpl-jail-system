@@ -46,9 +46,15 @@ or from the GitHub repository, generating the package with
 
 .. code:: bash
 
-    make distcheck
+ sudo apt-get install g++ make autotools-dev autoconf
+ aclocal
+ autoheader
+ autoconf
+ automake
+ ./configure
+ make distcheck
 
-This will generate a package in tar.gz format
+This will generate a package file named vpl-jail-system-[version].tar.gz
 
 Running the installer
 ---------------------
