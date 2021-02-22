@@ -343,6 +343,8 @@ The maximum number of processes.
 No running task can exceed this number of processes/threads.
 The default value is MAXPROCESSES=500.
 
+.. _REQUEST_MAX_SIZE:
+
 REQUEST_MAX_SIZE
 ^^^^^^^^^^^^^^^^
 
@@ -357,6 +359,8 @@ Example:
 .. code:: bash
 
 	REQUEST_MAX_SIZE=64 Mb
+
+.. _RESULT_MAX_SIZE:
 
 RESULT_MAX_SIZE
 ^^^^^^^^^^^^^^^

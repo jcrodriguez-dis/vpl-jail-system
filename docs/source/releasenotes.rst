@@ -12,7 +12,12 @@ Installation
 
 The new version moves the location of programs and script from the directory
 "/etc/vpl" to directory "/usr/sbin/vpl" and the location of log files from
-the directory "/etc/vpl" to directory "/var/log/vpl".
+the directory "/etc/vpl" to directory "/var/log/vpl". Resolves `issue 45`_.
+
+.. _issue 45: https://github.com/jcrodriguez-dis/vpl-xmlrpc-jail/issues/45
+
+The installer adds **MiniZinc** and **Groovy** to the development software
+and renames Python to Python2.
 
 Kotlin
 ^^^^^^
