@@ -39,9 +39,9 @@ class SSLBase{
 
 	void createContext() {
 		Configuration* configuration = Configuration::getConfiguration();
-		const char *cipherList = configuration->getSSLCipherList().c_str();
-		const char *certFile = configuration->getSSLCertFile().c_str();
-		const char *keyFile = configuration->getSSLKeyFile().c_str();
+		const string cipherList = configuration->getSSLCipherList();
+		const string certFile = configuration->getSSLCertFile();
+		const string keyFile = configuration->getSSLKeyFile();
 		#ifdef HAVE_TLS_SERVER_METHOD
 		const SSL_METHOD *method = TLS_server_method();
 		if (method == NULL) {
@@ -60,16 +60,16 @@ class SSLBase{
 		if ((newContext = SSL_CTX_new((SSL_METHOD *)method)) == NULL) { //Conversion for backward compatibility
 			syslog(LOG_EMERG,"SSL_CTX_new() fail: %s", getError());
 			fail = true;
-		} else if (SSL_CTX_use_certificate_chain_file(newContext, certFile) != 1) {
+		} else if (SSL_CTX_use_certificate_chain_file(newContext, certFile.c_str()) != 1) {
 			syslog(LOG_EMERG,"SSL_CTX_use_certificate_chain_file() fail: %s", getError());
 			fail = true;
-		} else if (SSL_CTX_use_PrivateKey_file(newContext, keyFile, SSL_FILETYPE_PEM) != 1) {
+		} else if (SSL_CTX_use_PrivateKey_file(newContext, keyFile.c_str(), SSL_FILETYPE_PEM) != 1) {
 			syslog(LOG_EMERG,"SSL_CTX_use_PrivateKey_file() fail: %s", getError());
 			fail = true;
 		} else if ( !SSL_CTX_check_private_key(newContext) ) {
 			syslog(LOG_EMERG,"SSL_CTX_check_private_key() fail: %s", getError());
 			fail = true;
-		} else if ( cipherList[0] && SSL_CTX_set_cipher_list(newContext, cipherList) == 0) {
+		} else if ( cipherList[0] && SSL_CTX_set_cipher_list(newContext, cipherList.c_str()) == 0) {
 			syslog(LOG_EMERG,"SSL_CTX_set_cipher_list() fail: %s", getError());
 			fail = true;
 		}
@@ -110,8 +110,8 @@ public:
 	}
 	void updateCertificatesIfNeeded() {
 		Configuration* configuration = Configuration::getConfiguration();
-		const char *certFile = configuration->getSSLCertFile().c_str();
-		const char *keyFile = configuration->getSSLKeyFile().c_str();
+		const string certFile = configuration->getSSLCertFile();
+		const string keyFile = configuration->getSSLKeyFile();
 		if ( this->timePrivateKeyFileModification != Util::timeOfFileModification(keyFile) ||
 		     this->timeCertificateFileModification != Util::timeOfFileModification(certFile) ) {
 			createContext();
