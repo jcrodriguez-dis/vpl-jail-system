@@ -2,7 +2,7 @@
 Troubleshooting
 ***************
 
-This document describes how can you check and troubleshooting the the VPL-Jail-System.
+This document describes how can you check and troubleshooting the VPL-Jail-System.
 For more details about VPL, visit the `VPL home page`_ or
 the `VPL plugin page at Moodle`_.
 
