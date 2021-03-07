@@ -27,11 +27,12 @@ or using system V
 
 .. code:: console
 
-	service vpl-jail-system status 
-	
-.. figure:: images/systemctl_status.png
+	service vpl-jail-system status
 
-	Example of systemctl output for an idle service
+.. figure:: images/systemctl_status.png
+    :alt: Status of the service
+  
+    Example of systemctl output for an idle service
 
 Accessible from a browser
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -52,8 +53,9 @@ You may go to "Advanced settings > Check execution servers" option of a VPL
 activity and you must see your server with the *Current status* to *ready*. 
 
 .. figure:: images/check_execution_servers.png
+    :alt: Jail servers check
 
-   Example of "Check execution servers" output
+    Example of "Check execution servers" output
 
 Troubleshooting
 ---------------
