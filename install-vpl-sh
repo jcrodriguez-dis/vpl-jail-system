@@ -179,6 +179,11 @@ function vpl_installq {
 
 function vpl_install_letsencrypt {
 	vpl_install "Let's Encrypt" certbot
+	if [ "$(command -v certbot)" = "" ] ; then
+		echo "Error: certbot not installed."
+		echo "Please install cerbot manually"
+		exit 0
+	fi
 	local DETECTEDFQDN=""
 	local HNAME=""
 	if [ "$(command -pv dnsdomainname)" != "" ] ; then
