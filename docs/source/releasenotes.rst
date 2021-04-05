@@ -2,10 +2,19 @@
 Release notes 
 *************
 
+V2.7.1
+======
+
+This is a bug-fix release of version 2.7.0.
+This release fixes a problem that affects systems
+with old versions of g++ that are not compatible with std::regex class.
+This problem is known to affect CentOS 7.
+
 V2.7.0
 ======
 
-This release notes decribe the changes included in this release from version 2.6.0.
+This release note describes the changes included in this release
+from version 2.6.0.
 
 Installation
 ------------
@@ -22,7 +31,7 @@ and renames Python to Python2.
 Kotlin
 ^^^^^^
 
-The installer ask if you want to install the kotlin command line compiler.
+The installer asks if you want to install the kotlin command-line compiler.
 You must introduce a kotlin version number to download and install it.
 See `Kotlin home page`_ for getting the version number.
 
@@ -33,6 +42,6 @@ See `Kotlin home page`_ for getting the version number.
 Configuration
 -------------
 
-Adds new parameter to control limits of data in request and evaluation result.
+Adds a new parameter to control limits of data in request and evaluation result.
 See :ref:`REQUEST_MAX_SIZE` and :ref:`RESULT_MAX_SIZE` for more details.
 
