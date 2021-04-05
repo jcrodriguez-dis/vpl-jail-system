@@ -552,7 +552,7 @@ uint64_t processMonitor::getMemoryUsed(){
 	static regex_t reg_mem;
 	if(!init){
 		regcomp(&reg_uid, ".*^Uid:[ \t]+([0-9]+)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
-		regcomp(&reg_mem, ".*^VmHWM:[ \t]+([0-9]+)[ \\t]+(.*)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
+		regcomp(&reg_mem, ".*^VmHWM:[ \t]+([0-9]+)[ \t]+(.*)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
 		init=true;
 	}
 	const int matchSize = 3;
