@@ -5,6 +5,7 @@
  **/
 #include <cassert>
 #include <iostream>
+#include <algorithm>
 #include <exception>
 #include "../src/util.h"
 #include "../src/cgroup.h"
