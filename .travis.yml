@@ -1,4 +1,9 @@
 language: cpp
 
+before_install:
+  - sudo apt-get update
+  - sudo apt-get -y install autotools-dev
+  - sudo apt-get -y install automake
+
 script: 
   - ./runTest.sh
