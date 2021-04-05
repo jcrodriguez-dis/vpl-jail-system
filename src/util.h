@@ -11,7 +11,6 @@
 #include <config.h>
 #endif
 #include <limits>
-#include <regex>
 #include <map>
 #include <iostream>
 #include <sys/types.h>
@@ -25,6 +24,7 @@
 #include <signal.h>
 #include <string.h>
 #include <string>
+#include "vplregex.h"
 #include "jail_limits.h"
 #include "httpException.h"
 
@@ -290,11 +290,11 @@ public:
 	 * return a memory size in Gb, Mb or Kb to as bytes long int
 	 */
 	static long int memSizeToBytesl(const string &memSize){
-		static regex regMemSize("^[ \t]*([0-9]+)[ \t]*([GgMmKk]?)");
+		static vplregex regMemSize("^[ \t]*([0-9]+)[ \t]*([GgMmKk]?)");
 		const int numberGroup = 1;
 		const int abbrebiationGroup = 2;
-		smatch found;
-		bool matchFound = regex_search(memSize, found, regMemSize);
+		vplregmatch found;
+		bool matchFound = regMemSize.search(memSize, found);
 		if (matchFound) {
 			return atol(found[numberGroup]) * memAbbreviation(found[abbrebiationGroup]);
 		} else {
@@ -337,11 +337,11 @@ public:
 	}
 
 	static bool correctFileName(const string &fn){
-		static regex reg("[[:cntrl:]]|[!-,]|[:-@]|[{-~]|\\\\|\\[|\\]|[\\/\\^`]|^ | $|^\\-|\\.\\.");
+		static vplregex reg("[[:cntrl:]]|[!-,]|[:-@]|[{-~]|\\\\|\\[|\\]|[\\/\\^`]|^ | $|^\\-|\\.\\.");
 		if(fn.size() <1) return false;
 		if(fn.size() >JAIL_FILENAME_SIZE_LIMIT) return false;
-		smatch found;
-		bool correct = ! regex_search(fn, found, reg);
+		vplregmatch found;
+		bool correct = ! reg.search(fn, found);
 		if( ! correct){
 			string incorrect = found[0];
 			syslog(LOG_DEBUG,"incorrectFile '%s' found '%s'"

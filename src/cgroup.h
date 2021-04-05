@@ -11,12 +11,12 @@
 #include <iostream>
 #include <map>
 #include <vector>
-#include <regex>
 #include <fstream>
+#include "vplregex.h"
 using namespace std;
 
 /**
- * Interface designed for a better management of CPU, memory and net resources
+ * Interface designed for access cgroup management of CPU, memory and net resources
  * Please, note that some of the interface's setters will require the user
  * to be part of the cgroup that is being modified
  */
@@ -24,24 +24,24 @@ class Cgroup {
 private:
 	static string baseCgroupFileSystem;
 	string cgroupDirectory;
-	static regex regUser;
-	static regex regSystem;
-	static regex regPeriods;
-	static regex regThrottled;
-	static regex regThrottledTime;
-	static regex regCache;
-	static regex regMem;
-	static regex regMapped;
-	static regex regFault;
-	static regex regHierarchical;
-	static regex regEth0;
-	static regex regEth1;
-	static regex regLo;
-	static regex regOOM;
-	static regex regUnder;
-	static regex regKill;
-	static regex regTrim;
-	string regFound(regex &reg, string input);
+	static vplregex regUser;
+	static vplregex regSystem;
+	static vplregex regPeriods;
+	static vplregex regThrottled;
+	static vplregex regThrottledTime;
+	static vplregex regCache;
+	static vplregex regMem;
+	static vplregex regMapped;
+	static vplregex regFault;
+	static vplregex regHierarchical;
+	static vplregex regEth0;
+	static vplregex regEth1;
+	static vplregex regLo;
+	static vplregex regOOM;
+	static vplregex regUnder;
+	static vplregex regKill;
+	static vplregex regTrim;
+	string regFound(vplregex &reg, string input);
 
 public:
 	static void setBaseCgroupFileSystem(string _baseCgroupFileSystem){

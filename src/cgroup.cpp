@@ -9,28 +9,28 @@
 using namespace std;
 
 string Cgroup::baseCgroupFileSystem="/sys/fs/cgroup";
-regex Cgroup::regUser("(^|\\n)user ([0-9]+)(\\n|$)");
-regex Cgroup::regSystem("(^|\\n)system ([0-9]+)(\\n|$)");
-regex Cgroup::regPeriods("(^|\\n)nr_periods ([0-9]+)(\\n|$)");
-regex Cgroup::regThrottled("(^|\\n)nr_throttled ([0-9]+)(\\n|$)");
-regex Cgroup::regThrottledTime("(^|\\n)throttled_time ([0-9]+)(\\n|$)");
-regex Cgroup::regCache("(^|\\n)cache ([0-9]+)(\\n|$)");
-regex Cgroup::regMem("(^|\\n)shmem ([0-9]+)(\\n|$)");
-regex Cgroup::regMapped("(^|\\n)mapped_file ([0-9]+)(\\n|$)");
-regex Cgroup::regFault("(^|\\n)pgfault ([0-9]+)(\\n|$)");
-regex Cgroup::regHierarchical("(^|\\n)hierarchical_memory_limit ([0-9]+)(\\n|$)");
-regex Cgroup::regEth0("(^|\\n)eth0 ([0-9]+)(\\n|$)");
-regex Cgroup::regEth1("(^|\\n)eth1 ([0-9]+)(\\n|$)");
-regex Cgroup::regLo("(^|\\n)lo ([0-9]+)(\\n|$)");
-regex Cgroup::regOOM("(^|\\n)oom_kill_disable ([0-9]+)(\\n|$)");
-regex Cgroup::regUnder("(^|\\n)under_oom ([0-9]+)(\\n|$)");
-regex Cgroup::regKill("(^|\\n)oom_kill ([0-9]+)(\\n|$)");
-regex Cgroup::regTrim("([ \\n\\t]*)([^ \\n\\t]+)([ \\n\\t]*)");
+vplregex Cgroup::regUser("(^|\n)user ([0-9]+)(\n|$)");
+vplregex Cgroup::regSystem("(^|\n)system ([0-9]+)(\n|$)");
+vplregex Cgroup::regPeriods("(^|\n)nr_periods ([0-9]+)(\n|$)");
+vplregex Cgroup::regThrottled("(^|\n)nr_throttled ([0-9]+)(\n|$)");
+vplregex Cgroup::regThrottledTime("(^|\n)throttled_time ([0-9]+)(\n|$)");
+vplregex Cgroup::regCache("(^|\n)cache ([0-9]+)(\n|$)");
+vplregex Cgroup::regMem("(^|\n)shmem ([0-9]+)(\n|$)");
+vplregex Cgroup::regMapped("(^|\n)mapped_file ([0-9]+)(\n|$)");
+vplregex Cgroup::regFault("(^|\n)pgfault ([0-9]+)(\n|$)");
+vplregex Cgroup::regHierarchical("(^|\n)hierarchical_memory_limit ([0-9]+)(\n|$)");
+vplregex Cgroup::regEth0("(^|\n)eth0 ([0-9]+)(\n|$)");
+vplregex Cgroup::regEth1("(^|\n)eth1 ([0-9]+)(\n|$)");
+vplregex Cgroup::regLo("(^|\n)lo ([0-9]+)(\n|$)");
+vplregex Cgroup::regOOM("(^|\n)oom_kill_disable ([0-9]+)(\n|$)");
+vplregex Cgroup::regUnder("(^|\n)under_oom ([0-9]+)(\n|$)");
+vplregex Cgroup::regKill("(^|\n)oom_kill ([0-9]+)(\n|$)");
+vplregex Cgroup::regTrim("([ \n\t]*)([^ \n\t]+)([ \n\t]*)");
 
-string Cgroup::regFound(regex &reg, string input){
-	smatch found;
+string Cgroup::regFound(vplregex &reg, string input){
+	vplregmatch found;
 	string match;
-	bool matchFound = regex_search(input,found,reg);
+	bool matchFound = reg.search(input, found);
 	if (matchFound) {
 		match = found[2];
 	}
