@@ -1,4 +1,8 @@
 #!/bin/bash
+aclocal
+autoheader
+autoconf
+automake
 ./configure
 if [ "$1" == "" ] ; then
 	make distcheck
