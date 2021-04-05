@@ -16,3 +16,5 @@ src/*.o
 */.deps
 src/vpl-jail-server
 .dirstamp
+tests/websocket-echo-test
+
