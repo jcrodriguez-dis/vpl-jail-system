@@ -30,22 +30,21 @@ public:
 	}
 	bool search(const string &input, vplregmatch &found) {
 		const int maxmatch = 10;
+		int limit = (int) found.size();
 		regmatch_t match[maxmatch];
 		int nomatch = regexec(&creg, input.c_str(), maxmatch, match, 0);
 		if (nomatch) return false;
-		int nmatchs = 0;
-		for ( int i = 0; i < maxmatch; i++) {
+		int nmatchs = limit > maxmatch? maxmatch : limit;
+		for ( int i = 0; i < nmatchs; i++) {
 			if (match[i].rm_so == -1) {
-				nmatchs = i;
+				found[i] = "";
+			} else {
+				found[i] = input.substr(match[i].rm_so,
+	                                    match[i].rm_eo - match[i].rm_so);
 			}
 		}
-		found = vplregmatch(nmatchs);
-		for ( int i = 0; i < maxmatch; i++) {
-			if (match[i].rm_so == -1) {
-				break;
-			}
-			found[i] = input.substr(match[i].rm_so,
-			                        match[i].rm_eo - match[i].rm_so);
+		for ( int i = nmatchs; i < limit; i++) {
+			found[i] = "";
 		}
 		return true;
 	}
