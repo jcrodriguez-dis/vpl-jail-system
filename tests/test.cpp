@@ -252,6 +252,81 @@ void testMemSizeToBytesi() {
 	assert(Util::memSizeToBytesi("1gbytes") == gb1);
 	assert(Util::memSizeToBytesi("1     G") == gb1);
 }
+
+void testVPLRegex() {
+	vplregex regRequestLine("^([^ ]+) ([^ ]+) ([^ ]+)$");
+	{
+		vplregmatch found(4);
+		string text = "GET http://algo.com/nada HTTP/1.2";
+		regRequestLine.search(text, found);
+		assert(found.size() == 4);
+		assert(found[0] == text);
+		assert(found[1] == "GET");
+		assert(found[2] == "http://algo.com/nada");
+		assert(found[3] == "HTTP/1.2");
+	}
+	vplregex regHeader("^[ \t]*([^ \t:]+):[ \t]*(.*)$");
+	{
+		vplregmatch found(3);
+		string text = "Cookie: name1=value1; name2=value2; name3=value3";
+		regHeader.search(text, found);
+		assert(found.size() == 3);
+		assert(found[0] == text);
+		assert(found[1] == "Cookie");
+		assert(found[2] == "name1=value1; name2=value2; name3=value3");
+	}
+	vplregex regURL("^([a-zA-Z]+)?(:\\/\\/[^\\/]+)?(.*)$");
+	{
+		vplregmatch found(4);
+		string text = "http://algo.com/nada.php?otracosa#1";
+		regURL.search(text, found);
+		assert(found.size() == 4);
+		assert(found[0] == text);
+		assert(found[1] == "http");
+		assert(found[2] == "://algo.com");
+		assert(found[3] == "/nada.php?otracosa#1");
+	}
+	{
+		vplregmatch found(4);
+		string text = "://nada.com/nada.php?otracosa#1";
+		regURL.search(text, found);
+		assert(found.size() == 4);
+		assert(found[0] == text);
+		assert(found[1] == "");
+		assert(found[2] == "://nada.com");
+		assert(found[3] == "/nada.php?otracosa#1");
+	}
+	{
+		vplregmatch found(4);
+		string text = "/nada.php?otracosa#1";
+		regURL.search(text, found);
+		assert(found.size() == 4);
+		assert(found[0] == text);
+		assert(found[1] == "");
+		assert(found[2] == "");
+		assert(found[3] == "/nada.php?otracosa#1");
+	}
+	vplregex regCookie("([^=]+)=([^;]+)(; )?");
+	{
+		vplregmatch found(3);
+		string text = "name1=value1; name2=value2; name3=value3";
+		regCookie.search(text, found);
+		assert(found.size() == 3);
+		assert(found[0] == "name1=value1; ");
+		assert(found[1] == "name1");
+		assert(found[2] == "value1");
+	}
+	{
+		vplregmatch found(3);
+		string text = "name1=value1";
+		regCookie.search(text, found);
+		assert(found.size() == 3);
+		assert(found[0] == text);
+		assert(found[1] == "name1");
+		assert(found[2] == "value1");
+	}
+}
+
 void testSetCgroupFileSystem(){
 	Cgroup::setBaseCgroupFileSystem("/sys/fs/cgroup");
 	assert(Cgroup::getBaseCgroupFileSystem() == "/sys/fs/cgroup");
@@ -596,6 +671,7 @@ int main(){
 			testMemSizeToBytesi();
 			testConfigurationEmpty();
 			testConfigurationFull();
+			testVPLRegex();
 			//Test cgroup
 			testSetCgroupFileSystem();
 			testGetCPUAcctStat();
