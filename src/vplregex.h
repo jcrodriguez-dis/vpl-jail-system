@@ -23,7 +23,10 @@ class vplregex {
 	regex_t creg;
 public:
 	vplregex(const string &reg) {
-		regcomp(&creg, reg.c_str(), REG_EXTENDED);
+		regcomp(& creg, reg.c_str(), REG_EXTENDED);
+	}
+	~vplregex() {
+		regfree(& creg);
 	}
 	bool search(const string &input, vplregmatch &found) {
 		const int maxmatch = 10;
