@@ -63,6 +63,9 @@ Troubleshooting
 Reviewing logs
 ^^^^^^^^^^^^^^
 
+You can see the log of the last installation at "/var/log/vpl_installation.log"
+and the service start/stop log at "/var/log/vpl-jail-service.log".
+
 You can obtain a detailed log of the execution process by changing the log level
 at the configuration file. Commonly The logs will be written to "/var/log/syslog".
 
