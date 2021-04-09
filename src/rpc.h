@@ -78,9 +78,14 @@ public:
 		response += responseMember("interactive",(interactive?1:0));
 		return responseWraper(response);
 	}
+	static string updateResponse(bool ok){
+		string response;
+		response += responseMember("update", ok? 1 : 0);
+		return responseWraper(response);
+	}
 	static string runningResponse(bool running){
 		string response;
-		response += responseMember("running",(running?1:0));
+		response += responseMember("running", running? 1 : 0);
 		return responseWraper(response);
 	}
 	static string stopResponse(){

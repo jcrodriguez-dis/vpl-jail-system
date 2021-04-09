@@ -138,6 +138,10 @@ void Jail::commandGetResult(string adminticket,string &compilation,string &execu
 	pm.getResult(compilation,execution,executed);
 	interactive=pm.isInteractive();
 }
+bool Jail::commandUpdate(mapstruct &parsedata){
+	return true;
+}
+
 bool Jail::commandRunning(string adminticket){
 	try{
 		processMonitor pm(adminticket);
@@ -305,6 +309,10 @@ void Jail::commandExecute(string executeticket,Socket *s){
 	}
 }
 
+bool Jail::httpPassthrough(Socket *socket){
+	return false;
+}
+
 bool Jail::isValidIPforRequest(){
 	const vector<string> &dirs=configuration->getTaskOnlyFrom();
 	if(dirs.size()==0) return true;
@@ -353,7 +361,7 @@ void Jail::process(Socket *socket){
 	syslog(LOG_INFO,"Start server version %s",Util::version());
 	string httpURLPath=configuration->getURLPath();
 	HttpJailServer server(socket);
-	try{
+	try {
 		socket->readHeaders();
 		if(socket->headerSize()==0){
 			if(socket->isSecure()){ //Don't count SSL error
@@ -362,15 +370,25 @@ void Jail::process(Socket *socket){
 				_exit(EXIT_FAILURE);
 			}
 		}
+		if (socket->getCookie(VPL_WEBCOOKIE).length()) { // If found cookie passing to local application and stop processing
+			if (! httpPassthrough(socket) ) {
+				server.send200("", false, VPL_CLEANWEBCOOKIE);
+				_exit(EXIT_FAILURE);
+			}
+		}
 		string httpMethod=socket->getMethod();
-		if(Util::toUppercase(socket->getHeader("Upgrade"))!="WEBSOCKET"){
+		if (Util::toUppercase(socket->getHeader("Upgrade")) != "WEBSOCKET") {
 			syslog(LOG_INFO,"http(s) request");
-			if(httpMethod=="GET"){
-				string response = predefinedURLResponse(socket->getURLPath());
-				if ( response.size() == 0 ) {
-					throw HttpException(notFoundCode, "Http GET: Url path not found '" + socket->getURLPath() + "'");
+			if (httpMethod == "GET") {
+				if (false) {
+					// If requestion passing
+				} else {
+					string response = predefinedURLResponse(socket->getURLPath());
+					if ( response.size() == 0 ) {
+						throw HttpException(notFoundCode, "Http GET: Url path not found '" + socket->getURLPath() + "'");
+					}
+					server.send200(response);
 				}
-				server.send200(response);
 				_exit(static_cast<int>(neutral));
 			}
 			if(httpMethod=="HEAD"){
@@ -423,14 +441,17 @@ void Jail::process(Socket *socket){
 					// Restores behaviour of < 2.3 version
 					throw "Ticket invalid";
 				}
-				server.send200(RPC::runningResponse(commandRunning(adminticket)));
+				server.send200(RPC::runningResponse(running));
 			}else if(request == "stop"){
 				string adminticket;
 				adminticket=parsedata["adminticket"]->getString();
 				commandStop(adminticket);
 				server.send200(RPC::stopResponse());
+			}else if(request == "update"){
+				bool ok = commandUpdate(parsedata);
+				server.send200(RPC::updateResponse(ok));
 			}else{ //Error
-				throw HttpException(badRequestCode,"Unknown request:"+request);
+				throw HttpException(badRequestCode, "Unknown request:" + request);
 			}
 		}else{ //Websocket
 			if(socket->getMethod() != "GET"){

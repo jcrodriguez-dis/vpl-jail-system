@@ -44,10 +44,12 @@ class Jail{
 	string commandAvailable(int memRequested);
 	void commandRequest(mapstruct &parsedata, string &adminticket,string &monitorticket,string &executionticket);
 	void commandGetResult(string adminticket,string &compilation,string &execution,bool &executed,bool &interactive);
+	bool commandUpdate(mapstruct &parsedata);
 	bool commandRunning(string adminticket);
 	void commandStop(string adminticket);
 	void commandMonitor(string userticket,Socket *s);
 	void commandExecute(string userticket,Socket *s);
+	bool httpPassthrough(Socket *s);
 	string predefinedURLResponse(string URLPath);
 public:
 	Jail(string);

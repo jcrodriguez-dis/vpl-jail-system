@@ -127,17 +127,20 @@ class Socket{
 	string protocol;
 	string URL;		//URL
 	string URLPath;
-	map<string,string> headers;		//Headers pair name:value
+	map<string,string> headers;	//Headers pair name:value
+	map<string,string> cookies; //Cookies pair name:value
 	size_t maxDataSize;	//Max program data size to read
 	string header;
 	string readBuffer;
 	string writeBuffer;
-	regex_t regRequestLine;
-	regex_t regHeader;
-	regex_t regURL;
+	static vplregex regRequestLine;
+	static vplregex regHeader;
+	static vplregex regURL;
+	static vplregex regCookie;
 	bool closed;
 	void parseRequestLine(const string &line);
 	void parseHeader(const string &line);
+	void parseCookies(const string &value);
 	void processHeaders(const string &input);
 	virtual ssize_t netWrite(const void *, size_t );
 	virtual ssize_t netRead(void *, size_t );
@@ -152,15 +155,16 @@ public:
 	string getVersion(){return version;}
 	string getURLPath(){return URLPath;}
 	string getHeader(string name);
+	string getCookie(string cookie);
 	int getSocket(){ return socket;}
 	bool isReadBuffered() { return readBuffer.size()>0;}
 	bool isWriteBuffered() { return writeBuffer.size()>0;}
 	virtual bool isSecure() { return false;}
 	bool isClosed(){return closed;}
-	void close(){if(!closed) shutdown(socket,SHUT_RDWR);closed=true;}
-	bool wait(const int msec=50); //Wait for a socket change until milisec time
-	void send(const string &data, bool async=false);
-	string receive(int sizeToReceive=0);
+	void close();
+	bool wait(const int msec = 50); //Wait for a socket change until milisec time
+	void send(const string &data, bool async = false);
+	string receive(int sizeToReceive = 0);
 };
 
 class SSLRetry{
@@ -170,64 +174,65 @@ class SSLRetry{
 	const SSL *ssl;
 public:
 	SSLRetry(int socket, const SSL *s, string action){
-		devices[0].fd=socket;
-		ssl=s;
-		message="Error in SSL "+action+" ";
-		currentTime=time(NULL);
-		timeLimit=currentTime+JAIL_SOCKET_TIMEOUT;
+		devices[0].fd = socket;
+		ssl = s;
+		message = "Error in SSL " + action + " ";
+		currentTime = time(NULL);
+		timeLimit = currentTime + JAIL_SOCKET_TIMEOUT;
 	}
 	bool end(ssize_t ret){
-		if(ret>0) return true;
-		int code=SSL_get_error(ssl,ret);
-		const char *scode=NULL;
-		switch(code){
+		if (ret > 0) return true;
+		int code = SSL_get_error(ssl, ret);
+		const char *scode = NULL;
+		switch (code) {
 			case SSL_ERROR_NONE: return true;
 			case SSL_ERROR_ZERO_RETURN: return true;
 			case SSL_ERROR_WANT_READ:
-				devices[0].events=POLLIN;
+				devices[0].events = POLLIN;
 				break;
 			case SSL_ERROR_WANT_WRITE:
-				devices[0].events=POLLOUT;
+				devices[0].events = POLLOUT;
 				break;
 			case SSL_ERROR_WANT_CONNECT:
-				if(scode == NULL){
-					scode="SSL_ERROR_WANT_CONNECT ";
+				if (scode == NULL) {
+					scode = "SSL_ERROR_WANT_CONNECT ";
 				}
 				/* no break */
 			case SSL_ERROR_WANT_ACCEPT:
-				if(scode == NULL){
-					scode="SSL_ERROR_WANT_ACCEPT ";
+				if (scode == NULL) {
+					scode = "SSL_ERROR_WANT_ACCEPT ";
 				}
 				/* no break */
 			case SSL_ERROR_SYSCALL:
-				if(scode == NULL){
-					scode="SSL_ERROR_SYSCALL ";
+				if (scode == NULL) {
+					scode = "SSL_ERROR_SYSCALL ";
 				}
 				if(ret == 0){
-					syslog(LOG_INFO,"SSL socket closed unexpected ret==0: %s %s",message.c_str(),scode);
+					syslog(LOG_INFO,"SSL socket closed unexpected ret==0: %s %s",
+						message.c_str(), scode);
 					return true;
 				}
 				/* no break */
 			case SSL_ERROR_SSL:
-				if(scode == NULL){
-					scode="SSL_ERROR_SSL ";
+				if (scode == NULL) {
+					scode = "SSL_ERROR_SSL ";
 				}
 				/* no break */
 			default:
-				if(scode == NULL){
-					scode="UNKNOW SSL_ERROR ";
+				if (scode == NULL) {
+					scode = "UNKNOW SSL_ERROR ";
 				}
-				throw HttpException(internalServerErrorCode
-						,message+scode+SSLBase::getError()); //Error
+				throw HttpException(internalServerErrorCode,
+				      	message+scode+SSLBase::getError()); //Error
 		}
 		ERR_clear_error();
-		time_t wait=(timeLimit-currentTime)*1000;
-		int res=poll(devices,1,wait);
-		if(res==-1) {
+		time_t wait = (timeLimit - currentTime) * 1000;
+		int res = poll(devices, 1, wait);
+		if (res == -1) {
 			throw HttpException(internalServerErrorCode, message+ ": poll error"); //Error
 		}
-		currentTime=time(NULL);
-		if(currentTime>timeLimit || res==0){
+		currentTime = time(NULL);
+		if (currentTime > timeLimit || res == 0) {
 			throw HttpException(requestTimeoutCode, message+": timeout");
 		}
 		return false;
@@ -237,7 +242,7 @@ public:
 class SSLSocket: public Socket{
 	SSL *ssl;
 	virtual ssize_t netWrite(const void *b, size_t s){
-		SSLRetry retry(getSocket(),ssl,"write");
+		SSLRetry retry(getSocket(), ssl, "write");
 		while(true){
 			ssize_t ret= SSL_write(ssl, b, s);
 			if(retry.end(ret)) return ret;
@@ -245,7 +250,7 @@ class SSLSocket: public Socket{
 		return 0; //Not reachable
 	}
 	virtual ssize_t netRead(void *b, size_t s){
-		SSLRetry retry(getSocket(),ssl,"read");
+		SSLRetry retry(getSocket(), ssl, "read");
 		while(true){
 			ssize_t ret= SSL_read(ssl, b, s);
 			if(retry.end(ret)) return ret;
@@ -258,7 +263,7 @@ public:
 		Util::fdblock(s,false);
 		SSL_set_fd(ssl, s);
 		//SSL_accept with timeout
-		SSLRetry retry(getSocket(),ssl,"accept");
+		SSLRetry retry(getSocket(), ssl, "accept");
 		while(true){
 			int ret= SSL_accept(ssl);
 			if(retry.end(ret)) break;
