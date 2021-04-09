@@ -30,6 +30,11 @@
 
 #define VPL_EXECUTION "vpl_execution"
 #define VPL_WEXECUTION "vpl_wexecution"
+#define VPL_WEBEXECUTION "vpl_webexecution"
+#define VPL_WEBCOOKIE "__vpl_webexecution__"
+#define VPL_WEBSETCOOKIE "Set-Cookie: " VPL_WEBCOOKIE "="
+#define VPL_CLEANWEBCOOKIE VPL_WEBSETCOOKIE "nada; Max-Age=-1\r\n"
+
 using namespace std;
 
 enum ExitStatus {success=EXIT_SUCCESS,
@@ -293,7 +298,7 @@ public:
 		static vplregex regMemSize("^[ \t]*([0-9]+)[ \t]*([GgMmKk]?)");
 		const int numberGroup = 1;
 		const int abbrebiationGroup = 2;
-		vplregmatch found;
+		vplregmatch found(3);
 		bool matchFound = regMemSize.search(memSize, found);
 		if (matchFound) {
 			return atol(found[numberGroup]) * memAbbreviation(found[abbrebiationGroup]);
@@ -338,16 +343,16 @@ public:
 
 	static bool correctFileName(const string &fn){
 		static vplregex reg("[[:cntrl:]]|[!-,]|[:-@]|[{-~]|\\\\|\\[|\\]|[\\/\\^`]|^ | $|^\\-|\\.\\.");
-		if(fn.size() <1) return false;
-		if(fn.size() >JAIL_FILENAME_SIZE_LIMIT) return false;
-		vplregmatch found;
-		bool correct = ! reg.search(fn, found);
-		if( ! correct){
+		if(fn.size() < 1) return false;
+		if(fn.size() > JAIL_FILENAME_SIZE_LIMIT) return false;
+		vplregmatch found(1);
+		bool incorrect = reg.search(fn, found);
+		if( incorrect){
 			string incorrect = found[0];
 			syslog(LOG_DEBUG,"incorrectFile '%s' found '%s'"
 					,fn.c_str(), incorrect.c_str());
 		}
-		return correct;
+		return ! incorrect;
 	}
 
 	static bool correctPath(const string &path){ //No trailing /
