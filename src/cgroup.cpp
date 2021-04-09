@@ -28,7 +28,7 @@ vplregex Cgroup::regKill("(^|\n)oom_kill ([0-9]+)(\n|$)");
 vplregex Cgroup::regTrim("([ \n\t]*)([^ \n\t]+)([ \n\t]*)");
 
 string Cgroup::regFound(vplregex &reg, string input){
-	vplregmatch found;
+	vplregmatch found(4);
 	string match;
 	bool matchFound = reg.search(input, found);
 	if (matchFound) {
