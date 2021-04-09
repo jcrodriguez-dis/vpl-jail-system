@@ -71,16 +71,22 @@ void HttpJailServer::sendRaw(const string &data){
 
 /**
  * send a response to client
- * @param int http code
- * @param string http code text
- * @param string response
+ * @param code http code
+ * @param codeText http code text
+ * @param load Payload to send
+ * @param headMethod if HEAD method no payload send (optional)
+ * @param extraHeader Extra headers to add (optional)
  */
-void HttpJailServer::send(int code, const string &codeText, const string &load, const bool headMethod){
+void HttpJailServer::send(int code, const string &codeText, const string &load,
+                          const bool headMethod, const string extraHeader) {
 	string output;
 	output +="HTTP/1.1 "+ Util::itos(code)+" "+codeText+"\r\n";
 	if(code != 100){
 		output += "Server: vpl-jail-system "+string(Util::version())+"\r\n";
 		output += "Connection: close\r\n";
+		if (extraHeader.length()) {
+			output += extraHeader;
+		}
 		output += "Content-Length: " + Util::itos(load.size()) + "\r\n";
 		syslog(LOG_DEBUG,"Response Content-Length: %lu",(unsigned long)load.size());
 		output += "Content-Type: ";
@@ -107,16 +113,21 @@ void HttpJailServer::send(int code, const string &codeText, const string &load, 
 }
 
 /**
- * send a 200 OK response to client
+ * Send a 200 OK response to client
+ * 
  * @param response xml to send as content
+ * @param headMethod if HEAD method no payload send (optional)
+ * @param extraHeader Extra headers to add (optional)
  */
-void HttpJailServer::send200(const string &response, const bool headMethod){
-	send(200,"OK", response, headMethod);
+void HttpJailServer::send200(const string &response, const bool headMethod, const string extraHeader){
+	send(200,"OK", response, headMethod, extraHeader);
 }
 
 /**
- * send a response to client
+ * Send a response to client
+ * 
  * @param code code to send
+ * @param text Extra text explainning the code
  */
 void HttpJailServer::sendCode(CodeNumber code, string text){
 	string codeText;
@@ -151,9 +162,12 @@ void HttpJailServer::sendCode(CodeNumber code, string text){
 		break;
 	};
 	string html;
-	if(code!=continueCode){
-		html = "<html><body><h2>"+codeText+"</h2><h3>"+text+"</h3></body></html>";
+	if (code != continueCode) {
+		html = "<html><head><title>" + codeText + "</title></head><body>";
+		html += "<h2>" + codeText + "</h2>";
+		html += "<h3>" + text + "</h3>";
+		html += "</body></html>";
 	}
-	send(cnumber,codeText,html);
+	send(cnumber, codeText, html);
 }
 
