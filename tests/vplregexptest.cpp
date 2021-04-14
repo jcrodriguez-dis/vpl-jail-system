@@ -30,36 +30,72 @@ class VPLregexTest: public BaseTest {
 			assert(found[1] == "Cookie");
 			assert(found[2] == "name1=value1; name2=value2; name3=value3");
 		}
-		vplregex regURL("^([a-zA-Z]+)?(:\\/\\/[^\\/]+)?(.*)$");
+		vplregex regURL("^([a-zA-Z]+)?(:\\/\\/[^\\/]+)?([^?]*)[?]?(.*)?$");
 		{
-			vplregmatch found(4);
+			vplregmatch found(5);
 			string text = "http://algo.com/nada.php?otracosa#1";
-			regURL.search(text, found);
-			assert(found.size() == 4);
+			assert(regURL.search(text, found));
+			assert(found.size() == 5);
 			assert(found[0] == text);
 			assert(found[1] == "http");
 			assert(found[2] == "://algo.com");
-			assert(found[3] == "/nada.php?otracosa#1");
+			assert(found[3] == "/nada.php");
+			assert(found[4] == "otracosa#1");
 		}
 		{
-			vplregmatch found(4);
+			vplregmatch found(5);
 			string text = "://nada.com/nada.php?otracosa#1";
-			regURL.search(text, found);
-			assert(found.size() == 4);
+			assert(regURL.search(text, found));
+			assert(found.size() == 5);
 			assert(found[0] == text);
 			assert(found[1] == "");
 			assert(found[2] == "://nada.com");
-			assert(found[3] == "/nada.php?otracosa#1");
+			assert(found[3] == "/nada.php");
+			assert(found[4] == "otracosa#1");
 		}
 		{
-			vplregmatch found(4);
+			vplregmatch found(5);
 			string text = "/nada.php?otracosa#1";
 			regURL.search(text, found);
-			assert(found.size() == 4);
+			assert(found.size() == 5);
 			assert(found[0] == text);
 			assert(found[1] == "");
 			assert(found[2] == "");
-			assert(found[3] == "/nada.php?otracosa#1");
+			assert(found[3] == "/nada.php");
+			assert(found[4] == "otracosa#1");
+		}
+		{
+			vplregmatch found(5);
+			string text = "/nada.php";
+			regURL.search(text, found);
+			assert(found.size() == 5);
+			assert(found[0] == text);
+			assert(found[1] == "");
+			assert(found[2] == "");
+			assert(found[3] == "/nada.php");
+			assert(found[4] == "");
+		}
+		{
+			vplregmatch found(5);
+			string text = "/";
+			regURL.search(text, found);
+			assert(found.size() == 5);
+			assert(found[0] == text);
+			assert(found[1] == "");
+			assert(found[2] == "");
+			assert(found[3] == "/");
+			assert(found[4] == "");
+		}
+		{
+			vplregmatch found(5);
+			string text = "/?algo";
+			regURL.search(text, found);
+			assert(found.size() == 5);
+			assert(found[0] == text);
+			assert(found[1] == "");
+			assert(found[2] == "");
+			assert(found[3] == "/");
+			assert(found[4] == "algo");
 		}
 		vplregex regCookie("([^=]+)=([^;]+)(; )?");
 		{

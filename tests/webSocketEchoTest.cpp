@@ -14,8 +14,18 @@ using namespace std;
 #include "../src/websocket.h"
 #include "../src/httpServer.h"
 
-int main()
-{
+class ConfigurationTestFull: public Configuration {
+protected:
+	ConfigurationTestFull(): Configuration("./configfiles/full.txt") {}
+public:
+	static Configuration* getConfiguration(){
+		singlenton = new ConfigurationTestFull();
+		return singlenton;
+	}
+};
+
+int main() {
+	ConfigurationTestFull::getConfiguration();
 	openlog("websocket-echo",LOG_PID,LOG_USER);
 	setlogmask(LOG_UPTO(LOG_DEBUG));
 	syslog(LOG_INFO,"Websocket echo test program started");
@@ -54,17 +64,38 @@ int main()
 			Socket socket(clientSocket);
 			socket.readHeaders();
 			webSocket ws(&socket);
-			ws.send("Hello from echo websocket",TEXT_FRAME);
+			ws.send("Hello from echo websocket", TEXT_FRAME);
 			while(!ws.isClosed()){
 				while(ws.wait());
 				string r=ws.receive();
-				if(r.size()>0)
-					ws.send(r,TEXT_FRAME);
+				if(r == "close") {
+					ws.send("disconnecting",TEXT_FRAME);
+					ws.close();
+					break;
+				}
+				if(r == "end") {
+					ws.send("finished",TEXT_FRAME);
+					ws.close();
+					close(listenSocket);
+					return EXIT_SUCCESS;
+				}
+				if(r.size()>0) {
+					ws.send(r, TEXT_FRAME);
+				}
 			}
 			cout << "disconnected" << endl;
-		}catch(HttpException &e){
+		} catch(HttpException &e) {
 			cerr << "HttpException: " << e.getLog() << endl;
+		} catch(const std::exception &e){
+			cerr << "Unexpected exception:" << e.what() << " " << __FILE__ << ":" << __LINE__;
+		}catch(const string &e) {
+			cerr << "Exception: " << e << endl;
+		} catch(const char *e) {
+			cerr << "Exception: " << e << endl;
+		} catch(...) {
+			cerr << "Unknow exception" << endl;
 		}
+
 	}
 	return EXIT_SUCCESS;
 }
