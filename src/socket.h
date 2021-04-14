@@ -127,6 +127,7 @@ class Socket{
 	string protocol;
 	string URL;		//URL
 	string URLPath;
+	string queryString;
 	map<string,string> headers;	//Headers pair name:value
 	map<string,string> cookies; //Cookies pair name:value
 	size_t maxDataSize;	//Max program data size to read
@@ -154,6 +155,7 @@ public:
 	string getMethod(){return method;}
 	string getVersion(){return version;}
 	string getURLPath(){return URLPath;}
+	string getQueryString(){return queryString;}
 	string getHeader(string name);
 	string getCookie(string cookie);
 	int getSocket(){ return socket;}

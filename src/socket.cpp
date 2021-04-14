@@ -21,7 +21,7 @@ SSLBase* SSLBase::singlenton=NULL;
 
 vplregex Socket::regRequestLine("^([^ ]+) ([^ ]+) ([^ ]+)$");
 vplregex Socket::regHeader("^[ \t]*([^ \t:]+):[ \t]*(.*)$");
-vplregex Socket::regURL("^([a-zA-Z]+)?(:\\/\\/[^\\/]+)?(.*)$");
+vplregex Socket::regURL("^([a-zA-Z]+)?(:\\/\\/[^\\/]+)?([^?]*)[?]?(.*)?$");
 vplregex Socket::regCookie("([^=]+)=([^;]+)(; )?");
 
 /**
@@ -37,7 +37,7 @@ void Socket::parseRequestLine(const string &line){
 	version = "";
 	protocol = "";
 	URLPath = "";
-	vplregmatch match(4);
+	vplregmatch match(5);
 	bool nomatch = ! regRequestLine.search(line, match);
 	if (nomatch) {
 		throw HttpException(badRequestCode, "Erroneous request line", line);
@@ -55,6 +55,7 @@ void Socket::parseRequestLine(const string &line){
 	}
 	protocol = match[1];
 	URLPath = match[3];
+	queryString = match[4];
 }
 string Socket::getHeader(string name){
 	name=Util::toUppercase(name);
