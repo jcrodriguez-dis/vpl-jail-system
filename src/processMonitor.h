@@ -15,10 +15,10 @@ using namespace std;
 #include "configuration.h"
 
 enum securityLevel{
-	admin,monitor,execute,none
+	admin, monitor, execute, httppassthrough, none
 };
 enum processState{
-	prestarting,starting,compiling,beforeRunning,running,retrieve,stopped
+	prestarting, starting, compiling, beforeRunning, running, retrieve, stopped
 };
 
 class processMonitor{
@@ -29,6 +29,7 @@ class processMonitor{
 	string adminticket;
 	string monitorticket;
 	string executionticket;
+	string httpPassthroughticket;
 	bool   interactive; //is interactive request
 	string lang; //Code of language to use
 	time_t startTime; //Start time of the request
@@ -38,7 +39,7 @@ class processMonitor{
 	Configuration *configuration;
 	string processControlPath; //Folder with process info
 	string homePath;
-	void writeInfo(ConfigData data=ConfigData());
+	void writeInfo(ConfigData data = ConfigData());
 	ConfigData readInfo();
 	void writeState();
 	void readState();
@@ -58,7 +59,11 @@ class processMonitor{
 		return processControlPath;
 	}
 	string getProcessControlPath(string name){
-		return processControlPath+"/"+name;
+		return processControlPath + "/" + name;
+	}
+	static string getPartialTicket() {
+		const int salt = 127;
+		return Util::itos(Util::random() / salt);
 	}
 	static void cleanPrisonerFiles(string);
 public:
@@ -73,16 +78,23 @@ public:
 	bool installScript(string to, string from);
 	static int requestsInProgress();
 	void setExtraInfo(ExecutionLimits, bool interactive, string lang);
-	string getLang(){ return lang;}
-	string getVNCPassword(){ return executionticket.substr(0,8);}
-	time_t getStartTime(){return startTime;}
-	time_t getMaxTime(){return executionLimits.maxtime;}
-	bool isInteractive(){return interactive;}
-	ExecutionLimits getLimits(){return executionLimits;}
-	uid_t getPrisonerID(){return prisoner;}
-	securityLevel getSecurityLevel(){return security;}
-	string getHomePath(){return configuration->getJailPath()+"/home/p"+Util::itos(prisoner);}
-	string getRelativeHomePath(){return "/home/p"+Util::itos(prisoner);}
+	string getLang() { return lang; }
+	string getVNCPassword(){ return executionticket.substr(0,8); }
+	time_t getStartTime() { return startTime; }
+	time_t getMaxTime() { return executionLimits.maxtime; }
+	bool isInteractive() { return interactive; }
+	ExecutionLimits getLimits() { return executionLimits; }
+	uid_t getPrisonerID() { return prisoner; }
+	securityLevel getSecurityLevel() { return security; }
+	string getHomePath() {
+		return configuration->getJailPath() + "/home/p" + Util::itos(prisoner);
+	}
+	string getRelativeHomePath() {
+		return "/home/p" + Util::itos(prisoner);
+	}
+	string getHttpPassthroughTicket() {
+		return "unticket";
+	}
 	void becomePrisoner();
 	void becomePrisoner(int);
 	bool isRunnig();

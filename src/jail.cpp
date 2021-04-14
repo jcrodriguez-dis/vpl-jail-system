@@ -42,13 +42,13 @@ string Jail::commandAvailable(int memRequested){
 
 void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &monitorticket,string &executionticket){
 	syslog(LOG_INFO,"Request for process");
-	processMonitor pm(adminticket,monitorticket,executionticket);
+	processMonitor pm(adminticket, monitorticket, executionticket);
 	pid_t pid=fork();
 	if(pid==0){ //new process
 		try {
-			syslog(LOG_INFO,"parse files %lu",(long unsigned int)parsedata.size());
-			mapstruct files=RPC::getFiles(parsedata["files"]);
-			mapstruct filestodelete=RPC::getFiles(parsedata["filestodelete"]);
+			syslog(LOG_INFO,"parse files %lu", (long unsigned int)parsedata.size());
+			mapstruct files = RPC::getFiles(parsedata["files"]);
+			mapstruct filestodelete = RPC::getFiles(parsedata["filestodelete"]);
 			mapstruct fileencoding;
 			if ( parsedata.find("fileencoding") != parsedata.end() ) {
 				fileencoding = RPC::getFiles(parsedata["fileencoding"]);
@@ -133,11 +133,15 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 		_exit(EXIT_SUCCESS);
 	}
 }
-void Jail::commandGetResult(string adminticket,string &compilation,string &execution, bool &executed, bool &interactive){
+
+void Jail::commandGetResult(string adminticket, string &compilation,
+                            string &execution, bool &executed,
+							bool &interactive){
 	processMonitor pm(adminticket);
-	pm.getResult(compilation,execution,executed);
-	interactive=pm.isInteractive();
+	pm.getResult(compilation, execution, executed);
+	interactive = pm.isInteractive();
 }
+
 bool Jail::commandUpdate(mapstruct &parsedata){
 	return true;
 }
@@ -166,7 +170,7 @@ void Jail::commandStop(string adminticket){
 		_exit(EXIT_SUCCESS);
 	}
 }
-void Jail::commandMonitor(string monitorticket,Socket *s){
+void Jail::commandMonitor(string monitorticket, Socket *s){
 	processMonitor pm(monitorticket);
 	webSocket ws(s);
 	processState state=prestarting;
@@ -174,17 +178,17 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 	time_t lastMessageTime = 0;
 	time_t lastTime=pm.getStartTime();
 	string lastMessage;
-	while(state != stopped){
-		processState newstate=pm.getState();
+	while (state != stopped) {
+		processState newstate = pm.getState();
 		time_t now = time(NULL);
 		time_t timeout = pm.getStartTime() + pm.getMaxTime();
 		if( ! lastMessage.empty() && now != lastMessageTime){
-			ws.send(lastMessage+": "+Util::itos(now-startTime)+" seg");
+			ws.send(lastMessage + ": "+Util::itos(now-startTime)+" seg");
 			lastMessageTime = now;
 		}
-		if(newstate!=state){
-			state=newstate;
-			switch(state){
+		if (newstate != state) {
+			state = newstate;
+			switch(state) {
 			case prestarting:
 				break;
 			case starting:
@@ -196,7 +200,7 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 				break;
 			case compiling:
 				syslog(LOG_DEBUG,"Monitor compiling");
-				timeout=now+pm.getMaxTime();
+				timeout = now + pm.getMaxTime();
 				startTime = now;
 				lastMessageTime = now;
 				lastMessage = "message:compilation";
@@ -204,14 +208,14 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 				break;
 			case beforeRunning:
 				syslog(LOG_DEBUG,"Monitor beforeRunning");
-				ws.send("compilation:"+pm.getCompilation());
-				timeout=now+JAIL_SOCKET_TIMEOUT;
-				if(pm.FileExists(VPL_EXECUTION)){
-					syslog(LOG_DEBUG,"run:terminal");
+				ws.send("compilation:" + pm.getCompilation());
+				timeout = now + JAIL_SOCKET_TIMEOUT;
+				if (pm.FileExists(VPL_EXECUTION)) {
+					syslog(LOG_DEBUG, "run:terminal");
 					ws.send("run:terminal");
-				}else if(pm.FileExists(VPL_WEXECUTION))
-					ws.send("run:vnc:"+pm.getVNCPassword());
-				else{
+				} else if (pm.FileExists(VPL_WEXECUTION))
+					ws.send("run:vnc:" + pm.getVNCPassword());
+				else {
 					ws.send("close:");
 					ws.close();
 					ws.wait(500); //wait client response
@@ -223,7 +227,7 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 			case running:
 				syslog(LOG_DEBUG,"Monitor running");
 				startTime = now;
-				timeout=now+pm.getMaxTime()+6 /* execution cleanup */;
+				timeout = now + pm.getMaxTime()+6 /* execution cleanup */;
 				lastMessageTime = now;
 				lastMessage = "message:running";
 				ws.send(lastMessage);
@@ -231,11 +235,11 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 			case retrieve:
 				syslog(LOG_DEBUG,"Monitor retrieve");
 				startTime = now;
-				timeout=now+JAIL_HARVEST_TIMEOUT;
+				timeout = now + JAIL_HARVEST_TIMEOUT;
 				ws.send("retrieve:");
 				break;
 			case stopped:
-				syslog(LOG_DEBUG,"Monitor stopped");
+				syslog(LOG_DEBUG, "Monitor stopped");
 				ws.send("close:");
 				ws.close();
 				ws.wait(500); //wait client response
@@ -245,14 +249,14 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 		ws.wait(100); // 10 time a second
 		
 		string rec=ws.receive();
-		if(ws.isClosed())
+		if (ws.isClosed())
 			break;
-		if(rec.size()>0){ //Receive client close ws
+		if (rec.size() > 0) { //Receive client close ws
 			ws.close();
 			break;
 		}
 		//Check running timeout
-		if(state != starting && timeout< time(NULL)){
+		if (state != starting && timeout < time(NULL)) {
 			ws.send("message:timeout");
 			pm.cleanTask();
 			usleep(3000000);
@@ -262,7 +266,7 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 			ws.receive();
 			return;
 		}
-		if(lastTime != now && pm.isOutOfMemory()){ //Every second check memory usage
+		if (lastTime != now && pm.isOutOfMemory()) { //Every second check memory usage
 			string ml= pm.getMemoryLimit();
 			syslog(LOG_DEBUG,"Out of memory (%s)",ml.c_str());
 			ws.send("message:outofmemory:"+ml);
@@ -280,37 +284,72 @@ void Jail::commandMonitor(string monitorticket,Socket *s){
 	pm.cleanTask();
 }
 
-void Jail::commandExecute(string executeticket,Socket *s){
+void Jail::commandExecute(string executeticket, Socket *s){
 	processMonitor pm(executeticket);
 	webSocket ws(s);
-	if(pm.getSecurityLevel() != execute){
+	if (pm.getSecurityLevel() != execute){ 
 		syslog(LOG_ERR,"%s: Security. Try to execute request with no monitor ticket",IP.c_str());
 		throw "Internal server error";
 	}
 	syslog(LOG_INFO,"Start executing");
-	if(pm.getState() == beforeRunning){
+	if( pm.getState() == beforeRunning){ 
 		pm.setRunner();
-		if(pm.FileExists(VPL_EXECUTION)){
+		if (pm.FileExists(VPL_EXECUTION) && pm.FileExists(VPL_WEBEXECUTION)) {
 			string program;
-			if(pm.installScript(".vpl_launcher.sh","vpl_terminal_launcher.sh"))
-				program=".vpl_launcher.sh";
-			else
-				program=VPL_EXECUTION;
+			if (pm.installScript(".vpl_launcher.sh", "vpl_terminal_launcher.sh")) {
+				program = ".vpl_launcher.sh";
+			} else {
+				program = VPL_EXECUTION;
+			}
 			runTerminal(pm, ws, program);
-		}
-		else if(pm.FileExists(VPL_WEXECUTION)){
-			if(pm.installScript(".vpl_launcher.sh","vpl_vnc_launcher.sh"))
+		} else if (pm.FileExists(VPL_WEXECUTION)) {
+			if (pm.installScript(".vpl_launcher.sh", "vpl_vnc_launcher.sh"))
 				runVNC(pm, ws, ".vpl_launcher.sh");
 			else
-				syslog(LOG_ERR,"%s:Error: vpl_vnc_launcher.sh not installed",IP.c_str());
-		}else{
-			syslog(LOG_ERR,"%s:Error: no thing to run",IP.c_str());
+				syslog(LOG_ERR, "%s:Error: vpl_vnc_launcher.sh not installed", IP.c_str());
+		} else {
+			syslog(LOG_ERR, "%s:Error: no thing to run", IP.c_str());
 		}
 	}
 }
 
+bool Jail::commandSetPassthroughCookie(string passthroughticket, HttpJailServer &server){
+	try {
+		processMonitor pm(passthroughticket);
+		if ( pm.getState() != processState::running ||
+		     pm.getSecurityLevel() != httppassthrough) {
+			 return false;
+		}
+	} catch(...) {
+		return false;
+	}
+
+	string extra = VPL_SETWEBCOOKIE + passthroughticket + "\r\n";
+	extra += VPL_LOCALREDIRECT;
+	server.send(302, "REDIRECT", "", false, extra);
+	return true;
+}
+
 bool Jail::httpPassthrough(Socket *socket){
 	return false;
+}
+
+/**
+ * Checks for http Passthrough setting request
+ * 
+ * @param URLPath URL path to check
+ * @param ticket possible ticket found
+ * 
+ * @return true if valid request structure found
+ */
+bool Jail::isRequestingCookie(string URLPath, string &ticket) {
+	static vplregex reg("^\\/([^\\/]+)\\/httpPassthrough$");
+	vplregmatch match(3);
+	if (! reg.search(URLPath, match)) {
+		return false;
+	}
+	ticket = match[1];
+	return true;
 }
 
 bool Jail::isValidIPforRequest(){
@@ -376,22 +415,33 @@ void Jail::process(Socket *socket){
 				_exit(EXIT_FAILURE);
 			}
 		}
-		string httpMethod=socket->getMethod();
+		string httpMethod = socket->getMethod();
 		if (Util::toUppercase(socket->getHeader("Upgrade")) != "WEBSOCKET") {
 			syslog(LOG_INFO,"http(s) request");
 			if (httpMethod == "GET") {
-				if (false) {
-					// If requestion passing
-				} else {
-					string response = predefinedURLResponse(socket->getURLPath());
-					if ( response.size() == 0 ) {
-						throw HttpException(notFoundCode, "Http GET: Url path not found '" + socket->getURLPath() + "'");
+				ExitStatus securityStatus = ExitStatus::neutral;
+				string response;
+				string cookieTicket;
+				if (isRequestingCookie(socket->getURLPath(), cookieTicket)) { // Getting cookie to access web app
+					string iWasHere = socket->getCookie(VPL_IWASHERECOOKIE);
+					if (iWasHere.length() && socket->getQueryString() == "private") { // Requires a private browser
+						response = "<html><body><h1>Please, use a New Private or Incognito Window</h1></body></html>";
+					} else { // Incorrect request of cookie
+						if (! commandSetPassthroughCookie(cookieTicket, server)) {
+							securityStatus = ExitStatus::httpError;
+						}
 					}
-					server.send200(response);
 				}
-				_exit(static_cast<int>(neutral));
+				if ( response.empty() ) {
+					response = predefinedURLResponse(socket->getURLPath());
+				}
+				if ( response.empty() ) {
+					throw HttpException(notFoundCode, "HTTP GET: URL path not found '" + socket->getURLPath() + "'");
+				}
+				server.send200(response);
+				_exit(static_cast<int>(securityStatus));
 			}
-			if(httpMethod=="HEAD"){
+			if (httpMethod == "HEAD") {
 				string response = predefinedURLResponse(socket->getURLPath());
 				if ( response.size() == 0 ) {
 					throw HttpException(notFoundCode, "Http HEAD: Url path not found '" + socket->getURLPath() + "'");
@@ -399,10 +449,10 @@ void Jail::process(Socket *socket){
 				server.send200(response, true);
 				_exit(static_cast<int>(neutral));
 			}
-			if(httpMethod != "POST"){
+			if (httpMethod != "POST") {
 				throw HttpException(badRequestCode, "Http(s) Unsupported METHOD " + httpMethod);
 			}
-			if(!isValidIPforRequest()) {
+			if (!isValidIPforRequest()) {
 				throw HttpException(badRequestCode, "Client not allowed");
 			}
 			server.validateRequest(httpURLPath);
@@ -411,29 +461,32 @@ void Jail::process(Socket *socket){
 			string request = RPC::methodName(xml.getRoot());
 			mapstruct parsedata = RPC::getData(xml.getRoot());
 			syslog(LOG_INFO, "Execute request '%s'", request.c_str());
-			if(request == "available"){
+			if (request == "available") {
 				ExecutionLimits jailLimits = configuration->getLimits();
 				int memRequested = parsedata["maxmemory"]->getInt();
 				string status = commandAvailable(memRequested);
 				syslog(LOG_INFO,"Status: '%s'",status.c_str());
-				server.send200(RPC::availableResponse(status,processMonitor::requestsInProgress(),
+				server.send200(RPC::availableResponse(status,
+				        processMonitor::requestsInProgress(),
 						jailLimits.maxtime,
 						jailLimits.maxfilesize,
 						jailLimits.maxmemory,
 						jailLimits.maxprocesses,
 						configuration->getSecurePort()));
-			}else if(request == "request"){
+			} else if(request == "request") {
 				string adminticket,monitorticket,executionticket;
-				commandRequest(parsedata, adminticket,monitorticket,executionticket);
-				server.send200(RPC::requestResponse(adminticket,monitorticket,executionticket
-						,configuration->getPort(),configuration->getSecurePort()));
-			}else if(request == "getresult"){
-				string adminticket,compilation,execution;
+				commandRequest(parsedata, adminticket, monitorticket, executionticket);
+				server.send200(RPC::requestResponse(adminticket,
+								monitorticket,executionticket,
+								configuration->getPort(),
+								configuration->getSecurePort()));
+			} else if(request == "getresult") {
+				string adminticket, compilation, execution;
 				bool executed,interactive;
 				adminticket=parsedata["adminticket"]->getString();
 				commandGetResult(adminticket, compilation, execution,executed,interactive);
 				server.send200(RPC::getResultResponse(compilation,execution,executed,interactive));
-			}else if(request == "running"){
+			} else if(request == "running") {
 				string adminticket;
 				adminticket=parsedata["adminticket"]->getString();
 				bool running = commandRunning(adminticket);
@@ -442,36 +495,38 @@ void Jail::process(Socket *socket){
 					throw "Ticket invalid";
 				}
 				server.send200(RPC::runningResponse(running));
-			}else if(request == "stop"){
+			} else if(request == "stop") {
 				string adminticket;
 				adminticket=parsedata["adminticket"]->getString();
 				commandStop(adminticket);
 				server.send200(RPC::stopResponse());
-			}else if(request == "update"){
+			} else if(request == "update") {
 				bool ok = commandUpdate(parsedata);
 				server.send200(RPC::updateResponse(ok));
-			}else{ //Error
+			} else { //Error
 				throw HttpException(badRequestCode, "Unknown request:" + request);
 			}
-		}else{ //Websocket
+		} else { //Websocket
 			if(socket->getMethod() != "GET"){
 				throw "ws(s) Unsupported METHOD "+httpMethod;
 			}
-			string URLPath=socket->getURLPath();
+			string URLPath = socket->getURLPath();
 			regex_t reg;
 			regmatch_t match[3];
 			regcomp(&reg, "^\\/([^\\/]+)\\/(.+)$", REG_EXTENDED);
 			int nomatch=regexec(&reg, URLPath.c_str(),3, match, 0);
-			if(nomatch)
+			if (nomatch) {
 				throw string("Bad URL");
-			string ticket=URLPath.substr(match[1].rm_so,match[1].rm_eo-match[1].rm_so);
-			string command=URLPath.substr(match[2].rm_so,match[2].rm_eo-match[2].rm_so);
-			if(command == "monitor"){
-				commandMonitor(ticket,socket);
-			}else if(command == "execute"){
-				commandExecute(ticket,socket);
-			}else
+			}
+			string ticket = URLPath.substr(match[1].rm_so,match[1].rm_eo-match[1].rm_so);
+			string command = URLPath.substr(match[2].rm_so,match[2].rm_eo-match[2].rm_so);
+			if (command == "monitor") {
+				commandMonitor(ticket, socket);
+			} else if (command == "execute") {
+				commandExecute(ticket, socket);
+			} else {
 				throw string("Bad command");
+			}
 		}
 		_exit(EXIT_SUCCESS);
 	}
@@ -589,7 +644,7 @@ void Jail::setLimits(processMonitor &pm){
 /**
  * run program controlling timeout and redirection
  */
-string Jail::run(processMonitor &pm,string name, int othermaxtime){
+string Jail::run(processMonitor &pm, string name, int othermaxtime){
 	int maxtime;
 	pm.getLimits().syslog("run");
 	if(othermaxtime){

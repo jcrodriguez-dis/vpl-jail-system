@@ -192,28 +192,28 @@ ConfigData processMonitor::readInfo(){
 }
 
 processMonitor::processMonitor(string & adminticket, string & monitorticket, string & executionticket){
-	const int salt=127;
+	
 	configuration = Configuration::getConfiguration();
 	security = admin;
-	string cp=configuration->getControlPath();
-	adminticket = Util::itos(Util::random()/salt);
-	monitorticket = Util::itos(Util::random()/salt);
-	executionticket = Util::itos(Util::random()/salt);
+	string cp = configuration->getControlPath();
+	adminticket = getPartialTicket();
+	monitorticket = getPartialTicket();
+	executionticket = getPartialTicket();
 	selectPrisoner();
-	executionticket += Util::itos(Util::random()/salt);
-	monitorticket += Util::itos(Util::random()/salt);
-	adminticket += Util::itos(Util::random()/salt);
+	executionticket += getPartialTicket();
+	monitorticket += getPartialTicket();
+	adminticket += getPartialTicket();
 	{
 		Lock lock(cp);
-		while(Util::fileExists(cp+"/"+monitorticket)
-		||Util::fileExists(cp+"/"+executionticket)
-		||Util::fileExists(cp+"/"+adminticket)){
-			adminticket = Util::itos(Util::random()/salt);
-			monitorticket = Util::itos(Util::random()/salt);
-			executionticket = Util::itos(Util::random()/salt);
-			executionticket += Util::itos(Util::random()/salt);
-			monitorticket += Util::itos(Util::random()/salt);
-			adminticket += Util::itos(Util::random()/salt);
+		while (Util::fileExists(cp + "/" + monitorticket) ||
+		       Util::fileExists(cp + "/" + executionticket) ||
+			   Util::fileExists(cp + "/" + adminticket)) {
+			adminticket = getPartialTicket();
+			monitorticket = getPartialTicket();
+			executionticket = getPartialTicket();
+			executionticket += getPartialTicket();
+			monitorticket += getPartialTicket();
+			adminticket += getPartialTicket();
 		}
 		//Write tickets
 		ConfigData data;
@@ -231,11 +231,13 @@ processMonitor::processMonitor(string & adminticket, string & monitorticket, str
 		this->adminticket = adminticket;
 		this->monitorticket = monitorticket;
 		this->executionticket = executionticket;
+		this->executionticket = executionticket;
+		this->httpPassthroughticket = "";
 		startTime = time(NULL);
-		interactive=false;
-		compiler_pid=0;
-		monitor_pid=0;
-		runner_pid=0;
+		interactive = false;
+		compiler_pid = 0;
+		monitor_pid = 0;
+		runner_pid = 0;
 		writeInfo();
 	}
 }
@@ -247,30 +249,35 @@ processMonitor::processMonitor(string ticket){
 	regex_t reg;
 	regcomp(&reg,"^[0-9]+$", REG_EXTENDED);
 	regmatch_t match[1];
-	int nomatch=regexec(&reg, ticket.c_str(),1, match, 0);
+	int nomatch = regexec(&reg, ticket.c_str(),1, match, 0);
 	regfree(&reg);
-	if(nomatch == 0){
+	if (nomatch == 0) {
 		Lock lock(configuration->getControlPath());
-		string fileName=configuration->getControlPath() + "/" + ticket;
+		string fileName = configuration->getControlPath() + "/" + ticket;
 		if(Util::fileExists(fileName)){
 			ConfigData data;
 			data["USER_ID"] = "0";
-			data["SECURITY"] = "3"; //none
-			data = ConfigurationFile::readConfiguration(fileName,data);
-			setPrisonerID (atoi(data["USER_ID"].c_str()));
+			data["SECURITY"] = "4"; //none
+			data = ConfigurationFile::readConfiguration(fileName, data);
+			if (data["USER_ID"] == "0" || data["SECURITY"] == "4") {
+				throw "Ticket invalid";
+			}
+			setPrisonerID(atoi(data["USER_ID"].c_str()));
 			security = (securityLevel) atoi(data["SECURITY"].c_str());
-			if(security == monitor || security == execute)
-				Util::deleteFile(fileName);//Anulate tikect
+			if (security == monitor || security == execute) {
+				Util::deleteFile(fileName); // Remove tikect
+			}
 			string configFile = getProcessControlPath("config");
-			if(Util::fileExists(configFile)){
+			if (Util::fileExists(configFile)) {
 				readInfo();
 				error=false;
 			}
-			if(security == monitor)
+			if (security == monitor) {
 				monitorize();
+			}
 		}
 	}
-	if(error){
+	if (error) {
 		throw "Ticket invalid";
 	}
 }

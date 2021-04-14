@@ -49,7 +49,9 @@ class Jail{
 	void commandStop(string adminticket);
 	void commandMonitor(string userticket,Socket *s);
 	void commandExecute(string userticket,Socket *s);
+	bool commandSetPassthroughCookie(string passthroughticket, HttpJailServer & server);
 	bool httpPassthrough(Socket *s);
+	bool isRequestingCookie(string URLPath, string &ticket);
 	string predefinedURLResponse(string URLPath);
 public:
 	Jail(string);
