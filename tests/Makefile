@@ -1,6 +1,6 @@
 # Generate the tests programs
 COMPILER = g++
-CXXFLAGS = -g -std=c++11 -DHAVE_CONFIG_H -I.. 
+CXXFLAGS = -g -O0 -std=c++11 -DHAVE_CONFIG_H -I.. 
 LIBS = -lssl -lcrypto -lutil
 
 
