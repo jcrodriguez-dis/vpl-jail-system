@@ -47,8 +47,9 @@ string webSocket::getHandshakeAnswer(){
 	string ret="HTTP/1.1 101 Switching Protocols\r\n"
 			"Connection: Upgrade\r\n"
 			"Upgrade: websocket\r\n"
-			+protocols+
-			"Sec-WebSocket-Accept: "+responseKey+"\r\n\r\n";
+			VPL_SETIWASHERECOOKIE
+			+ protocols +
+			"Sec-WebSocket-Accept: " + responseKey + "\r\n\r\n";
 	return ret;
 }
 
