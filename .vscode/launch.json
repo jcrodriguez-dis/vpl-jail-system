@@ -23,5 +23,24 @@
                 }
             ]
         }
+        {
+            "name": "(gdb) Launch webSocket test",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/websocket-echo-test",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/tests",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
     ]
 }
