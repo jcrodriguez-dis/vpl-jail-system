@@ -32,8 +32,11 @@
 #define VPL_WEXECUTION "vpl_wexecution"
 #define VPL_WEBEXECUTION "vpl_webexecution"
 #define VPL_WEBCOOKIE "__vpl_webexecution__"
-#define VPL_WEBSETCOOKIE "Set-Cookie: " VPL_WEBCOOKIE "="
-#define VPL_CLEANWEBCOOKIE VPL_WEBSETCOOKIE "nada; Max-Age=-1\r\n"
+#define VPL_SETWEBCOOKIE "Set-Cookie: " VPL_WEBCOOKIE "="
+#define VPL_CLEANWEBCOOKIE VPL_SETWEBCOOKIE "nada; Max-Age=-1\r\n"
+#define VPL_IWASHERECOOKIE "__vpl_iwashere__"
+#define VPL_SETIWASHERECOOKIE "Set-Cookie: " VPL_IWASHERECOOKIE "=yes\r\n"
+#define VPL_LOCALREDIRECT "Location: /\r\n"
 
 using namespace std;
 
@@ -171,16 +174,19 @@ public:
 	}
 
 	/**
-	 * return a random int take from /dev/random
+	 * Returns a random int taken from /dev/urandom
 	 */
-	static int random(){
-		int randomFile = open("/dev/urandom", O_RDONLY);
+	static int random() {
+		static int randomFile = -1;
+		if (randomFile == -1) {
+			randomFile = open("/dev/urandom", O_RDONLY); // May need a close?
+		}
 		int ret;
 		ssize_t r = read(randomFile, ((void*) (&ret)), (sizeof(int)));
-		return abs(ret+r);
+		return abs(ret + r);
 	}
 	/**
-	 * clean the string removing spaces from end and start
+	 * Cleans the string removing spaces from end and start
 	 * remove a 'text'=>text and "text"=>text
 	 */
 	static void trimAndRemoveQuotes(string &s){
