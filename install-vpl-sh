@@ -308,7 +308,32 @@ function vpl_generate_selfsigned_certificate {
 	#Generate self signed certificate for 5 years
 	openssl x509 -in certini.pem -out cert.pem -req -signkey key.pem -days 1826 
 }
+
+function vpl_install_daemon() {
+	echo "Preparing daemon compilation"
+	./configure >>$LOGFILE
+	echo "Compiling daemon (vpl-jail-server)"
+	make >>$LOGFILE
+	if [ -d $VPL_CONFIG_DIR ] ; then
+		echo "Updating installation => $VPL_CONFIG_DIR"
+		#Stop service
+		vpl_stop_service >>$LOGFILE
+	else
+		echo "Installing => $VPL_CONFIG_DIR"
+		mkdir $VPL_CONFIG_DIR
+	fi
+	if [ ! -d $VPL_PROGRAMS_DIR ] ; then
+		mkdir $VPL_PROGRAMS_DIR
+	fi
+	#Copy daemon 
+	cp src/vpl-jail-server $VPL_PROGRAMS_DIR
+}
 echo "Installation log file => $LOGFILE"
+if [ "$1" == "update" ] ; then
+	vpl_install_daemon
+	vpl_start_service >>$LOGFILE
+	exit
+fi
 echo "Preparing the installation"
 if [ "$PMTYPE" == "1" ] ; then
 	vpl_install "LSB core" redhat-lsb-core
@@ -348,24 +373,7 @@ else
 	vpl_install "curl" curl
 	vpl_install "net-tools" net-tools
 fi
-echo "Checking installed software"
-./configure >>$LOGFILE
-echo "Compiling vpl-jail-server"
-make >>$LOGFILE
-
-if [ -d $VPL_CONFIG_DIR ] ; then
-    echo "Updating installation => $VPL_CONFIG_DIR"
-	#Stop service
-	vpl_stop_service >>$LOGFILE
-else
-	echo "Installing => $VPL_CONFIG_DIR"
-    mkdir $VPL_CONFIG_DIR
-fi
-if [ ! -d $VPL_PROGRAMS_DIR ] ; then
-    mkdir $VPL_PROGRAMS_DIR
-fi
-#Copy daemon 
-cp src/vpl-jail-server $VPL_PROGRAMS_DIR
+vpl_install_daemon
 #Copy configuration file
 VPL_CONFIGFILE=$VPL_CONFIG_DIR/vpl-jail-system.conf
 if [ -f $VPL_CONFIGFILE ] ; then
