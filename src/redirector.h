@@ -23,31 +23,24 @@ using namespace std;
 #include <sys/resource.h>
 #include "websocket.h"
 
-class Redirector{
-	int fdps;  //Pseudo terminal file descriptor
-	int sock;    //Socket
+class Redirector {
+protected:
+	const int MAX = JAIL_NET_BUFFER_SIZE; //Buffer size to read
+	const int POLLBAD = POLLERR | POLLHUP | POLLNVAL;
+	const int POLLREAD = POLLIN | POLLPRI;
+	const int polltimeout = 100; //  0.1 sec 
 	time_t timeout; //Timeout when connecting
 	string messageBuf; //Buffer of messages from Jail system
 	string programbuf; //Buffer from net to program
 	string netbuf;  //Buffer from program to net
 	const int bufferSizeLimit; //Size limit 50Kb
-	int port; //Port of vncserver
-	webSocket *ws; //webSocket for online
 	enum States {begin, connecting, connected, ending, end, error} state;
-	bool online;
-	bool indirect;
 	bool noOutput; //true if program output nothing
-	void advanceOnline();
-	void advanceIndirect();
-	void advanceBatch();
 	static string eventsToString(int);
 public:
 	Redirector();
-	void start(webSocket *s, const int port);
-	void start(const int fdps, webSocket *s);
-	void start(const int fdps);
 	void stop() {state=ending;}
-	void advance();
+	virtual void advance() = 0;
 	bool isError(){return state == error;}
 	bool isActive(){return state != error && state != end;}
 	bool isSilent(){return noOutput;}
@@ -57,4 +50,66 @@ public:
 	string getOutput();
 	size_t getOutputSize();
 };
+
+class RedirectorTerminalBatch: public Redirector {
+protected:
+	int fdps;  //Pseudo terminal file descriptor
+public:
+	RedirectorTerminalBatch(const int fdps) {
+		this->state = begin;
+		this->fdps = fdps;
+	};
+	void advance();
+};
+
+class RedirectorTerminal: public Redirector {
+protected:
+	int fdps;  //Pseudo terminal file descriptor
+	webSocket *ws; //webSocket for online
+public:
+	RedirectorTerminal(const int fdps, webSocket *s) {
+		this->state = begin;
+		this->fdps = fdps;
+		this->ws = s;
+	}
+	void advance();
+};
+
+class RedirectorVNC: public Redirector {
+protected:
+	int port;  // VNC port number
+	webSocket *ws; //webSocket for online
+	int sock; // Connettion with VNC server
+public:
+	RedirectorVNC(webSocket *ws, const int port){
+		this->state = begin;
+		this->ws = ws;
+		this->port = port;
+		this->sock = -1;
+		this->timeout = time(NULL) + 10;
+	}
+	void advance();
+};
+
+class RedirectorWebServer: public Redirector {
+protected:
+	Socket *client; // Socket object conneted with client
+	string serverAddress; // Local web server address as 127.X.X.X:PORT
+	int server; // Socket raw conneted with local web server
+public:
+	/**
+	 * Constructor
+	 * @param client Object connected with client navigator
+	 * @param serverAddress Local web server address with format 127.X.X.X:PORT
+	 */
+	RedirectorWebServer(Socket *client, string serverAddress){
+		this->state = begin;
+		this->client = client;
+		this->serverAddress = serverAddress;
+		this->server = -1;
+		this->timeout = time(NULL) + 10;
+	}
+	void advance();
+};
+
 #endif

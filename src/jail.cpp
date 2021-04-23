@@ -33,8 +33,8 @@ string Jail::commandAvailable(int memRequested){
 	if(Util::fileExists("/etc/nologin")){ //System going shutdown
 		return "offline";
 	}else {
-		char *mem=(char*)malloc(memRequested);
-		if(mem==NULL) return "busy";
+		char *mem = (char*)malloc(memRequested);
+		if(mem == NULL) return "busy";
 		else free(mem);
 	}
 	return "ready";
@@ -55,59 +55,60 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 			}
 			string script=parsedata["execute"]->getString();
 			//Retrieve files to execution dir and options, decode data if needed
-			for(mapstruct::iterator i=files.begin(); i!=files.end(); i++){
-				string name=i->first;
-				string data=i->second->getString();
+			for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
+				string name = i->first;
+				string data = i->second->getString();
 				if ( fileencoding.find(name) != fileencoding.end()
 					 && fileencoding[name]->getInt() == 1 ) {
-					syslog(LOG_INFO,"Decoding file %s from b64",name.c_str());
+					syslog(LOG_INFO, "Decoding file %s from b64", name.c_str());
 					data = Base64::decode(data);
 					if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
 						name = name.substr(0, name.length() - 4);
 					}
 				}
-				syslog(LOG_INFO,"Write file %s data size %lu",name.c_str(),(long unsigned int)data.size());
-				pm.writeFile(name,data);
+				syslog(LOG_INFO, "Write file %s data size %lu", name.c_str(), (long unsigned int)data.size());
+				pm.writeFile(name, data);
 			}
-			ExecutionLimits executionLimits=Configuration::getConfiguration()->getLimits();
+			ExecutionLimits executionLimits = Configuration::getConfiguration()->getLimits();
 			syslog(LOG_INFO,"Reading parms");
 			executionLimits.syslog("Config");
-			executionLimits.maxtime=min(parsedata["maxtime"]->getInt(),executionLimits.maxtime);
-			executionLimits.maxfilesize=min(parsedata["maxfilesize"]->getInt(),executionLimits.maxfilesize);
-			executionLimits.maxmemory=min(parsedata["maxmemory"]->getInt(),executionLimits.maxmemory);
-			executionLimits.maxprocesses=min(parsedata["maxprocesses"]->getInt(),executionLimits.maxprocesses);
+			executionLimits.maxtime = min(parsedata["maxtime"]->getInt(), executionLimits.maxtime);
+			executionLimits.maxfilesize = min(parsedata["maxfilesize"]->getInt(), executionLimits.maxfilesize);
+			executionLimits.maxmemory = min(parsedata["maxmemory"]->getInt(), executionLimits.maxmemory);
+			executionLimits.maxprocesses = min(parsedata["maxprocesses"]->getInt(), executionLimits.maxprocesses);
 			executionLimits.syslog("Request");
-			string vpl_lang=parsedata["lang"]->getString();
-			syslog(LOG_DEBUG,"VPL_LANG %s",vpl_lang.c_str());
-			bool interactive=parsedata["interactive"]->getInt()>0;
-			syslog(LOG_DEBUG,"interactive %d",parsedata["interactive"]->getInt());
-			pm.setExtraInfo(executionLimits,interactive,vpl_lang);
+			string vpl_lang = parsedata["lang"]->getString();
+			syslog(LOG_DEBUG, "VPL_LANG %s", vpl_lang.c_str());
+			bool interactive = parsedata["interactive"]->getInt() > 0;
+			syslog(LOG_DEBUG, "interactive %d", parsedata["interactive"]->getInt());
+			pm.setExtraInfo(executionLimits, interactive, vpl_lang);
 			pm.setCompiler();
-			syslog(LOG_INFO,"Compilation");
-			string compilationOutput=run(pm,script);
+			syslog(LOG_INFO, "Compilation");
+			string compilationOutput = run(pm, script);
 			pm.setCompilationOutput(compilationOutput);
-			bool compiled=pm.FileExists(VPL_EXECUTION)||pm.FileExists(VPL_WEXECUTION);
-			if(compiled){
+			bool compiled = pm.FileExists(VPL_EXECUTION) || pm.FileExists(VPL_WEXECUTION) || pm.FileExists(VPL_WEBEXECUTION);
+			if (compiled) {
 				//Delete files
-				for(mapstruct::iterator i=filestodelete.begin(); i!=filestodelete.end(); i++){
-					string name=i->first;
-					syslog(LOG_INFO,"Delete file %s",name.c_str());
+				for (mapstruct::iterator i = filestodelete.begin(); i != filestodelete.end(); i++) {
+					string name = i->first;
+					syslog(LOG_INFO, "Delete file %s", name.c_str());
 					pm.deleteFile(name);
 				}
-				if(!interactive && pm.FileExists(VPL_EXECUTION)){
+				if (!interactive && pm.FileExists(VPL_EXECUTION)) {
 					pm.setRunner();
-					syslog(LOG_INFO,"Non interactive execution");
+					syslog(LOG_INFO, "Non interactive execution");
 					string program;
-					if(pm.installScript(".vpl_launcher.sh","vpl_batch_launcher.sh"))
-						program=".vpl_launcher.sh";
-					else
-						program=VPL_EXECUTION;
-					string executionOutput=run(pm,program);
-					syslog(LOG_INFO,"Write execution result");
-					pm.setExecutionOutput(executionOutput,true);
+					if (pm.installScript(".vpl_launcher.sh", "vpl_batch_launcher.sh")) {
+						program = ".vpl_launcher.sh";
+					} else {
+						program = VPL_EXECUTION;
+					}
+					string executionOutput = run(pm, program);
+					syslog(LOG_INFO, "Write execution result");
+					pm.setExecutionOutput(executionOutput, true);
 				}
 			}else{
-				syslog(LOG_INFO,"Compilation fail");
+				syslog(LOG_INFO, "Compilation fail");
 			}
 		}
 		catch(std::exception &e){
@@ -173,10 +174,12 @@ void Jail::commandStop(string adminticket){
 void Jail::commandMonitor(string monitorticket, Socket *s){
 	processMonitor pm(monitorticket);
 	webSocket ws(s);
-	processState state=prestarting;
+	processState state = prestarting;
+	bool webserver = false;
+	bool runBrowser = false;
 	time_t startTime = 0;
 	time_t lastMessageTime = 0;
-	time_t lastTime=pm.getStartTime();
+	time_t lastTime = pm.getStartTime();
 	string lastMessage;
 	while (state != stopped) {
 		processState newstate = pm.getState();
@@ -210,12 +213,16 @@ void Jail::commandMonitor(string monitorticket, Socket *s){
 				syslog(LOG_DEBUG,"Monitor beforeRunning");
 				ws.send("compilation:" + pm.getCompilation());
 				timeout = now + JAIL_SOCKET_TIMEOUT;
-				if (pm.FileExists(VPL_EXECUTION)) {
+				if (pm.FileExists(VPL_EXECUTION) || pm.FileExists(VPL_WEBEXECUTION)) {
 					syslog(LOG_DEBUG, "run:terminal");
 					ws.send("run:terminal");
+					webserver = pm.FileExists(VPL_WEBEXECUTION);
 				} else if (pm.FileExists(VPL_WEXECUTION))
 					ws.send("run:vnc:" + pm.getVNCPassword());
 				else {
+					if (pm.getCompilation().empty()) {
+						ws.send("compilation:The compilation process did not generate an executable nor error message.");
+					}
 					ws.send("close:");
 					ws.close();
 					ws.wait(500); //wait client response
@@ -227,10 +234,15 @@ void Jail::commandMonitor(string monitorticket, Socket *s){
 			case running:
 				syslog(LOG_DEBUG,"Monitor running");
 				startTime = now;
-				timeout = now + pm.getMaxTime()+6 /* execution cleanup */;
+				timeout = now + pm.getMaxTime() + 6 /* execution cleanup */;
 				lastMessageTime = now;
 				lastMessage = "message:running";
 				ws.send(lastMessage);
+				// TODO Checks if browser with cookie running to remove URL message
+				if ( webserver && !runBrowser && pm.FileExists(VPL_LOCALSERVERADDRESSFILE) ) {
+					runBrowser = true;
+					ws.send("run:browser:" + pm.getHttpPassthroughTicket());
+				}
 				break;
 			case retrieve:
 				syslog(LOG_DEBUG,"Monitor retrieve");
@@ -246,7 +258,7 @@ void Jail::commandMonitor(string monitorticket, Socket *s){
 				break;
 			}
 		}
-		ws.wait(100); // 10 time a second
+		ws.wait(100); // 10 times a second
 		
 		string rec=ws.receive();
 		if (ws.isClosed())
@@ -292,14 +304,22 @@ void Jail::commandExecute(string executeticket, Socket *s){
 		throw "Internal server error";
 	}
 	syslog(LOG_INFO,"Start executing");
-	if( pm.getState() == beforeRunning){ 
+	if (pm.getState() == beforeRunning) { 
 		pm.setRunner();
-		if (pm.FileExists(VPL_EXECUTION) && pm.FileExists(VPL_WEBEXECUTION)) {
+		if (pm.FileExists(VPL_EXECUTION)) {
 			string program;
 			if (pm.installScript(".vpl_launcher.sh", "vpl_terminal_launcher.sh")) {
 				program = ".vpl_launcher.sh";
 			} else {
 				program = VPL_EXECUTION;
+			}
+			runTerminal(pm, ws, program);
+		} else if (pm.FileExists(VPL_WEBEXECUTION)) {
+			string program;
+			if (pm.installScript(".vpl_launcher.sh", "vpl_web_launcher.sh")) {
+				program = ".vpl_launcher.sh";
+			} else {
+				program = VPL_WEBEXECUTION;
 			}
 			runTerminal(pm, ws, program);
 		} else if (pm.FileExists(VPL_WEXECUTION)) {
@@ -308,7 +328,7 @@ void Jail::commandExecute(string executeticket, Socket *s){
 			else
 				syslog(LOG_ERR, "%s:Error: vpl_vnc_launcher.sh not installed", IP.c_str());
 		} else {
-			syslog(LOG_ERR, "%s:Error: no thing to run", IP.c_str());
+			syslog(LOG_ERR, "%s:Error: nothing to run", IP.c_str());
 		}
 	}
 }
@@ -324,13 +344,47 @@ bool Jail::commandSetPassthroughCookie(string passthroughticket, HttpJailServer 
 		return false;
 	}
 
-	string extra = VPL_SETWEBCOOKIE + passthroughticket + "\r\n";
+	string extra = VPL_SETWEBCOOKIE + passthroughticket + "; Path=/\r\n";
 	extra += VPL_LOCALREDIRECT;
 	server.send(302, "REDIRECT", "", false, extra);
 	return true;
 }
 
-bool Jail::httpPassthrough(Socket *socket){
+/**
+ * Passthrough the request to the localwebserver
+ * 
+ * @param socket The open socket that manage the connection
+ * 
+ * @return if the request finnaly has rigth to access
+ */
+bool Jail::httpPassthrough(string passthroughticket, Socket *socket){
+	try {
+		processMonitor pm(passthroughticket);
+		if ( pm.getState() != processState::running ) {
+			syslog(LOG_INFO,"httpPassthrough fail: ! processState::running");
+			return false;
+		}
+		if ( pm.getSecurityLevel() != httppassthrough ) {
+			syslog(LOG_INFO,"httpPassthrough fail: pm.getSecurityLevel() != httppassthrough");
+			return false;
+		}
+		runPassthrough(pm, socket);
+		return true;
+	} catch(HttpException &exception){
+		syslog(LOG_ERR,"%s:%s",IP.c_str(),exception.getLog().c_str());
+		return false;
+	}
+	catch(std::exception &e){
+		syslog(LOG_ERR,"%s:Unexpected exception %s on %s:%d",IP.c_str(), e.what(),__FILE__,__LINE__);
+	}
+	catch(string &exception){
+		syslog(LOG_ERR,"%s:%s",IP.c_str(),exception.c_str());
+	}
+	catch(const char *s){
+		syslog(LOG_ERR,"%s:%s",IP.c_str(),s);
+	}catch(...) {
+		syslog(LOG_INFO,"httpPassthrough fail: unexpected exception");
+	}
 	return false;
 }
 
@@ -352,9 +406,13 @@ bool Jail::isRequestingCookie(string URLPath, string &ticket) {
 	return true;
 }
 
-bool Jail::isValidIPforRequest(){
-	const vector<string> &dirs=configuration->getTaskOnlyFrom();
-	if(dirs.size()==0) return true;
+/**
+ * Returns if IP can request a task
+ * @return true if IP is allow to request task
+ */
+bool Jail::isValidIPforRequest() {
+	const vector<string> &dirs = configuration->getTaskOnlyFrom();
+	if (dirs.size() == 0) return true;
 	int l = (int) dirs.size();
 	for(int i = 0; i< l; i++){
 		if(IP.find(dirs[i]) == 0)
@@ -410,10 +468,7 @@ void Jail::process(Socket *socket){
 			}
 		}
 		if (socket->getCookie(VPL_WEBCOOKIE).length()) { // If found cookie passing to local application and stop processing
-			if (! httpPassthrough(socket) ) {
-				server.send200("", false, VPL_CLEANWEBCOOKIE);
-				_exit(EXIT_FAILURE);
-			}
+			httpPassthrough(socket->getCookie(VPL_WEBCOOKIE), socket);
 		}
 		string httpMethod = socket->getMethod();
 		if (Util::toUppercase(socket->getHeader("Upgrade")) != "WEBSOCKET") {
@@ -484,8 +539,8 @@ void Jail::process(Socket *socket){
 				string adminticket, compilation, execution;
 				bool executed,interactive;
 				adminticket=parsedata["adminticket"]->getString();
-				commandGetResult(adminticket, compilation, execution,executed,interactive);
-				server.send200(RPC::getResultResponse(compilation,execution,executed,interactive));
+				commandGetResult(adminticket, compilation, execution, executed, interactive);
+				server.send200(RPC::getResultResponse(compilation, execution, executed, interactive));
 			} else if(request == "running") {
 				string adminticket;
 				adminticket=parsedata["adminticket"]->getString();
@@ -559,9 +614,9 @@ void Jail::process(Socket *socket){
 void Jail::goJail(){
 	string jailPath=configuration->getJailPath();
 	if(chdir(jailPath.c_str()) != 0)
-		throw HttpException(internalServerErrorCode,"I can't chdir to jail",jailPath);
+		throw HttpException(internalServerErrorCode, "I can't chdir to jail", jailPath);
 	if(chroot(jailPath.c_str()) != 0)
-		throw HttpException(internalServerErrorCode,"I can't chroot to jail",jailPath);
+		throw HttpException(internalServerErrorCode, "I can't chroot to jail", jailPath);
 	syslog(LOG_INFO,"chrooted \"%s\"",jailPath.c_str());
 }
 
@@ -570,52 +625,52 @@ void Jail::goJail(){
  */
 void Jail::transferExecution(processMonitor &pm, string fileName){
 	string dir=pm.getRelativeHomePath();
-	syslog(LOG_DEBUG,"Jail::transferExecution to %s+%s",dir.c_str(),fileName.c_str());
-	string fullname=dir+"/"+fileName;
+	syslog(LOG_DEBUG, "Jail::transferExecution to %s+%s", dir.c_str(), fileName.c_str());
+	string fullname = dir + "/" + fileName;
 	if(chdir(dir.c_str())){
-		throw "I can't chdir to exec dir :"+dir;
+		throw "I can't chdir to exec dir :" + dir;
 	}
 	if(!Util::fileExists(fullname)){
-		throw string("transferExecution: execution file not found: ")+fullname;
+		throw string("transferExecution: execution file not found: ") + fullname;
 	}
 	char *arg[6];
-	char *command= new char[fullname.size()+1];
-	strcpy(command,fullname.c_str());
+	char *command= new char[fullname.size() + 1];
+	strcpy(command, fullname.c_str());
 	setpgrp();
 	int narg=0;
 	arg[narg++] = command;
 	arg[narg++] = NULL;
-	int nenv=0;
+	int nenv = 0;
 	char *env[10];
-	string uid=Util::itos(pm.getPrisonerID());
-	string HOME="HOME=/home/p"+uid;
-	env[nenv++]=(char *)HOME.c_str();
-	string PATH="PATH="+configuration->getCleanPATH();
-	env[nenv++]=(char *)PATH.c_str();
-	env[nenv++]=(char *)"TERM=dumb";
-	string UID="UID="+uid;
+	string uid = Util::itos(pm.getPrisonerID());
+	string HOME = "HOME=/home/p" + uid;
+	env[nenv++] = (char *)HOME.c_str();
+	string PATH = "PATH=" + configuration->getCleanPATH();
+	env[nenv++] = (char *)PATH.c_str();
+	env[nenv++] = (char *)"TERM=dumb";
+	string UID = "UID="+uid;
 	env[nenv++]=(char *)UID.c_str();
-	string USER="USER=p"+uid;
-	env[nenv++]=(char *)USER.c_str();
-	string USERNAME="USERNAME=Prisoner "+uid;
-	env[nenv++]=(char *)USERNAME.c_str();
-	string VPL_LANG="VPL_LANG="+pm.getLang();
-	env[nenv++]=(char *)VPL_LANG.c_str();
-	string VPL_VNCPASSWD="VPL_VNCPASSWD="+pm.getVNCPassword();
-	if(pm.isInteractive()){
-		env[nenv++]=(char *)VPL_VNCPASSWD.c_str();
+	string USER = "USER=p" + uid;
+	env[nenv++] = (char *)USER.c_str();
+	string USERNAME = "USERNAME=Prisoner " + uid;
+	env[nenv++] = (char *)USERNAME.c_str();
+	string VPL_LANG = "VPL_LANG=" + pm.getLang();
+	env[nenv++] = (char *)VPL_LANG.c_str();
+	string VPL_VNCPASSWD = "VPL_VNCPASSWD=" + pm.getVNCPassword();
+	if (pm.isInteractive()) {
+		env[nenv++] = (char *)VPL_VNCPASSWD.c_str();
 	}
-	env[nenv++]=NULL;
-	syslog(LOG_DEBUG,"Running \"%s\"",command);
-	execve(command,arg,env);
-	throw string("I can't execve: ")+command+" ("+strerror(errno)+")";
+	env[nenv++] = NULL;
+	syslog(LOG_DEBUG, "Running \"%s\"", command);
+	execve(command, arg, env);
+	throw string("I can't execve: ") + command + " (" + strerror(errno) + ")";
 }
 
 /**
  * set user limits
  */
 void Jail::setLimits(processMonitor &pm){
-	ExecutionLimits executionLimits=pm.getLimits();
+	ExecutionLimits executionLimits = pm.getLimits();
 	executionLimits.syslog("setLimits");
 	struct rlimit limit;
 	limit.rlim_cur=0;
@@ -647,51 +702,48 @@ void Jail::setLimits(processMonitor &pm){
 string Jail::run(processMonitor &pm, string name, int othermaxtime){
 	int maxtime;
 	pm.getLimits().syslog("run");
-	if(othermaxtime){
-		maxtime=othermaxtime;
-		syslog(LOG_INFO,"Other maxtime set: %d",othermaxtime);
+	if (othermaxtime) {
+		maxtime = othermaxtime;
+		syslog(LOG_INFO, "Other maxtime set: %d", othermaxtime);
 	}
 	else
-		maxtime=pm.getMaxTime();
-	int fdmaster=-1;
-	signal(SIGTERM,SIG_IGN);
-	signal(SIGKILL,SIG_IGN);
-	newpid=forkpty(&fdmaster,NULL,NULL,NULL);
+		maxtime = pm.getMaxTime();
+	int fdmaster = -1;
+	signal(SIGTERM, SIG_IGN);
+	signal(SIGKILL, SIG_IGN);
+	newpid = forkpty(&fdmaster, NULL, NULL, NULL);
 	if (newpid == -1) //fork error
 		return "Jail: fork error";
-	if(newpid == 0){ //new process
-		try{
+	if (newpid == 0) { //new process
+		try {
 			goJail();
 			setLimits(pm);
 			pm.becomePrisoner();
 			setsid();
-			transferExecution(pm,name);
-		}catch(const char *s){
-			syslog(LOG_ERR,"Error running: %s",s);
+			transferExecution(pm, name);
+		} catch(const char *s) {
+			syslog(LOG_ERR, "Error running: %s",s);
 			printf("\nJail error: %s\n",s);
-		}
-		catch(const string &s){
+		} catch(const string &s) {
 			syslog(LOG_ERR,"Error running: %s",s.c_str());
 			printf("\nJail error: %s\n",s.c_str());
-		}
-		catch(...){
+		} catch(...) {
 			syslog(LOG_ERR,"Error running");
 			printf("\nJail error: at execution stage\n");
 		}
 		_exit(EXIT_SUCCESS);
 	}
 	syslog(LOG_INFO, "child pid %d",newpid);
-	Redirector redirector;
-	redirector.start(fdmaster);
-	time_t startTime=time(NULL);
-	time_t lastTime=startTime;
-	int stopSignal=SIGTERM;
-	bool noMonitor=false;
+	RedirectorTerminalBatch redirector(fdmaster);
+	time_t startTime = time(NULL);
+	time_t lastTime = startTime;
+	int stopSignal = SIGTERM;
+	bool noMonitor = false;
 	int status;
-	while(redirector.isActive()){
+	while(redirector.isActive()) {
 		redirector.advance();
-		pid_t wret=waitpid(newpid, &status, WNOHANG);
-		if(wret == newpid){
+		pid_t wret = waitpid(newpid, &status, WNOHANG);
+		if (wret == newpid) {
 			if(WIFSIGNALED(status)){
 				int signal = WTERMSIG(status);
 				char buf[1000];
@@ -765,16 +817,16 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime){
  * run program in terminal controlling timeout and redirection
  */
 void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
-	int fdmaster=-1;
-	ExecutionLimits executionLimits=pm.getLimits();
-	signal(SIGTERM,SIG_IGN);
-	signal(SIGKILL,SIG_IGN);
-	newpid=forkpty(&fdmaster,NULL,NULL,NULL);
-	if (newpid == -1){ //fork error
-		syslog(LOG_INFO,"Jail: fork error %m");
+	int fdmaster = -1;
+	ExecutionLimits executionLimits = pm.getLimits();
+	signal(SIGTERM, SIG_IGN);
+	signal(SIGKILL, SIG_IGN);
+	newpid = forkpty(&fdmaster, NULL, NULL, NULL);
+	if (newpid == -1) { //fork error
+		syslog(LOG_INFO, "Jail: fork error %m");
 		return;
 	}
-	if(newpid == 0){ //new process
+	if (newpid == 0) { //new process
 		try{
 			goJail();
 			setLimits(pm);
@@ -790,61 +842,60 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 		_exit(EXIT_SUCCESS);
 	}
 	syslog(LOG_INFO, "child pid %d",newpid);
-	Redirector redirector;
+	RedirectorTerminal redirector(fdmaster,&ws);
 	syslog(LOG_INFO, "Redirector start terminal control");
-	redirector.start(fdmaster,&ws);
-	time_t startTime=time(NULL);
-	time_t lastTime=startTime;
-	bool noMonitor=false;
-	int stopSignal=SIGTERM;
+	time_t startTime = time(NULL);
+	time_t lastTime = startTime;
+	bool noMonitor = false;
+	int stopSignal = SIGTERM;
 	int status;
 	syslog(LOG_INFO,"run: start redirector loop");
 	while(redirector.isActive() && !ws.isClosed()){
 		redirector.advance();
-		pid_t wret=waitpid(newpid, &status, WNOHANG);
+		pid_t wret = waitpid(newpid, &status, WNOHANG);
 		if(wret == 0){
-			time_t now=time(NULL);
+			time_t now = time(NULL);
 			if(lastTime != now){
-				int elapsedTime=now-startTime;
+				int elapsedTime = now-startTime;
 				lastTime = now;
-				if(elapsedTime>JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()){
-					syslog(LOG_INFO,"Not monitored");
-					noMonitor=true;
-					if(stopSignal!=SIGKILL)
+				if (elapsedTime > JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()) {
+					syslog(LOG_INFO, "Not monitored");
+					noMonitor = true;
+					if(stopSignal != SIGKILL)
 						redirector.addMessage("\r\nJail: process stopped\n");
 					redirector.stop();
-					kill(newpid,stopSignal);
-					stopSignal=SIGKILL;
-				}else if(elapsedTime > executionLimits.maxtime){
-					if(stopSignal!=SIGKILL)
+					kill(newpid, stopSignal);
+					stopSignal = SIGKILL;
+				} else if(elapsedTime > executionLimits.maxtime) {
+					if (stopSignal != SIGKILL)
 						redirector.addMessage("\r\nJail: execution time limit reached.\n");
 					redirector.stop();
-					syslog(LOG_INFO,"Execution time limit (%d) reached"
-							,executionLimits.maxtime);
-					kill(newpid,stopSignal);
-					stopSignal=SIGKILL;
+					syslog(LOG_INFO, "Execution time limit (%d) reached",
+							executionLimits.maxtime);
+					kill(newpid, stopSignal);
+					stopSignal = SIGKILL;
 				}
-				else if(pm.isOutOfMemory()){
+				else if (pm.isOutOfMemory()) {
 					string ml= pm.getMemoryLimit();
-					if(stopSignal!=SIGKILL)
-						redirector.addMessage("\r\nJail: out of memory ("+ml+")\n");
-					syslog(LOG_INFO,"Out of memory (%s)",ml.c_str());
-					kill(newpid,stopSignal);
-					stopSignal=SIGKILL; //Second try
+					if (stopSignal != SIGKILL)
+						redirector.addMessage("\r\nJail: out of memory (" + ml + ")\n");
+					syslog(LOG_INFO, "Out of memory (%s)",ml.c_str());
+					kill(newpid, stopSignal);
+					stopSignal = SIGKILL; //Second try
 				}
 			}
-		}else{ //Not running or error
+		} else { //Not running or error
 			break;
 		}
 	}
-	syslog(LOG_DEBUG,"End redirector loop");
+	syslog(LOG_DEBUG, "End redirector loop");
 	//wait until 5sg for redirector to read and send program output
-	for(int i=0;redirector.isActive() && i<50; i++){
+	for (int i = 0; redirector.isActive() && i < 50; i++) {
 		redirector.advance();
 		usleep(100000); // 1/10 seg
 	}
-	if(noMonitor){
-		syslog(LOG_DEBUG,"Not monitored");
+	if (noMonitor) {
+		syslog(LOG_DEBUG, "Not monitored");
 		pm.cleanTask();
 	}
 }
@@ -859,9 +910,8 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 	string output=run(pm,name,10); //FIXME use constant
 	syslog(LOG_DEBUG,"%s",output.c_str());
 	int VNCServerPort=Util::atoi(output);
-	Redirector redirector;
+	RedirectorVNC redirector(&ws, VNCServerPort);
 	syslog(LOG_INFO, "Redirector start vncserver control");
-	redirector.start(&ws,VNCServerPort);
 	time_t startTime=time(NULL);
 	time_t lastTime=startTime;
 	bool noMonitor=false;
@@ -907,3 +957,31 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 		pm.cleanTask();
 	}
 }
+
+/**
+ * Data Passthrough from navigator to local webserver
+ */
+void Jail::runPassthrough(processMonitor &pm, Socket *s) {
+	// TODO change to config data
+	string localServerAdress = pm.getLocalWebServer();
+	RedirectorWebServer redirector(s, localServerAdress);
+	syslog(LOG_INFO, "Redirector web server request start");
+	time_t startTime = time(NULL);
+	time_t lastTime = startTime;
+	while (redirector.isActive() && ! s->isClosed()) {
+		redirector.advance();
+		time_t now = time(NULL);
+		if (lastTime != now) {
+			int elapsedTime = now - startTime;
+			lastTime = now;
+			if (elapsedTime > JAIL_HARVEST_TIMEOUT) {
+				syslog(LOG_INFO,"Execution time limit (%d) reached", JAIL_HARVEST_TIMEOUT);
+				s->send("<b>Execution time limit reached</b>");
+				redirector.stop();
+				break;
+			}
+		}
+	}
+	syslog(LOG_DEBUG,"End web redirector loop");
+}
+

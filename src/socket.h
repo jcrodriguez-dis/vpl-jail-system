@@ -143,25 +143,26 @@ class Socket{
 	void parseHeader(const string &line);
 	void parseCookies(const string &value);
 	void processHeaders(const string &input);
-	virtual ssize_t netWrite(const void *, size_t );
-	virtual ssize_t netRead(void *, size_t );
+	virtual ssize_t netWrite(const void *, size_t);
+	virtual ssize_t netRead(void *, size_t);
 public:
 	Socket(int socket);
 	virtual ~Socket();
 	void readHeaders();
-	size_t headerSize(){return header.size();}
-	uint32_t getClientIP(){return clientip;}
-	string getProtocol(){return protocol;}
-	string getMethod(){return method;}
-	string getVersion(){return version;}
-	string getURLPath(){return URLPath;}
-	string getQueryString(){return queryString;}
+	size_t headerSize() { return header.size(); }
+	uint32_t getClientIP() { return clientip; }
+	string getHeaders() { return header; }
+	string getProtocol() { return protocol; }
+	string getMethod() { return method; }
+	string getVersion() { return version; }
+	string getURLPath() { return URLPath; }
+	string getQueryString() { return queryString; }
 	string getHeader(string name);
 	string getCookie(string cookie);
-	int getSocket(){ return socket;}
-	bool isReadBuffered() { return readBuffer.size()>0;}
-	bool isWriteBuffered() { return writeBuffer.size()>0;}
-	virtual bool isSecure() { return false;}
+	int getSocket() { return socket; }
+	bool isReadBuffered() { return readBuffer.size()>0; }
+	bool isWriteBuffered() { return writeBuffer.size()>0; }
+	virtual bool isSecure() { return false; }
 	bool isClosed(){return closed;}
 	void close();
 	bool wait(const int msec = 50); //Wait for a socket change until milisec time

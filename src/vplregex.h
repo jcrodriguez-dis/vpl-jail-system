@@ -23,7 +23,12 @@ class vplregex {
 	regex_t creg;
 public:
 	vplregex(const string &reg) {
-		regcomp(& creg, reg.c_str(), REG_EXTENDED);
+		int res = regcomp(& creg, reg.c_str(), REG_EXTENDED);
+		if (res) {
+			static char buf[100];
+			regerror(res, &creg, buf, 100);
+			throw buf;
+		}
 	}
 	~vplregex() {
 		regfree(& creg);
@@ -33,7 +38,12 @@ public:
 		int limit = (int) found.size();
 		regmatch_t match[maxmatch];
 		int nomatch = regexec(&creg, input.c_str(), maxmatch, match, 0);
-		if (nomatch) return false;
+		if (nomatch == REG_NOMATCH) return false;
+		if (nomatch) {
+			static char buf[100];
+			regerror(nomatch, &creg, buf, 100);
+			throw buf;
+		}
 		int nmatchs = limit > maxmatch? maxmatch : limit;
 		for ( int i = 0; i < nmatchs; i++) {
 			if (match[i].rm_so == -1) {

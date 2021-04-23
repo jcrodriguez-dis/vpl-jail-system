@@ -37,6 +37,7 @@
 #define VPL_IWASHERECOOKIE "__vpl_iwashere__"
 #define VPL_SETIWASHERECOOKIE "Set-Cookie: " VPL_IWASHERECOOKIE "=yes\r\n"
 #define VPL_LOCALREDIRECT "Location: /\r\n"
+#define VPL_LOCALSERVERADDRESSFILE ".vpl_localserveraddress"
 
 using namespace std;
 

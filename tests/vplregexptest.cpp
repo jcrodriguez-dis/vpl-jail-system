@@ -116,6 +116,15 @@ class VPLregexTest: public BaseTest {
 			assert(found[1] == "name1");
 			assert(found[2] == "value1");
 		}
+		{
+			vplregex reg("^(127\\.[0-9]+\\.[0-9]+\\.[0-9]+):([0-9]+)$");
+			vplregmatch found(3);
+			string text = "127.11.52.24:34441";
+			assert(reg.search(text, found));
+			assert(found[0] == text);
+			assert(found[1] == "127.11.52.24");
+			assert(found[2] == "34441");
+		}
 	}
 public:
 	string name() {

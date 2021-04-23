@@ -18,7 +18,7 @@ void setLogLevel(int level){
 	setlogmask(LOG_UPTO(mlevels[level]));
 	syslog(LOG_INFO,"Set log mask up to %d", level);
 }
-
+#ifndef TEST
 /**
  * main accept command line [-d level] [-uri URI]
  * where level is the syslog log level and URI is the xmlrpc server uri
@@ -53,3 +53,4 @@ int main(int const argc, const char ** const argv, char * const * const env) {
 	}
 	exit(exitStatus);
 }
+#endif

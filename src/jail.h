@@ -30,6 +30,7 @@ using namespace std;
  * class Jail
  **/
 class Jail{
+protected:
 	pid_t  newpid;            //pid of program executed
 	pid_t  redirectorpid;    //pid of redirector process
 	string IP; //Client IP
@@ -39,7 +40,6 @@ class Jail{
 	void changeUser(processMonitor &pm);
 	void setLimits(processMonitor &pm);
 	void transferExecution(processMonitor &pm,string fileName);
-	bool isValidIPforRequest();
 	//Action commands
 	string commandAvailable(int memRequested);
 	void commandRequest(mapstruct &parsedata, string &adminticket,string &monitorticket,string &executionticket);
@@ -50,11 +50,12 @@ class Jail{
 	void commandMonitor(string userticket,Socket *s);
 	void commandExecute(string userticket,Socket *s);
 	bool commandSetPassthroughCookie(string passthroughticket, HttpJailServer & server);
-	bool httpPassthrough(Socket *s);
-	bool isRequestingCookie(string URLPath, string &ticket);
-	string predefinedURLResponse(string URLPath);
 public:
 	Jail(string);
+	bool isValidIPforRequest();
+	bool httpPassthrough(string passthroughticket, Socket *socket);
+	bool isRequestingCookie(string URLPath, string &ticket);
+	string predefinedURLResponse(string URLPath);
 	void process(Socket *);//process request and return answer
 	void writeFile(processMonitor &pm,string name, const string &data);
 	string readFile(processMonitor &pm,string name);
@@ -62,5 +63,6 @@ public:
 	string run(processMonitor &pm,string name, int othermaxtime=0);
 	void runTerminal(processMonitor &pm, webSocket &s, string name);
 	void runVNC(processMonitor &pm, webSocket &s, string name);
+	void runPassthrough(processMonitor &pm, Socket *s);
 };
 #endif

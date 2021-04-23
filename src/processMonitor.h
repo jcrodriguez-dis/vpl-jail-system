@@ -30,6 +30,7 @@ class processMonitor{
 	string monitorticket;
 	string executionticket;
 	string httpPassthroughticket;
+	string localwebserver;
 	bool   interactive; //is interactive request
 	string lang; //Code of language to use
 	time_t startTime; //Start time of the request
@@ -65,6 +66,7 @@ class processMonitor{
 		const int salt = 127;
 		return Util::itos(Util::random() / salt);
 	}
+	static void removeTicketFile(string ticket);
 	static void cleanPrisonerFiles(string);
 public:
 	processMonitor(string & adminticket, string & monitorticket, string & executionticket);
@@ -92,9 +94,8 @@ public:
 	string getRelativeHomePath() {
 		return "/home/p" + Util::itos(prisoner);
 	}
-	string getHttpPassthroughTicket() {
-		return "unticket";
-	}
+	string getHttpPassthroughTicket();
+	string getLocalWebServer();
 	void becomePrisoner();
 	void becomePrisoner(int);
 	bool isRunnig();

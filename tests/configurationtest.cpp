@@ -96,4 +96,3 @@ public:
 };
 
 ConfigurationTest configurationTest;
-
