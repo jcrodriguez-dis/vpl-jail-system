@@ -23,7 +23,11 @@ the nature of the service (execute external code) carry an intrinsic threat.
 Preparing the system
 --------------------
 
-Install a Linux O.S. as clean as possible.
+Install a Linux O.S. as clean as possible. At least install the "en_US.UTF-8" locale
+and all other locales you want. Notice that the VPL plugin will try to use the locale
+in use on the moodle, but will use "en_US.UTF-8" as fall back locale if setting
+the Moodle one fails.
+
 If you have enough resources, you can install a GUI interface.
 Stop any service that you don't need as the web server, ssh server, etc.
 If the O.S. has a firewall, you must configure it (or stop it) to give access
@@ -44,7 +48,7 @@ You must get the source package from https://vpl.dis.ulpgc.es/, e.g., using
 
 or from the GitHub repository, generating the package with
 
-.. code:: bash
+.. code:: console
 
  sudo apt-get install g++ make autotools-dev autoconf
  aclocal
@@ -73,17 +77,17 @@ Follow the instructions and wait for the necessary downloads.
 The installation script will try to install the development software commonly used.
 
 The installer will ask you about:
+
 - If you want to use Let's Encrypt, creates a self-signed SSL certificate or use your own certificates.
-- (updating) If you want to replace the configuration file with a fresh one.
+- When updating, if you want to replace the configuration file with a fresh one.
 - If you want to install different compilers and interpreters.
 
-.. note:: If you have your own SSL certificates for the https and wss communications,
-   you must write your certificates using the default location, you must use "/etc/vpl/cert.pem"
-   filename for the public certificate and "/etc/vpl/key.pem" for the private key,
-   or use the configuration file to change the default location.
-   If your Certification Authority (CA) is not a root CA you may need to add the intermediate CA
-   certificates to the "cert.pem" file.
-   You must restart the service to apply the modifications.
+.. note:: If you have your own SSL certificates for the HTTPS and WSS communications,
+  you must copy your public certificate to the "/etc/vpl/cert.pem" file and the
+  private key to the "/etc/vpl/key.pem" file. You also can change the configuration
+  file to tell the system the location of your certificates. If your Certification
+  Authority (CA) is not a root CA you may need to add the intermediate CA certificates
+  to the "cert.pem" file. You may restart the service to apply the modifications.
    
 Adding the jail/execution server to the VPL plugin at Moodle
 ------------------------------------------------------------
