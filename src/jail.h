@@ -40,11 +40,13 @@ protected:
 	void changeUser(processMonitor &pm);
 	void setLimits(processMonitor &pm);
 	void transferExecution(processMonitor &pm,string fileName);
+	void saveParseFiles(processMonitor &pm, mapstruct &parsedata);
+	ExecutionLimits getParseExecutionLimits(mapstruct &parsedata);
 	//Action commands
 	string commandAvailable(int memRequested);
 	void commandRequest(mapstruct &parsedata, string &adminticket,string &monitorticket,string &executionticket);
 	void commandGetResult(string adminticket,string &compilation,string &execution,bool &executed,bool &interactive);
-	bool commandUpdate(mapstruct &parsedata);
+	bool commandUpdate(string adminticket, mapstruct &parsedata);
 	bool commandRunning(string adminticket);
 	void commandStop(string adminticket);
 	void commandMonitor(string userticket,Socket *s);

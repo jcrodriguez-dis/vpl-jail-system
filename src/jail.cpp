@@ -40,43 +40,51 @@ string Jail::commandAvailable(int memRequested){
 	return "ready";
 }
 
+void Jail::saveParseFiles(processMonitor &pm, mapstruct &parsedata) {
+	mapstruct files = RPC::getFiles(parsedata["files"]);
+	mapstruct fileencoding;
+	if ( parsedata.find("fileencoding") != parsedata.end() ) {
+		fileencoding = RPC::getFiles(parsedata["fileencoding"]);
+	}
+	//Save files to execution dir, decode data if needed
+	for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
+		string name = i->first;
+		string data = i->second->getString();
+		if ( fileencoding.find(name) != fileencoding.end()
+				&& fileencoding[name]->getInt() == 1 ) {
+			syslog(LOG_INFO, "Decoding file %s from b64", name.c_str());
+			data = Base64::decode(data);
+			if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
+				name = name.substr(0, name.length() - 4);
+			}
+		}
+		syslog(LOG_INFO, "Write file %s data size %lu", name.c_str(), (long unsigned int)data.size());
+		pm.writeFile(name, data);
+	}
+}
+
+ExecutionLimits Jail::getParseExecutionLimits(mapstruct &parsedata) {
+	ExecutionLimits executionLimits = Configuration::getConfiguration()->getLimits();
+	syslog(LOG_INFO,"Reading parms");
+	executionLimits.syslog("Config");
+	executionLimits.maxtime = min(parsedata["maxtime"]->getInt(), executionLimits.maxtime);
+	executionLimits.maxfilesize = min(parsedata["maxfilesize"]->getInt(), executionLimits.maxfilesize);
+	executionLimits.maxmemory = min(parsedata["maxmemory"]->getInt(), executionLimits.maxmemory);
+	executionLimits.maxprocesses = min(parsedata["maxprocesses"]->getInt(), executionLimits.maxprocesses);
+	executionLimits.syslog("Request");
+	return executionLimits;
+}
+
 void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &monitorticket,string &executionticket){
 	syslog(LOG_INFO,"Request for process");
 	processMonitor pm(adminticket, monitorticket, executionticket);
 	pid_t pid=fork();
 	if(pid==0){ //new process
 		try {
-			syslog(LOG_INFO,"parse files %lu", (long unsigned int)parsedata.size());
-			mapstruct files = RPC::getFiles(parsedata["files"]);
-			mapstruct filestodelete = RPC::getFiles(parsedata["filestodelete"]);
-			mapstruct fileencoding;
-			if ( parsedata.find("fileencoding") != parsedata.end() ) {
-				fileencoding = RPC::getFiles(parsedata["fileencoding"]);
-			}
-			string script=parsedata["execute"]->getString();
-			//Retrieve files to execution dir and options, decode data if needed
-			for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
-				string name = i->first;
-				string data = i->second->getString();
-				if ( fileencoding.find(name) != fileencoding.end()
-					 && fileencoding[name]->getInt() == 1 ) {
-					syslog(LOG_INFO, "Decoding file %s from b64", name.c_str());
-					data = Base64::decode(data);
-					if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
-						name = name.substr(0, name.length() - 4);
-					}
-				}
-				syslog(LOG_INFO, "Write file %s data size %lu", name.c_str(), (long unsigned int)data.size());
-				pm.writeFile(name, data);
-			}
-			ExecutionLimits executionLimits = Configuration::getConfiguration()->getLimits();
+			syslog(LOG_INFO,"Parse data %lu", (long unsigned int)parsedata.size());
+			saveParseFiles(pm, parsedata);
 			syslog(LOG_INFO,"Reading parms");
-			executionLimits.syslog("Config");
-			executionLimits.maxtime = min(parsedata["maxtime"]->getInt(), executionLimits.maxtime);
-			executionLimits.maxfilesize = min(parsedata["maxfilesize"]->getInt(), executionLimits.maxfilesize);
-			executionLimits.maxmemory = min(parsedata["maxmemory"]->getInt(), executionLimits.maxmemory);
-			executionLimits.maxprocesses = min(parsedata["maxprocesses"]->getInt(), executionLimits.maxprocesses);
-			executionLimits.syslog("Request");
+			ExecutionLimits executionLimits = getParseExecutionLimits(parsedata);
 			string vpl_lang = parsedata["lang"]->getString();
 			syslog(LOG_DEBUG, "VPL_LANG %s", vpl_lang.c_str());
 			bool interactive = parsedata["interactive"]->getInt() > 0;
@@ -84,11 +92,13 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 			pm.setExtraInfo(executionLimits, interactive, vpl_lang);
 			pm.setCompiler();
 			syslog(LOG_INFO, "Compilation");
+			string script = parsedata["execute"]->getString();
 			string compilationOutput = run(pm, script);
 			pm.setCompilationOutput(compilationOutput);
 			bool compiled = pm.FileExists(VPL_EXECUTION) || pm.FileExists(VPL_WEXECUTION) || pm.FileExists(VPL_WEBEXECUTION);
 			if (compiled) {
 				//Delete files
+				mapstruct filestodelete = RPC::getFiles(parsedata["filestodelete"]);
 				for (mapstruct::iterator i = filestodelete.begin(); i != filestodelete.end(); i++) {
 					string name = i->first;
 					syslog(LOG_INFO, "Delete file %s", name.c_str());
@@ -143,7 +153,55 @@ void Jail::commandGetResult(string adminticket, string &compilation,
 	interactive = pm.isInteractive();
 }
 
-bool Jail::commandUpdate(mapstruct &parsedata){
+bool Jail::commandUpdate(string adminticket, mapstruct &parsedata){
+	processMonitor pm(adminticket);
+	pid_t pid=fork();
+	if(pid==0){ //new process
+		try {
+			syslog(LOG_INFO,"parse files %lu", (long unsigned int)parsedata.size());
+			mapstruct files = RPC::getFiles(parsedata["files"]);
+			mapstruct fileencoding;
+			if ( parsedata.find("fileencoding") != parsedata.end() ) {
+				fileencoding = RPC::getFiles(parsedata["fileencoding"]);
+			}
+			//Save files to execution dir and options, decode data if needed
+			for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
+				string name = i->first;
+				string data = i->second->getString();
+				if ( fileencoding.find(name) != fileencoding.end()
+					 && fileencoding[name]->getInt() == 1 ) {
+					syslog(LOG_INFO, "Decoding file %s from b64", name.c_str());
+					data = Base64::decode(data);
+					if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
+						name = name.substr(0, name.length() - 4);
+					}
+				}
+				syslog(LOG_INFO, "Write file %s data size %lu", name.c_str(), (long unsigned int)data.size());
+				pm.writeFile(name, data);
+			}
+		}
+		catch(std::exception &e){
+			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.what(), __FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		catch(string &e){
+			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.c_str(), __FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		catch(HttpException &e){
+			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.getLog().c_str(), __FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		catch(const char *e){
+			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e,__FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		catch(...){
+			syslog(LOG_ERR, "unexpected exception %s:%d", __FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		_exit(EXIT_SUCCESS);
+	}
 	return true;
 }
 
@@ -213,13 +271,16 @@ void Jail::commandMonitor(string monitorticket, Socket *s){
 				syslog(LOG_DEBUG,"Monitor beforeRunning");
 				ws.send("compilation:" + pm.getCompilation());
 				timeout = now + JAIL_SOCKET_TIMEOUT;
-				if (pm.FileExists(VPL_EXECUTION) || pm.FileExists(VPL_WEBEXECUTION)) {
+				if (pm.FileExists(VPL_EXECUTION)) {
 					syslog(LOG_DEBUG, "run:terminal");
 					ws.send("run:terminal");
-					webserver = pm.FileExists(VPL_WEBEXECUTION);
-				} else if (pm.FileExists(VPL_WEXECUTION))
+				} else if (pm.FileExists(VPL_WEBEXECUTION)) {
+					syslog(LOG_DEBUG, "run:terminal");
+					ws.send("run:webterminal");
+					webserver = true;
+				} else if (pm.FileExists(VPL_WEXECUTION)) {
 					ws.send("run:vnc:" + pm.getVNCPassword());
-				else {
+				} else {
 					if (pm.getCompilation().empty()) {
 						ws.send("compilation:The compilation process did not generate an executable nor error message.");
 					}
@@ -455,12 +516,12 @@ string Jail::predefinedURLResponse(string URLPath) {
  *  6) websocket: monitor, execute
  */
 void Jail::process(Socket *socket){
-	syslog(LOG_INFO,"Start server version %s",Util::version());
-	string httpURLPath=configuration->getURLPath();
+	syslog(LOG_INFO, "Start server version %s", Util::version());
+	string httpURLPath = configuration->getURLPath();
 	HttpJailServer server(socket);
 	try {
 		socket->readHeaders();
-		if(socket->headerSize()==0){
+		if(socket->headerSize() == 0){
 			if(socket->isSecure()){ //Don't count SSL error
 				_exit(static_cast<int>(neutral));
 			}else{
@@ -472,7 +533,7 @@ void Jail::process(Socket *socket){
 		}
 		string httpMethod = socket->getMethod();
 		if (Util::toUppercase(socket->getHeader("Upgrade")) != "WEBSOCKET") {
-			syslog(LOG_INFO,"http(s) request");
+			syslog(LOG_INFO, "http(s) request");
 			if (httpMethod == "GET") {
 				ExitStatus securityStatus = ExitStatus::neutral;
 				string response;
@@ -520,7 +581,7 @@ void Jail::process(Socket *socket){
 				ExecutionLimits jailLimits = configuration->getLimits();
 				int memRequested = parsedata["maxmemory"]->getInt();
 				string status = commandAvailable(memRequested);
-				syslog(LOG_INFO,"Status: '%s'",status.c_str());
+				syslog(LOG_INFO, "Status: '%s'", status.c_str());
 				server.send200(RPC::availableResponse(status,
 				        processMonitor::requestsInProgress(),
 						jailLimits.maxtime,
@@ -529,7 +590,7 @@ void Jail::process(Socket *socket){
 						jailLimits.maxprocesses,
 						configuration->getSecurePort()));
 			} else if(request == "request") {
-				string adminticket,monitorticket,executionticket;
+				string adminticket, monitorticket, executionticket;
 				commandRequest(parsedata, adminticket, monitorticket, executionticket);
 				server.send200(RPC::requestResponse(adminticket,
 								monitorticket,executionticket,
@@ -556,7 +617,8 @@ void Jail::process(Socket *socket){
 				commandStop(adminticket);
 				server.send200(RPC::stopResponse());
 			} else if(request == "update") {
-				bool ok = commandUpdate(parsedata);
+				string adminticket=parsedata["adminticket"]->getString();
+				bool ok = commandUpdate(adminticket, parsedata);
 				server.send200(RPC::updateResponse(ok));
 			} else { //Error
 				throw HttpException(badRequestCode, "Unknown request:" + request);
