@@ -275,7 +275,7 @@ void Jail::commandMonitor(string monitorticket, Socket *s){
 					syslog(LOG_DEBUG, "run:terminal");
 					ws.send("run:terminal");
 				} else if (pm.FileExists(VPL_WEBEXECUTION)) {
-					syslog(LOG_DEBUG, "run:terminal");
+					syslog(LOG_DEBUG, "run:webterminal");
 					ws.send("run:webterminal");
 					webserver = true;
 				} else if (pm.FileExists(VPL_WEXECUTION)) {
