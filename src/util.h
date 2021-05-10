@@ -31,23 +31,25 @@
 #define VPL_EXECUTION "vpl_execution"
 #define VPL_WEXECUTION "vpl_wexecution"
 #define VPL_WEBEXECUTION "vpl_webexecution"
-#define VPL_WEBCOOKIE "__vpl_webexecution__"
+#define VPL_WEBCOOKIE "VPL_web"
 #define VPL_SETWEBCOOKIE "Set-Cookie: " VPL_WEBCOOKIE "="
-#define VPL_CLEANWEBCOOKIE VPL_SETWEBCOOKIE "nada; Max-Age=-1\r\n"
-#define VPL_IWASHERECOOKIE "__vpl_iwashere__"
-#define VPL_SETIWASHERECOOKIE "Set-Cookie: " VPL_IWASHERECOOKIE "=yes\r\n"
+#define VPL_CLEANWEBCOOKIE VPL_SETWEBCOOKIE "n; Max-Age=-1\r\n"
+#define VPL_IWASHERECOOKIE "VPL_Iwh"
+#define VPL_SETIWASHERECOOKIE "Set-Cookie: " VPL_IWASHERECOOKIE "=y; Path=/; SameSite=none; Secure\r\n"
 #define VPL_LOCALREDIRECT "Location: /\r\n"
 #define VPL_LOCALSERVERADDRESSFILE ".vpl_localserveraddress"
 
 using namespace std;
 
-enum ExitStatus {success=EXIT_SUCCESS,
-				internalError=EXIT_FAILURE,
-				neutral,
-				httpError,
-				websocketError};
+enum ExitStatus {
+	success=EXIT_SUCCESS,
+	internalError=EXIT_FAILURE,
+	neutral,
+	httpError,
+	websocketError
+};
 
-struct ExecutionLimits{
+struct ExecutionLimits {
 	int maxtime;
 	int maxfilesize;
 	int maxmemory;

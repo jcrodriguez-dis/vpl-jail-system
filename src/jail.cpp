@@ -540,9 +540,10 @@ void Jail::process(Socket *socket){
 				string cookieTicket;
 				if (isRequestingCookie(socket->getURLPath(), cookieTicket)) { // Getting cookie to access web app
 					string iWasHere = socket->getCookie(VPL_IWASHERECOOKIE);
-					if (iWasHere.length() && socket->getQueryString() == "private") { // Requires a private browser
+					if ( (!iWasHere.empty()) &&
+					     (socket->getQueryString() == "private")) { // Requires a private browser
 						response = "<html><body><h1>Please, use a New Private or Incognito Window</h1></body></html>";
-					} else { // Incorrect request of cookie
+					} else {
 						if (! commandSetPassthroughCookie(cookieTicket, server)) {
 							securityStatus = ExitStatus::httpError;
 						}
@@ -554,7 +555,7 @@ void Jail::process(Socket *socket){
 				if ( response.empty() ) {
 					throw HttpException(notFoundCode, "HTTP GET: URL path not found '" + socket->getURLPath() + "'");
 				}
-				server.send200(response);
+				server.send200(response, false, VPL_SETIWASHERECOOKIE);
 				_exit(static_cast<int>(securityStatus));
 			}
 			if (httpMethod == "HEAD") {
