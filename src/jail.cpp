@@ -529,7 +529,9 @@ void Jail::process(Socket *socket){
 			}
 		}
 		if (socket->getCookie(VPL_WEBCOOKIE).length()) { // If found cookie passing to local application and stop processing
-			httpPassthrough(socket->getCookie(VPL_WEBCOOKIE), socket);
+			if (httpPassthrough(socket->getCookie(VPL_WEBCOOKIE), socket)) {
+				_exit(EXIT_SUCCESS);
+			}
 		}
 		string httpMethod = socket->getMethod();
 		if (Util::toUppercase(socket->getHeader("Upgrade")) != "WEBSOCKET") {
@@ -542,7 +544,7 @@ void Jail::process(Socket *socket){
 					string iWasHere = socket->getCookie(VPL_IWASHERECOOKIE);
 					if ( (!iWasHere.empty()) &&
 					     (socket->getQueryString() == "private")) { // Requires a private browser
-						response = "<html><body><h1>Please, use a New Private or Incognito Window</h1></body></html>";
+						response = "<html><body><h1>Please, to access web applications use a new Private or Incognito window.</h1></body></html>";
 					} else {
 						if (! commandSetPassthroughCookie(cookieTicket, server)) {
 							securityStatus = ExitStatus::httpError;
