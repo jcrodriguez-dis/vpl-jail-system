@@ -372,6 +372,7 @@ else
 	vpl_install "wget" wget
 	vpl_install "curl" curl
 	vpl_install "net-tools" net-tools
+	vpl_install "bc" bc
 fi
 vpl_install_daemon
 #Copy configuration file
@@ -511,6 +512,9 @@ else
         vpl_install "Python3 pudb" python3-pudb
         vpl_install "Python3 pycodestyle" python3-pycodestyle
         vpl_install "Python3 NetworkX" python3-networkx
+		vpl_install "Python mypy" mypy
+		vpl_install "Python pycodestyle" pycodestyle
+		vpl_install "Python pydocstyle" pydocstyle
         vpl_install "Pythom Thonny" thonny
         vpl_install "Ruby interpreter" ruby
         vpl_install "Scala programming language" scala
