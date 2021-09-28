@@ -86,6 +86,18 @@ class UtilTest: public BaseTest {
 		assert(!Util::correctFileName("klsdja~f"));
 		assert(!Util::correctFileName("kls/djaf"));
 		assert(!Util::correctFileName("\\klsdjaf.pp"));
+		assert(!Util::correctFileName("kls<djaf.pp"));
+		assert(!Util::correctFileName("kls>djaf.pp"));
+		assert(!Util::correctFileName("kls&djaf.pp"));
+		assert(!Util::correctFileName("kls%djaf.pp"));
+		assert(!Util::correctFileName("kls#jaf.pp"));
+		assert(!Util::correctFileName("kls@jaf.pp"));
+		assert(!Util::correctFileName("kls?jaf.pp"));
+		assert(!Util::correctFileName("kls`jaf.pp"));
+		assert(!Util::correctFileName("nose<mal"));
+		assert(!Util::correctFileName("nose>mal"));
+		assert(!Util::correctFileName("nose=mal"));
+		assert(!Util::correctFileName("kls*jaf.pp"));
 		assert(!Util::correctFileName("nose..mal"));
 		assert(!Util::correctFileName(""));
 		assert(!Util::correctFileName(
@@ -143,10 +155,12 @@ class UtilTest: public BaseTest {
 		int kb1219 = 1219 * 1024;
 		int mb435 = 435 * 1024 * 1024;
 		int gb1 = 1024 * 1024 * 1024;
-		assert(Util::memSizeToBytesi("nada") == 0);
-		assert(Util::memSizeToBytesi("-10") == 0);
-		assert(Util::memSizeToBytesi("0") == 0);
-		assert(Util::memSizeToBytesi("0 Mb") == 0);
+		long long kgb = gb1 * 1024ll;
+		long long gb99 = 99999999ll * gb1;
+		assert(Util::memSizeToBytesi("nada") == numeric_limits<int>::max());
+		assert(Util::memSizeToBytesi("-10") == numeric_limits<int>::max());
+		assert(Util::memSizeToBytesi("0") == numeric_limits<int>::max());
+		assert(Util::memSizeToBytesi("0 Mb") == numeric_limits<int>::max());
 		assert(Util::memSizeToBytesi("1234") == l1234);
 		assert(Util::memSizeToBytesi("1219 kbytes") == kb1219);
 		assert(Util::memSizeToBytesi("1219K") == kb1219);
@@ -154,6 +168,11 @@ class UtilTest: public BaseTest {
 		assert(Util::memSizeToBytesi("435m") == mb435);
 		assert(Util::memSizeToBytesi("1gbytes") == gb1);
 		assert(Util::memSizeToBytesi("1     G") == gb1);
+		assert(Util::memSizeToBytesi("999999999 G") == numeric_limits<int>::max());
+		assert(Util::memSizeToBytesl("1024     G") == kgb);
+		assert(Util::memSizeToBytesl("99999999     G") >= gb99);
+		assert(Util::fixMemSize(9999999999) == 9999999999);
+		assert(Util::fixMemSize(-1) == numeric_limits<long long>::max());
 	}
 public:
 	string name() {
