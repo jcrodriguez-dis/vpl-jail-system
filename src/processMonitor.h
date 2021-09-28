@@ -108,7 +108,7 @@ public:
 	bool isMonitored();
 	void monitorize();
 	bool isOutOfMemory();
-	uint64_t getMemoryUsed();
+	long long getMemoryUsed();
 	string getMemoryLimit();
 	string getCompilation();
 	void getResult(string &compilation, string &execution, bool &executed);

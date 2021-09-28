@@ -1,6 +1,6 @@
 /**
  * @package:   Part of vpl-jail-system
- * @copyright: Copyright (C) 2014 Juan Carlos Rodríguez-del-Pino
+ * @copyright: Copyright (C) 2021 Juan Carlos Rodríguez-del-Pino
  * @license:   GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 
@@ -28,8 +28,11 @@
 /*
  * @return string "ready", "busy", "offline"
  */
-string Jail::commandAvailable(int memRequested){
-	syslog(LOG_INFO,"Memory requested %d",memRequested);
+string Jail::commandAvailable(long long memRequested){
+	syslog(LOG_INFO,"Memory requested %lld", memRequested);
+	if (memRequested <= 0) {
+		return "ready";
+	}
 	if(Util::fileExists("/etc/nologin")){ //System going shutdown
 		return "offline";
 	}else {
@@ -68,8 +71,10 @@ ExecutionLimits Jail::getParseExecutionLimits(mapstruct &parsedata) {
 	syslog(LOG_INFO,"Reading parms");
 	executionLimits.syslog("Config");
 	executionLimits.maxtime = min(parsedata["maxtime"]->getInt(), executionLimits.maxtime);
-	executionLimits.maxfilesize = min(parsedata["maxfilesize"]->getInt(), executionLimits.maxfilesize);
-	executionLimits.maxmemory = min(parsedata["maxmemory"]->getInt(), executionLimits.maxmemory);
+	executionLimits.maxfilesize = min(Util::fixMemSize(parsedata["maxfilesize"]->getLong()),
+                                      executionLimits.maxfilesize);
+	executionLimits.maxmemory = min(Util::fixMemSize(parsedata["maxmemory"]->getLong()),
+								    executionLimits.maxmemory);
 	executionLimits.maxprocesses = min(parsedata["maxprocesses"]->getInt(), executionLimits.maxprocesses);
 	executionLimits.syslog("Request");
 	return executionLimits;
@@ -582,7 +587,9 @@ void Jail::process(Socket *socket){
 			syslog(LOG_INFO, "Execute request '%s'", request.c_str());
 			if (request == "available") {
 				ExecutionLimits jailLimits = configuration->getLimits();
-				int memRequested = parsedata["maxmemory"]->getInt();
+				long long memRequested = parsedata["maxmemory"]->getLong();
+				// Next line fixes XML-RPC int limits (-1).
+				memRequested = memRequested > 0 ? memRequested : configuration->getLimits().maxmemory;
 				string status = commandAvailable(memRequested);
 				syslog(LOG_INFO, "Status: '%s'", status.c_str());
 				server.send200(RPC::availableResponse(status,

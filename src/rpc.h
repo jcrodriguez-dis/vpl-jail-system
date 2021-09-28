@@ -35,38 +35,47 @@ public:
 				"</string></value>\n"
 				"</member>\n";
 	}
-	static string responseMember(string name, int value){
-		return "<member><name>"
-				+name+"</name>\n"
-				"<value><int>"
-				+ Util::itos(value) +
-				"</int></value>\n"
-				"</member>\n";
+	static string responseMember(string name, long long value) {
+		if (value <= INT32_MAX) {
+			return "<member><name>"
+					+name+"</name>\n"
+					"<value><int>"
+					+ Util::itos(value) +
+					"</int></value>\n"
+					"</member>\n";
+		} else {
+			return "<member><name>"
+					+name+"</name>\n"
+					"<value><double>"
+					+ Util::dtos(value) +
+					"</double></value>\n"
+					"</member>\n";			
+		}
 	}
 	/**
 	 * return a ready response
 	 */
-	static string availableResponse(string status, int load, int maxtime, int maxfilesize,
-			int maxmemory, int maxprocesses, int secureport){
+	static string availableResponse(string status, int load, int maxtime, long long maxfilesize,
+			long long maxmemory, int maxprocesses, int secureport){
 		string response;
-		response += responseMember("status",status);
-		response += responseMember("load",load);
-		response += responseMember("maxtime",maxtime);
-		response += responseMember("maxfilesize",maxfilesize);
-		response += responseMember("maxmemory",maxmemory);
-		response += responseMember("maxprocesses",maxprocesses);
-		response += responseMember("secureport",secureport);
+		response += responseMember("status", status);
+		response += responseMember("load", load);
+		response += responseMember("maxtime", maxtime);
+		response += responseMember("maxfilesize", maxfilesize);
+		response += responseMember("maxmemory", maxmemory);
+		response += responseMember("maxprocesses", maxprocesses);
+		response += responseMember("secureport", secureport);
 		return responseWraper(response);
 	}
 
 	static string requestResponse(const string adminticket,const string monitorticket,
 			const string executionticket, int port,int secuport){
 		string response;
-		response += responseMember("adminticket",adminticket);
-		response += responseMember("monitorticket",monitorticket);
-		response += responseMember("executionticket",executionticket);
-		response += responseMember("port",port);
-		response += responseMember("secureport",secuport);
+		response += responseMember("adminticket", adminticket);
+		response += responseMember("monitorticket", monitorticket);
+		response += responseMember("executionticket", executionticket);
+		response += responseMember("port", port);
+		response += responseMember("secureport", secuport);
 		return responseWraper(response);
 	}
 

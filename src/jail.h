@@ -43,7 +43,7 @@ protected:
 	void saveParseFiles(processMonitor &pm, mapstruct &parsedata);
 	ExecutionLimits getParseExecutionLimits(mapstruct &parsedata);
 	//Action commands
-	string commandAvailable(int memRequested);
+	string commandAvailable(long long memRequested);
 	void commandRequest(mapstruct &parsedata, string &adminticket,string &monitorticket,string &executionticket);
 	void commandGetResult(string adminticket,string &compilation,string &execution,bool &executed,bool &interactive);
 	bool commandUpdate(string adminticket, mapstruct &parsedata);

@@ -92,8 +92,8 @@ void Configuration::readConfigFile(){
 	if(!Util::correctPath(controlPath))
 		throw "Incorrect control path "+controlPath;
 	jailLimits.maxtime = atoi(data["MAXTIME"].c_str());
-	jailLimits.maxfilesize = Util::memSizeToBytesi(data["MAXFILESIZE"]);
-	jailLimits.maxmemory = Util::memSizeToBytesi(data["MAXMEMORY"]);
+	jailLimits.maxfilesize = Util::memSizeToBytesl(data["MAXFILESIZE"]);
+	jailLimits.maxmemory = Util::memSizeToBytesl(data["MAXMEMORY"]);
 	jailLimits.maxprocesses = atoi(data["MAXPROCESSES"].c_str());
 	string tof = data["TASK_ONLY_FROM"];
 	string dir;

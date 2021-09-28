@@ -51,11 +51,11 @@ enum ExitStatus {
 
 struct ExecutionLimits {
 	int maxtime;
-	int maxfilesize;
-	int maxmemory;
+	long long maxfilesize;
+	long long maxmemory;
 	int maxprocesses;
 	void syslog(const char *s){
-		::syslog(LOG_DEBUG,"%s: maxtime: %d seg, maxfilesize: %d Kb, maxmemory %d Kb, maxprocesses: %d",
+		::syslog(LOG_DEBUG,"%s: maxtime: %d seg, maxfilesize: %lld Kb, maxmemory %lld Kb, maxprocesses: %d",
 				s,maxtime, maxfilesize/1024, maxmemory/1024, maxprocesses);
 	}
 };
@@ -241,12 +241,22 @@ public:
 	}
 
 	/**
+	 * return a double as string
+	 */
+	static string dtos(double value){
+		const int maxIntChars = 60;
+		char buf[maxIntChars];
+		sprintf(buf,"%lg",value);
+		return buf;
+	}
+
+	/**
 	 * return an int/long int as string
 	 */
-	static string itos(const long int value){
+	static string itos(const long long value){
 		const int maxIntChars = 31;
 		char buf[maxIntChars];
-		sprintf(buf,"%ld",value);
+		sprintf(buf,"%lld",value);
 		return buf;
 	}
 
@@ -262,19 +272,19 @@ public:
 	}
 
 	/**
-	 * return an string as long int
+	 * return an string as long long
 	 */
-	static long int atol(const string &s){
-		return ::atol(s.c_str());
+	static long long atol(const string &s){
+		return ::atoll(s.c_str());
 	}
 
 	/**
 	 * return the value of Kb, Mb or Gb
 	 */
-	static long int memAbbreviation(const string &abbreviation){
-		const long int kb = 1024;
-		const long int mb = 1024 * kb;
-		const long int gb = 1024 * mb;
+	static long long memAbbreviation(const string &abbreviation){
+		const long long kb = 1024;
+		const long long mb = 1024 * kb;
+		const long long gb = 1024 * mb;
 		if (abbreviation.size() == 0) {
 			return 1;
 		}
@@ -293,17 +303,18 @@ public:
 	 * return a memory size in Gb, Mb or Kb to as bytes int
 	 */
 	static int memSizeToBytesi(const string &s){
-		long int longValue = memSizeToBytesl(s);
-		if ( longValue >  numeric_limits<int>::max()) {
+		long long value = memSizeToBytesl(s);
+		if ( value >  numeric_limits<int>::max() ||
+		     value <= 0 ) {
 			return numeric_limits<int>::max();
 		}
-		return longValue;
+		return value;
 	}
 
 	/**
-	 * return a memory size in Gb, Mb or Kb to as bytes long int
+	 * return a memory size in Gb, Mb or Kb to as bytes long long
 	 */
-	static long int memSizeToBytesl(const string &memSize){
+	static long long memSizeToBytesl(const string &memSize){
 		static vplregex regMemSize("^[ \t]*([0-9]+)[ \t]*([GgMmKk]?)");
 		const int numberGroup = 1;
 		const int abbrebiationGroup = 2;
@@ -313,6 +324,17 @@ public:
 			return atol(found[numberGroup]) * memAbbreviation(found[abbrebiationGroup]);
 		} else {
 			return 0;
+		}
+	}
+
+	/**
+	 * Fix memory size -1 due XML-RPC limits
+	 */
+	static long long fixMemSize(long long memSize){
+		if (memSize <= 0) {
+			return numeric_limits<long long>::max();
+		} else {
+			return memSize;
 		}
 	}
 
@@ -356,7 +378,7 @@ public:
 		if(fn.size() > JAIL_FILENAME_SIZE_LIMIT) return false;
 		vplregmatch found(1);
 		bool incorrect = reg.search(fn, found);
-		if( incorrect){
+		if (incorrect) {
 			string incorrect = found[0];
 			syslog(LOG_DEBUG,"incorrectFile '%s' found '%s'"
 					,fn.c_str(), incorrect.c_str());

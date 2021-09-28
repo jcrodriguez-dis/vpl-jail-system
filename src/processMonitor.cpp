@@ -175,8 +175,8 @@ ConfigData processMonitor::readInfo() {
 	ConfigData data;
 	data = ConfigurationFile::readConfiguration(getProcessControlPath("config"), data);
 	executionLimits.maxtime = atoi(data["MAXTIME"].c_str());
-	executionLimits.maxfilesize = atoi(data["MAXFILESIZE"].c_str());
-	executionLimits.maxmemory = atoi(data["MAXMEMORY"].c_str());
+	executionLimits.maxfilesize = atoll(data["MAXFILESIZE"].c_str());
+	executionLimits.maxmemory = atoll(data["MAXMEMORY"].c_str());
 	executionLimits.maxprocesses = atoi(data["MAXPROCESSES"].c_str());
 
 	adminticket = data["ADMINTICKET"];
@@ -589,8 +589,8 @@ void processMonitor::cleanTask() {
 }
 
 bool processMonitor::isOutOfMemory() {
-	if (executionLimits.maxmemory == 0) return false;
-	return (uint64_t) executionLimits.maxmemory < getMemoryUsed();
+	if (executionLimits.maxmemory <= 0) return false;
+	return executionLimits.maxmemory < getMemoryUsed();
 }
 
 string processMonitor::getMemoryLimit() {
@@ -598,7 +598,7 @@ string processMonitor::getMemoryLimit() {
 	return Util::itos(executionLimits.maxmemory/(1024*1024)) + "MiB";
 }
 
-uint64_t processMonitor::getMemoryUsed() {
+long long processMonitor::getMemoryUsed() {
 	string dir = "/proc";
 	dirent *ent;
 	DIR *dirfd = opendir(dir.c_str());
@@ -616,7 +616,7 @@ uint64_t processMonitor::getMemoryUsed() {
 	}
 	const int matchSize = 3;
 	regmatch_t match[matchSize];
-	uint64_t s = 0;
+	long long s = 0;
 	while ((ent = readdir(dirfd)) != NULL) {
 		const string name(ent->d_name);
 		const pid_t PID = Util::atoi(name);

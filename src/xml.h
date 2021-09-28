@@ -58,12 +58,33 @@ public:
 		 * return content as int
 		 */
 		int getInt() const {
-			if(tag=="int")
-				return atoi(getContent().c_str());
-			if(tag=="double"){
-				double value=atof(getContent().c_str());
-				if(value>INT_MAX) return INT_MAX;
+			if (tag == "int") {
+				long long value = atoll(getContent().c_str());
+				if ( value > INT_MAX ) {
+					return INT_MAX;
+				}
 				return (int) value;
+			}
+			if (tag == "double") {
+				double value = atof(getContent().c_str());
+				if(value > INT_MAX) return INT_MAX;
+				return (int) value;
+			}
+			throw HttpException(badRequestCode
+					 ,"RPC/XML parse type error: expected int found "+tag);
+		}
+		/**
+		 * return content as long long
+		 */
+		long long getLong() const {
+			if (tag == "int") {
+				return atoll(getContent().c_str());
+			}
+			if (tag == "double") {
+				double value = atof(getContent().c_str());
+				if (value > numeric_limits<long long>::max())
+					return numeric_limits<long long>::max();
+				return (long long) value;
 			}
 			throw HttpException(badRequestCode
 					 ,"RPC/XML parse type error: expected int found "+tag);
