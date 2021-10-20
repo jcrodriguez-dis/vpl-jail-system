@@ -1,6 +1,21 @@
 *************
-Release notes 
+Release notes
 *************
+
+V2.7.2
+======
+
+This is mainly a bug-fix release of version 2.7.1.
+
+* This release includes a workaround to a problem with the limits of int
+  in the XMLRPC protocol (the protocol uses int32).
+  This problem avoids setting a memory size or file size larger than the maximum int32 value.
+  A full solution to this problem requires modifications in the Moodle plugin side.
+  This workaround switches the size limit to the jail server local size limit when the problem is found.
+
+* Adds new tools to the installer: bc, mypy, pycodestyle, and pydocstyle.
+
+* Uses long long int to represent memory a file size.
 
 V2.7.1
 ======
