@@ -5,6 +5,7 @@
  **/
 #include <sys/syslog.h>
 #include <climits>
+#include <sstream>
 #include "configuration.h"
 #include "configurationFile.h"
 
@@ -95,20 +96,11 @@ void Configuration::readConfigFile(){
 	jailLimits.maxfilesize = Util::memSizeToBytesl(data["MAXFILESIZE"]);
 	jailLimits.maxmemory = Util::memSizeToBytesl(data["MAXMEMORY"]);
 	jailLimits.maxprocesses = atoi(data["MAXPROCESSES"].c_str());
-	string tof = data["TASK_ONLY_FROM"];
-	string dir;
-	size_t pos=0;
-	while((pos=tof.find(" ", pos)) != string::npos){
-		dir=tof.substr(0, pos);
-		Util::trimAndRemoveQuotes(dir);
-		if(dir.length() > 0)
-			taskOnlyFrom.push_back(dir);
-		tof.erase(0, pos);
+	istringstream iss(data["TASK_ONLY_FROM"]);
+	for (string ipnet; iss >> ipnet; ) {
+		taskOnlyFrom.push_back(ipnet);
+		syslog(LOG_INFO,"TASK_ONLY_FROM found IP/net %s", ipnet.c_str());
 	}
-	dir=tof.substr(0, pos);
-	Util::trimAndRemoveQuotes(dir);
-	if(dir.size() > 0)
-		taskOnlyFrom.push_back(dir);
 	interface = data["INTERFACE"];
 	port = atoi(data["PORT"].c_str());
 	sport = atoi(data["SECURE_PORT"].c_str());
