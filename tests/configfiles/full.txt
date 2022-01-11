@@ -32,7 +32,7 @@ CONTROLPATH="/mnt/opt/var/vpl-jail-system"
 #IP or net (type A, B and C) separate with spaces
 #Format IP: full dot notation. Example: 128.122.11.22
 #Format net: dot notation ending with dot. Example: 10.1.
-TASK_ONLY_FROM=10.10.3. 193.22.144.23 196.23.
+TASK_ONLY_FROM=10.10.3. 193.22.144.23     196.23. 17.18.19.20    21.22.23.24      1.2.3.4
 
 #To serve only to one interface of your system
 INTERFACE=128.1.1.7

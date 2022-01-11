@@ -68,10 +68,13 @@ class ConfigurationTest: public BaseTest {
 		assert(config->getMinPrisoner() == 11111);
 		assert(config->getMaxPrisoner() == 11222);
 		vector<string> taskOnly = config->getTaskOnlyFrom();
-		assert(taskOnly.size() == 3);
+		assert(taskOnly.size() == 6);
 		assert(taskOnly[0] == "10.10.3.");
 		assert(taskOnly[1] == "193.22.144.23");
 		assert(taskOnly[2] == "196.23.");
+		assert(taskOnly[3] == "17.18.19.20");
+		assert(taskOnly[4] == "21.22.23.24");
+		assert(taskOnly[5] == "1.2.3.4");
 		assert(config->getInterface() == "128.1.1.7");
 		assert(config->getURLPath() == "/secr$et$");
 		assert(config->getPort() == 8081);
