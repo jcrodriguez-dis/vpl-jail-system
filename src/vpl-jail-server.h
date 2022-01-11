@@ -235,14 +235,11 @@ class Daemon{
 			}
 		}
 	}
-
-	void initSocketServer(){
-		this->port = configuration->getPort();
-		this->sport = configuration->getSecurePort();
-		this->interface = configuration->getInterface();
-		this->listenSocket = -1;
-		this->secureListenSocket = -1;
-		this->nSockets = 0;
+	int initSocket(int port, const char *type, int timeout=10) {
+		if (port <= 0) {
+			syslog(LOG_INFO,"No %s used", type);
+			return -1;
+		}
 		struct sockaddr_in local;
 		memset(&local, 0, sizeof(local));
 		local.sin_family = AF_INET;
@@ -250,63 +247,59 @@ class Daemon{
 			local.sin_addr.s_addr = inet_addr(interface.c_str());
 		else
 			local.sin_addr.s_addr = INADDR_ANY;
-		if (this->port) {
-			listenSocket = socket(AF_INET, SOCK_STREAM, 0);
-			if (listenSocket == -1)
-				throw "socket() error";
-			#ifdef SO_REUSEPORT
-			int on=1;
-			if (setsockopt(listenSocket, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
-				syslog(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
+		int socketfd = socket(AF_INET, SOCK_STREAM, 0);
+		if (socketfd == -1)
+			throw "socket() error";
+		#ifdef SO_REUSEPORT
+		int on=1;
+		if (setsockopt(socketfd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
+			syslog(LOG_ERR,"setsockopt(SO_REUSEPORT) %s failed: %m", type);
+		}
+		#endif
+		local.sin_port = htons(port);
+		int bindResult = -1;
+		for (int i = 1; bindResult == -1 && i <= timeout; i++) {
+			bindResult = bind(socketfd, (struct sockaddr *) &local, sizeof(local));
+			if (bindResult == -1) {
+				sleep(1);
+				syslog(LOG_DEBUG,"bind() to %s retry %d: %m", type, i);
 			}
-			#endif
-			local.sin_port = htons(port);
-			if (bind(listenSocket, (struct sockaddr *) &local, sizeof(local)) == -1)
-				throw string("bind() error: ") + strerror(errno);
-			if (listen(listenSocket, 100) == -1) //100 queue size
-				throw "listen() error";
-			syslog(LOG_INFO,"Listen at port %s:%d",inet_ntoa(local.sin_addr), port);
-	    } else {
-	    	syslog(LOG_INFO,"No plain http port used");
-	    }
+		}
+		if ( bindResult == -1)
+			throw string("bind() to ") + type + " error: " + strerror(errno);
+		if (listen(socketfd, 100) == -1) //100 queue size
+			throw "listen() error";
+		syslog(LOG_INFO,"Listening at %s %s:%d", type, inet_ntoa(local.sin_addr), port);
+		return socketfd;
+	}
 
-		if(this->sport){
-			secureListenSocket = socket(AF_INET, SOCK_STREAM, 0);
-			if (secureListenSocket == -1)
-				throw "socket() error";
-			#ifdef SO_REUSEPORT
-			int on=1;
-		    if (setsockopt(secureListenSocket, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
-				syslog(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
-		    }
-			#endif
-			local.sin_port = htons(sport);
-			if (bind(secureListenSocket, (struct sockaddr *) &local, sizeof(local)) == -1)
-				throw "bind() secure port error";
-			if (listen(secureListenSocket, 100) == -1) //100 queue size
-				throw "listen() secure port error";
-			syslog(LOG_INFO,"Listen at secure port %s:%d",inet_ntoa(local.sin_addr), sport);
-		} else {
-		   	syslog(LOG_INFO,"No https secure port used");
-		}
-		if ( !this->port && !this->sport ) {
-			syslog(LOG_CRIT,"No PORT or SECURE_PORT defined");
-			_exit(EXIT_FAILURE);
-		}
+	void initSocketServer(){
+		this->port = configuration->getPort();
+		this->sport = configuration->getSecurePort();
+		this->interface = configuration->getInterface();
+		this->listenSocket = this->initSocket(this->port, "http plain port");
+		this->secureListenSocket = this->initSocket(this->sport, "https secure port");;
+		this->nSockets = 0;
+
 		if (this->listenSocket >= 0) {
 			sockets[nSockets].fd = this->listenSocket;
 			sockets[nSockets].events = POLLIN;
 			isSecureSocket[nSockets] = false;
-			nSockets++;
+			this->nSockets++;
 		}
 		if (this->sport >= 0) {
 			sockets[nSockets].fd = this->secureListenSocket;
 			sockets[nSockets].events = POLLIN;
 			isSecureSocket[nSockets] = true;
-			nSockets++;
+			this->nSockets++;
+		}
+		if ( this->nSockets == 0) {
+			syslog(LOG_CRIT,"No PORT or SECURE_PORT defined");
+			_exit(EXIT_FAILURE);
 		}
 		actualSocket=-1;
 	}
+
 	void demonize(){
 		pid_t child_pid = fork();
 		if(child_pid < 0) {
@@ -367,10 +360,13 @@ public:
 		loops++;
 		if ( loops >= checkPoint ) {
 			loops = 0;
+			try {
+				SSLBase::getSSLBase()->updateCertificatesIfNeeded();
+			} catch(...) {
+			}
 			int pid = fork();
 			if (pid == 0) {
 				try {
-					SSLBase::getSSLBase()->updateCertificatesIfNeeded();
 					processMonitor::cleanZombieTasks();
 				} catch(...) {
 				}
