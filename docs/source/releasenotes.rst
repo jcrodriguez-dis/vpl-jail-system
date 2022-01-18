@@ -5,17 +5,22 @@ Release notes
 V2.7.2
 ======
 
-This is mainly a bug-fix release of version 2.7.1.
+This is a bug-fix release of version 2.7.1 with small improvements.
 
 * This release includes a workaround to a problem with the limits of int
   in the XMLRPC protocol (the protocol uses int32).
   This problem avoids setting a memory size or file size larger than the maximum int32 value.
   A full solution to this problem requires modifications in the Moodle plugin side.
-  This workaround switches the size limit to the jail server local size limit when the problem is found.
-
-* Adds new tools to the installer: bc, mypy, pycodestyle, and pydocstyle.
+  This temporal workaround switches the size limit to the jail server local size limit
+  when the problem is found.
 
 * Uses long long int to represent memory a file size.
+
+* The installer includes the tool bc and new modules when installing python3:
+  mypy, pycodestyle, and pydocstyle.
+
+* The system checks for a change in the SSL certificate, reloading it if changed.
+  This allows updating certificates without stopping the service.
 
 V2.7.1
 ======
