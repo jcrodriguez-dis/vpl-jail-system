@@ -103,7 +103,7 @@ am_vpl_jail_server_OBJECTS = main.$(OBJEXT) vpl-jail-server.$(OBJEXT) \
 	jail.$(OBJEXT) httpServer.$(OBJEXT) redirector.$(OBJEXT) \
 	configurationFile.$(OBJEXT) configuration.$(OBJEXT) \
 	processMonitor.$(OBJEXT) socket.$(OBJEXT) websocket.$(OBJEXT) \
-	util.$(OBJEXT) cgroup.$(OBJEXT)
+	util.$(OBJEXT) xml.$(OBJEXT) cgroup.$(OBJEXT)
 vpl_jail_server_OBJECTS = $(am_vpl_jail_server_OBJECTS)
 vpl_jail_server_LDADD = $(LDADD)
 AM_V_P = $(am__v_P_@AM_V@)
@@ -127,7 +127,7 @@ am__depfiles_remade = ./$(DEPDIR)/cgroup.Po \
 	./$(DEPDIR)/main.Po ./$(DEPDIR)/processMonitor.Po \
 	./$(DEPDIR)/redirector.Po ./$(DEPDIR)/socket.Po \
 	./$(DEPDIR)/util.Po ./$(DEPDIR)/vpl-jail-server.Po \
-	./$(DEPDIR)/websocket.Po
+	./$(DEPDIR)/websocket.Po ./$(DEPDIR)/xml.Po
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
@@ -282,7 +282,7 @@ configuration.cpp configuration.h\
 processMonitor.cpp processMonitor.h\
 socket.cpp socket.h\
 websocket.cpp websocket.h\
-util.cpp util.h rpc.h xml.h jail_limits.h lock.h\
+util.cpp util.h datamessage.h rpc.h xmlrpc.h xml.h xml.cpp jail_limits.h lock.h\
 cgroup.cpp cgroup.h vplregex.h
 
 
@@ -390,6 +390,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/util.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vpl-jail-server.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/websocket.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xml.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -552,6 +553,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/util.Po
 	-rm -f ./$(DEPDIR)/vpl-jail-server.Po
 	-rm -f ./$(DEPDIR)/websocket.Po
+	-rm -f ./$(DEPDIR)/xml.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -609,6 +611,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/util.Po
 	-rm -f ./$(DEPDIR)/vpl-jail-server.Po
 	-rm -f ./$(DEPDIR)/websocket.Po
+	-rm -f ./$(DEPDIR)/xml.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

@@ -6,7 +6,7 @@
 
 #ifndef JAIL_INC_H
 #define JAIL_INC_H
-#include "rpc.h"
+#include "xmlrpc.h"
 #include <string>
 #include <fstream>
 using namespace std;

@@ -35,6 +35,7 @@ function runTests() {
 	local ferrors=errors.txt
 	local ntests="$#"
 	local n=1
+	local testresult
 	writeInfo "" "$ntests tests found"
 	while [ "$1" != "" ] ; do
 		test=$1
@@ -42,7 +43,8 @@ function runTests() {
 		{
 			"$test"
 		} 1>$fmessages 2>$ferrors
-		if [ "$?" != "0" ] ; then
+		testresult=$?
+		if [ "$testresult" != "0" -a "$testresult" != "111" ] ; then
 			writeError "Errors found" " $X_MARK"
 			head -n 10 $ferrors
 			head -n 10 $fmessages
@@ -51,6 +53,9 @@ function runTests() {
 			exit 1
 		else
 			writeCorrect "$CHECK_MARK"
+			if [ "$testresult" == "111" ] ; then
+				echo "$(cat $fmessages)"
+			fi
 		fi
 		((n=n+1))
 		shift
@@ -76,7 +81,7 @@ function Packaging_for_distribution() {
 function Unit_tests() {
 	local result
 	cd tests
-	make program-test
+	make program-test 1>/dev/null
 	if test -f program-test ; then
 		rm -R cgroup.test 2> /dev/null
 		cp -a cgroup cgroup.test
@@ -89,7 +94,7 @@ function Unit_tests() {
 			tail /var/log/syslog
 			return 1
 		else
-			return 0
+			return 111
 		fi
 	fi
 	cd ..
@@ -112,7 +117,7 @@ function WebSocket_tests() {
 			tail /var/log/syslog
 			return 1
 		else
-			return 0
+			return 111
 		fi
 	fi
 	cd ..

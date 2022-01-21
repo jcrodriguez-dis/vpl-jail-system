@@ -411,7 +411,7 @@ public:
 		return "";
 	}
 
-	static bool createDir(const string &path, uid_t user,size_t pos=1){ //absolute path
+	static bool createDir(const string &path, uid_t user,size_t pos = 1){ //absolute path
 		string curDir;
 		while((pos = path.find('/',pos)) != string::npos){
 			curDir=path.substr(0,pos++);
@@ -448,29 +448,29 @@ public:
 	/**
 	 * Write a file
 	 */
-	static void writeFile(string name,const string &data,uid_t user=0,size_t pos=0){
+	static void writeFile(string name, const string &data,uid_t user = 0,size_t pos = 0){
 		FILE *fd=fopen(name.c_str(),"wb");
-		if(fd==NULL){
-			string dir=getDir(name);
+		if (fd == NULL) {
+			string dir = getDir(name);
 			syslog(LOG_DEBUG,"path '%s' dir '%s'",name.c_str(), dir.c_str());
-			if(dir.size())
+			if (dir.size())
 				createDir(dir,user,pos);
-			fd=fopen(name.c_str(),"wb");
-			if(fd==NULL)
+			fd = fopen(name.c_str(),"wb");
+			if (fd == NULL)
 				throw HttpException(internalServerErrorCode
 						,"I can't write file");
 		}
-		if(data.size()>0 && fwrite(data.data(),data.size(),1,fd)!=1){
+		if (data.size() > 0 && fwrite(data.data(), data.size(), 1, fd) != 1) {
 			fclose(fd);
 			throw HttpException(internalServerErrorCode
 					,"I can't write to file");
 		}
 		fclose(fd);
-		if(lchown(name.c_str(),user,user))
-			syslog(LOG_ERR,"Can't change file owner %m");
-		bool isScript=name.size()>4 && name.rfind(".sh",name.size()-3)!=string::npos;
-		if(chmod(name.c_str(),isScript?0700:0600))
-			syslog(LOG_ERR,"Can't change file perm %m");
+		if (lchown(name.c_str(),user,user))
+			syslog(LOG_ERR, "Can't change file owner %m");
+		bool isScript = name.size() > 4 && name.rfind(".sh", name.size() - 3) !=string::npos;
+		if (chmod(name.c_str(), isScript ? 0700 : 0600))
+			syslog(LOG_ERR, "Can't change file perm %m");
 	}
 
 	/**

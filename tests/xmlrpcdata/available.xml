@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<methodCall>
+<methodName>available</methodName>
+<params>
+ <param>
+  <value>
+   <struct>
+    <member>
+     <name>maxmemory</name>
+     <value>
+      <int>10240</int>
+     </value>
+    </member>
+   </struct>
+  </value>
+ </param>
+</params>
+</methodCall>

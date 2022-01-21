@@ -24,7 +24,7 @@ public:
         cout << "Running " << tests.size() << " tests" << endl;
         for ( int i = 0; i <  tests.size(); i++) {
             BaseTest* test = tests[i];
-            cout << (i+1) << ") Test: " << test->name() << endl;
+            cout << (i+1) << ") Testing: " << test->name() << endl;
             try {
                 test->launch();
             } catch(const exception & e) {
@@ -52,7 +52,7 @@ public:
                 }
             }
 		}
-		cout << "*** Test Finish ***" << endl;
+		cout << "Unit tests finish" << endl;
         return fail? 1 : 0;
     }
 };

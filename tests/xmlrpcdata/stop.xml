@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<methodCall>
+<methodName>stop</methodName>
+<params>
+ <param>
+  <value>
+   <struct>
+    <member>
+     <name>adminticket</name>
+     <value>
+      <string>133355567641662</string>
+     </value>
+    </member>
+    <member>
+     <name>pluginversion</name>
+     <value>
+      <int>2021052513</int>
+     </value>
+    </member>
+   </struct>
+  </value>
+ </param>
+</params>
+</methodCall>

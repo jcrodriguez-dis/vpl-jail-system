@@ -15,189 +15,98 @@
 #include <syslog.h>
 
 #include "httpServer.h"
+#include "datamessage.h"
 
 using namespace std;
-/**
- * XML process XML data
- */
-class XML{
-	const string raw; //XML to process
-public:
-	/**
-	 * Node that represent a tag
-	 */
-	class TreeNode{
-		const string &raw;			//Reference to raw data
-		const string tag;			//Tag name, no parm
-		const size_t tag_offset;	//Tag offset in raw
-		size_t tag_len;				//Length of tag information
-		vector<TreeNode*> children;	//List of child tags
-	public:
-		TreeNode(const string &raw,string tag,size_t tag_offset):
-			raw(raw),tag(tag),tag_offset(tag_offset){
-			tag_len=0;
-		}
-		~TreeNode(){
-			for(size_t i=0; i<children.size(); i++){
-				delete children[i];
-			}
-		}
-		/**
-		 * return tag name
-		 */
-		string getName() const {
-			return tag;
-		}
-		/**
-		 * return raw tag content
-		 */
-		string getContent() const {
-			return raw.substr(tag_offset,tag_len);
-		}
-		/**
-		 * return content as int
-		 */
-		int getInt() const {
-			if (tag == "int") {
-				long long value = atoll(getContent().c_str());
-				if ( value > INT_MAX ) {
-					return INT_MAX;
-				}
-				return (int) value;
-			}
-			if (tag == "double") {
-				double value = atof(getContent().c_str());
-				if(value > INT_MAX) return INT_MAX;
-				return (int) value;
-			}
-			throw HttpException(badRequestCode
-					 ,"RPC/XML parse type error: expected int found "+tag);
-		}
-		/**
-		 * return content as long long
-		 */
-		long long getLong() const {
-			if (tag == "int") {
-				return atoll(getContent().c_str());
-			}
-			if (tag == "double") {
-				double value = atof(getContent().c_str());
-				if (value > numeric_limits<long long>::max())
-					return numeric_limits<long long>::max();
-				return (long long) value;
-			}
-			throw HttpException(badRequestCode
-					 ,"RPC/XML parse type error: expected int found "+tag);
-		}
-		/**
-		 * return content as string
-		 */
-		string getString() const {
-			if(tag=="string" || tag =="name")
-				return XML::decodeXML(getContent());
-			throw HttpException(badRequestCode
-					,"RPC/XML parse type error",
-					"expected string or name  and found "+tag);
-		}
-		size_t nchild() const{
-			return children.size();
-		}
-		TreeNode* child(size_t i) const{
-			if(i>=children.size())
-				throw HttpException(badRequestCode
-						,"RPC/XML parse child error");
-			return children[i];
-		}
-		TreeNode* child(string stag) const{
-			for(size_t i=0; i<children.size(); i++){
-				if(children[i]->getName()==stag)
-					return children[i];
-			}
-			throw HttpException(badRequestCode
-					,"RPC/XML search child by name error");
-		}
+class XML;
 
-		/**
-		 * Find the next tag from offset
-		 * @param raw string complete XML
-		 * @param offset search offset (update to the end of tag ">")
-		 * @param tag string found
-		 * @param btag where start the tag found
-		 */
-		static bool nextTag(const string &raw,size_t &offset, string &tag, size_t &btag){
-			while(offset<raw.size()){
-				if(raw[offset]=='<'){
-					btag=offset;
-					while(offset<raw.size()){
-						if(raw[offset]=='>'){ //tag from btag i to etag
-							tag=raw.substr(btag+1,offset-(btag+1));
-							//syslog(LOG_DEBUG,"tag: %s",tag.c_str());
-							offset++;
-							return true;
-						}
-						offset++;
-					}
-					throw HttpException(badRequestCode
-							,"XML parse error: unexpected end of XML");
-				}
-				offset++;
-			}
-			return false;
-		}
-		/**
-		 * parse content of a tag generating child
-		 */
-		size_t process(){
-			size_t offset=tag_offset,ontag;
-			string ntag;
-			while(nextTag(raw,offset,ntag,ontag)){
-				size_t l=ntag.size();
-				if(ntag[0] == '/'){
-					ntag.erase(0,1);
-					if(tag==ntag){
-						tag_len=ontag-tag_offset;
-						return offset;
-					}else{
-						throw HttpException(badRequestCode
-								,"XML parse error: unexpected end of tag",ntag);
-					}
-				}else if(ntag[l-1]=='/'){
-					ntag.erase(l-1,1);
-					children.push_back(new TreeNode(raw,ntag,offset));
-				}else{
-					TreeNode *child=new TreeNode(raw,ntag,offset);
-					children.push_back(child);
-					offset = child->process();
-				}
-			}
-			throw HttpException(badRequestCode
-					,"XML parse error: end tag not found");
-		}
-	};
-private:
-	TreeNode *root; //root node of parse xml
+class TreeNodeXML: public TreeNode {
 public:
-	//parse xml
-	XML(const string &raw):raw(raw){
+	TreeNodeXML(const string &raw, string tag, size_t tag_offset): TreeNode(raw, tag, tag_offset) {
+	}
+
+	string getString() const;
+};
+
+/**
+ * XML data message
+ */
+class XML: public DataMessage {
+	/**
+	 * Find the next tag from offset
+	 * @param raw string complete XML
+	 * @param offset search offset (update to the end of tag ">")
+	 * @param tag string found
+	 * @param btag where start the tag found
+	 */
+	static bool nextTag(const string &raw,size_t &offset, string &tag, size_t &btag){
+		while (offset < raw.size()) {
+			if (raw[offset] == '<') {
+				btag=offset;
+				while (offset < raw.size()) {
+					if (raw[offset] == '>'){ //tag from btag i to etag
+						tag = raw.substr(btag + 1, offset - (btag + 1));
+						//syslog(LOG_DEBUG,"tag: %s",tag.c_str());
+						offset++;
+						return true;
+					}
+					offset++;
+				}
+				throw HttpException(badRequestCode
+						,"XML parse error: unexpected end of XML");
+			}
+			offset++;
+		}
+		return false;
+	}
+	size_t processNode(TreeNode *node) {
+		size_t offset = node->getOffset(), ontag;
+		string ntag;
+		while (nextTag(raw, offset, ntag, ontag)) {
+			size_t l = ntag.size();
+			if (ntag[0] == '/') {
+				ntag.erase(0,1);
+				if (node->getName() == ntag) {
+					node->setLen(ontag - node->getOffset());
+					return offset;
+				} else {
+					throw HttpException(badRequestCode
+							,"XML parse error: unexpected end of tag",ntag);
+				}
+			} else if (ntag[l - 1] == '/') {
+				ntag.erase(l - 1,1);
+				node->addChild(new TreeNodeXML(raw,ntag,offset));
+			} else {
+				TreeNode *child = new TreeNodeXML(raw, ntag, offset);
+				node->addChild(child);
+				offset = processNode(child);
+			}
+		}
+		throw HttpException(badRequestCode
+				,"XML parse error: end tag not found");
+	}
+	/**
+	 * parse content of a tag generating child
+	 */
+	TreeNode *processRawData() {
 		size_t offset=0, aux;
-		if(raw.find("</methodCall>",raw.size()-13) != string::npos){
+		if(raw.find("</methodCall>", raw.size() - 13) != string::npos){
 			syslog(LOG_INFO,"XML: data pass end tag of methodcall");
 		}
 		string tag;
-		if(!TreeNode::nextTag(raw,offset,tag,aux) || !TreeNode::nextTag(raw,offset,tag,aux)){
+		if(!nextTag(raw, offset, tag, aux) || !nextTag(raw,offset,tag,aux)){
 			throw HttpException(badRequestCode
 					,"XML parse error: start tag not found");
 		}
-		root = new TreeNode(raw,tag,offset);
-		root->process();
+		TreeNode* newroot = new TreeNodeXML(raw, tag, offset);
+		processNode(newroot);
+		return newroot;
 	}
-
-	~XML(){
-		delete root;
-	}
-
-	const TreeNode *getRoot(){
-		return root;
+	
+public:
+	//parse xml
+	XML(const string &raw): DataMessage(raw) {
+		root = processRawData();
 	}
 
 	static string encodeXML(const string &data){
@@ -290,8 +199,5 @@ public:
 	}
 
 };
-
-//mapstruct map of RPC-XML struct value
-typedef map<string, const XML::TreeNode *> mapstruct;
 
 #endif

@@ -45,17 +45,21 @@ void HttpJailServer::validateRequest(string expected_path){
 }
 
 string HttpJailServer::receive(){
-	if(socket->getHeader("Expect")== "100-continue"){
+	if (socket->getHeader("Expect") == "100-continue") {
 		sendCode(continueCode);
 	}
-	int sizeToRead=atoi(socket->getHeader("Content-Length").c_str());
+	int sizeToRead = atoi(socket->getHeader("Content-Length").c_str());
 	if(sizeToRead != 0){
 		if(sizeToRead > Configuration::getConfiguration()->getRequestMaxSize()){
 			throw HttpException(requestEntityTooLargeCode
 					,"http Request size too large"
 					,socket->getHeader("Content-Length"));
 		}
-		return socket->receive(sizeToRead);
+		string payload = socket->receive(sizeToRead);
+		#ifdef LOGPAYLOAD
+		Util::writeFile("/tmp/payload" + Util::itos(clock()) + ".txt", payload);
+		#endif
+		return payload;
 	}
 	return "";
 }

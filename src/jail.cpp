@@ -44,10 +44,11 @@ string Jail::commandAvailable(long long memRequested){
 }
 
 void Jail::saveParseFiles(processMonitor &pm, mapstruct &parsedata) {
-	mapstruct files = RPC::getFiles(parsedata["files"]);
+	XMLRPC rpc;
+	mapstruct files = rpc.getFiles(parsedata["files"]);
 	mapstruct fileencoding;
 	if ( parsedata.find("fileencoding") != parsedata.end() ) {
-		fileencoding = RPC::getFiles(parsedata["fileencoding"]);
+		fileencoding = rpc.getFiles(parsedata["fileencoding"]);
 	}
 	//Save files to execution dir, decode data if needed
 	for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
@@ -103,7 +104,8 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 			bool compiled = pm.FileExists(VPL_EXECUTION) || pm.FileExists(VPL_WEXECUTION) || pm.FileExists(VPL_WEBEXECUTION);
 			if (compiled) {
 				//Delete files
-				mapstruct filestodelete = RPC::getFiles(parsedata["filestodelete"]);
+				XMLRPC rpc;
+				mapstruct filestodelete = rpc.getFiles(parsedata["filestodelete"]);
 				for (mapstruct::iterator i = filestodelete.begin(); i != filestodelete.end(); i++) {
 					string name = i->first;
 					syslog(LOG_INFO, "Delete file %s", name.c_str());
@@ -163,11 +165,12 @@ bool Jail::commandUpdate(string adminticket, mapstruct &parsedata){
 	pid_t pid=fork();
 	if(pid==0){ //new process
 		try {
+			XMLRPC rpc;
 			syslog(LOG_INFO,"parse files %lu", (long unsigned int)parsedata.size());
-			mapstruct files = RPC::getFiles(parsedata["files"]);
+			mapstruct files = rpc.getFiles(parsedata["files"]);
 			mapstruct fileencoding;
 			if ( parsedata.find("fileencoding") != parsedata.end() ) {
-				fileencoding = RPC::getFiles(parsedata["fileencoding"]);
+				fileencoding = rpc.getFiles(parsedata["fileencoding"]);
 			}
 			//Save files to execution dir and options, decode data if needed
 			for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
@@ -582,8 +585,9 @@ void Jail::process(Socket *socket){
 			server.validateRequest(httpURLPath);
 			string data = server.receive();
 			XML xml(data);
-			string request = RPC::methodName(xml.getRoot());
-			mapstruct parsedata = RPC::getData(xml.getRoot());
+			XMLRPC rpc;
+			string request = rpc.methodName(xml.getRoot());
+			mapstruct parsedata = rpc.getData(xml.getRoot());
 			syslog(LOG_INFO, "Execute request '%s'", request.c_str());
 			if (request == "available") {
 				ExecutionLimits jailLimits = configuration->getLimits();
@@ -592,7 +596,7 @@ void Jail::process(Socket *socket){
 				memRequested = memRequested > 0 ? memRequested : configuration->getLimits().maxmemory;
 				string status = commandAvailable(memRequested);
 				syslog(LOG_INFO, "Status: '%s'", status.c_str());
-				server.send200(RPC::availableResponse(status,
+				server.send200(rpc.availableResponse(status,
 				        processMonitor::requestsInProgress(),
 						jailLimits.maxtime,
 						jailLimits.maxfilesize,
@@ -602,7 +606,7 @@ void Jail::process(Socket *socket){
 			} else if(request == "request") {
 				string adminticket, monitorticket, executionticket;
 				commandRequest(parsedata, adminticket, monitorticket, executionticket);
-				server.send200(RPC::requestResponse(adminticket,
+				server.send200(rpc.requestResponse(adminticket,
 								monitorticket,executionticket,
 								configuration->getPort(),
 								configuration->getSecurePort()));
@@ -611,7 +615,7 @@ void Jail::process(Socket *socket){
 				bool executed,interactive;
 				adminticket=parsedata["adminticket"]->getString();
 				commandGetResult(adminticket, compilation, execution, executed, interactive);
-				server.send200(RPC::getResultResponse(compilation, execution, executed, interactive));
+				server.send200(rpc.getResultResponse(compilation, execution, executed, interactive));
 			} else if(request == "running") {
 				string adminticket;
 				adminticket=parsedata["adminticket"]->getString();
@@ -620,16 +624,16 @@ void Jail::process(Socket *socket){
 					// Restores behaviour of < 2.3 version
 					throw "Ticket invalid";
 				}
-				server.send200(RPC::runningResponse(running));
+				server.send200(rpc.runningResponse(running));
 			} else if(request == "stop") {
 				string adminticket;
 				adminticket=parsedata["adminticket"]->getString();
 				commandStop(adminticket);
-				server.send200(RPC::stopResponse());
+				server.send200(rpc.stopResponse());
 			} else if(request == "update") {
 				string adminticket=parsedata["adminticket"]->getString();
 				bool ok = commandUpdate(adminticket, parsedata);
-				server.send200(RPC::updateResponse(ok));
+				server.send200(rpc.updateResponse(ok));
 			} else { //Error
 				throw HttpException(badRequestCode, "Unknown request:" + request);
 			}
