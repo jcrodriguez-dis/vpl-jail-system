@@ -534,7 +534,8 @@ else
         vpl_install "Go programming language compiler" golang
         vpl_install "Haxe programming language" haxe
         vpl_install "JQuery JavaScript Lib" libjs-jquery
-        vpl_install "JQuery-UI JavaScript Lib" libjs-jquery-ui 
+        vpl_install "JQuery-UI JavaScript Lib" libjs-jquery-ui
+		vpl_install "Julia" julia
         vpl_install "Lua compiler 5.1" lua5.1
         vpl_install "R statistical computation and graphics system (GNU)" r-base
         vpl_install "MIPS R2000/R3000 emulator" spim
