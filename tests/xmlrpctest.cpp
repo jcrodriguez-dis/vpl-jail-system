@@ -12,20 +12,18 @@
 class XMLRPCTest: public BaseTest {
 	void testAvailable() {
 		string rawdata = Util::readFile("./xmlrpcdata/available.xml");
-		XML xml(rawdata);
-		XMLRPC rpc;
-		string method = rpc.methodName(xml.getRoot());
+		XMLRPC rpc(rawdata);
+		string method = rpc.getMethodName();
 		assert(method == "available");
-		mapstruct data = rpc.getData(xml.getRoot());
+		mapstruct data = rpc.getData();
 		assert(data["maxmemory"]->getLong() == 10240);
 	}
 
 	void innerTest(string file, string method, string adminticket, long long pluginversion) {
 		string rawdata = Util::readFile("./xmlrpcdata/" + file);
-		XML xml(rawdata);
-		XMLRPC rpc;
-		assert(rpc.methodName(xml.getRoot()) == method);
-		mapstruct data = rpc.getData(xml.getRoot());
+		XMLRPC rpc(rawdata);
+		assert(rpc.getMethodName() == method);
+		mapstruct data = rpc.getData();
 		assert(data["adminticket"]->getString() == adminticket);
 		assert(data["pluginversion"]->getLong() == pluginversion);
 	}
@@ -44,11 +42,10 @@ class XMLRPCTest: public BaseTest {
 
 	void testRequest() {
 		string rawdata = Util::readFile("./xmlrpcdata/request.xml");
-		XML xml(rawdata);
-		XMLRPC rpc;
-		string method = rpc.methodName(xml.getRoot());
+		XMLRPC rpc(rawdata);
+		string method = rpc.getMethodName();
 		assert(method == "request");
-		mapstruct data = rpc.getData(xml.getRoot());
+		mapstruct data = rpc.getData();
 		assert(data["maxtime"]->getLong() == 240);
 		assert(data["maxfilesize"]->getLong() == 67108864);
 		assert(data["maxmemory"]->getLong() == -2147483648);
@@ -62,7 +59,7 @@ class XMLRPCTest: public BaseTest {
 		assert(data["lang"]->getString() == "en_US.UTF-8");
 		assert(data["pluginversion"]->getLong() == 2021052513L);
 
-		mapstruct files = rpc.getFiles(data["files"]);
+		mapstruct files = rpc.getFiles();
 		string filecontent;
 		filecontent = "#!/bin/bash&#10;# This file is part of VPL for Moodle - http://vpl.dis.ulpgc.es/&#10;# Script for running C++ language&#10;# Copyright (C) 2012 Juan Carlos Rodr&#195;&#173;guez-del-Pino&#10;# License http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later&#10;# Author Juan Carlos Rodr&#195;&#173;guez-del-Pino &#60;jcrodriguez@dis.ulpgc.es&#62;&#10;&#10;#@vpl_script_description Using default g++ with math and util libs&#10;#load common script and check programs&#10;. common_script.sh&#10;check_program g++&#10;if [ &#34;$1&#34; == &#34;version&#34; ] ; then&#10;&#9;echo &#34;#!/bin/bash&#34; &#62; vpl_execution&#10;&#9;echo &#34;g++ --version | head -n2&#34; &#62;&#62; vpl_execution&#10;&#9;chmod +x vpl_execution&#10;&#9;exit&#10;fi &#10;get_source_files cpp C&#10;# Generate file with source files&#10;generate_file_of_files .vpl_source_files&#10;# Compile&#10;g++ -fno-diagnostics-color -o vpl_execution $2 @.vpl_source_files -lm -lutil&#10;rm .vpl_source_files&#10;";
 		filecontent = XML::decodeXML(filecontent);
@@ -78,11 +75,11 @@ class XMLRPCTest: public BaseTest {
 		assert(files["common_script.sh"]->getString() == filecontent);
 		assert(files.size() == 4);
 
-		mapstruct filestodelete = rpc.getFiles(data["filestodelete"]);
+		mapstruct filestodelete = rpc.getFileToDelete();
 		assert(filestodelete["vpl_run.sh"]->getLong() == 1);
 		assert(filestodelete.size() == 1);
 
-		mapstruct fileencoding = rpc.getFiles(data["fileencoding"]);
+		mapstruct fileencoding = rpc.getFileEncoding();
 		assert(fileencoding["vpl_run.sh"]->getLong() == 0);
 		assert(fileencoding["a.cpp"]->getLong() == 0);
 		assert(fileencoding["vpl_environment.sh"]->getLong() == 0);

@@ -15,7 +15,31 @@
  * Class to prepare and process XML-RPC messages
  */
 class XMLRPC: public RPC {
+	XML *xml;
+	TreeNode *method;
+	mapstruct data;
+	void processRoot() {
+		if(root->getName() == "methodCall"){
+			if(root->nchild() != 2) {
+				throw HttpException(badRequestCode,"RPC/XML root must have 2 attributes");
+			}
+			this->method = this->root->child("methodName");
+			this->data = getStructMembers(this->root->child("params")->child("param")->child("value")->child("struct"));
+		} else {
+			throw HttpException(badRequestCode, "RPC/XML methodName parse error");
+		}
+	}
 public:
+	XMLRPC(string rawData) {
+		this->xml = new XML(rawData);
+		this->root = xml->getRoot();
+		processRoot();
+	}
+
+	~XMLRPC() {
+		delete this->xml;
+	}
+
 	string responseWraper(string response) {
 		return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
 				"<methodResponse>\n"
@@ -106,22 +130,17 @@ public:
 	/**
 	 * return method call name
 	 */
-	string methodName(const TreeNode *root) {
-		if(root->getName() == "methodCall"){
-			const TreeNode *method=root->child("methodName");
-			return method->getContent();
-		}
-		throw HttpException(badRequestCode
-				,"RPC/XML methodName parse error");
+	string getMethodName() {
+		return this->method->getRawContent();
 	}
 	/**
 	 * return struct value as a mapstruct
 	 */
-	mapstruct getStructMembers(const TreeNode *st) {
+	static mapstruct getStructMembers(const TreeNode *st) {
 		if(st->getName() == "struct"){
 			mapstruct ret;
 			for(size_t i=0; i< st->nchild(); i++){
-				ret[st->child(i)->child("name")->getString()]=st->child(i)->child("value")->child(0);
+				ret[st->child(i)->child("name")->getString()] = st->child(i)->child("value")->child(0);
 			}
 			return ret;
 		}else if(st->getName() == "array" && st->nchild() == 0) {
@@ -130,25 +149,40 @@ public:
 			return ret;
 		}
 		syslog(LOG_ERR,"Expected struct/array(0) found %s",st->getName().c_str());
-		throw HttpException(badRequestCode
-				,"RPC/XML getStructMembers parse error");
+		throw HttpException(badRequestCode, "RPC/XML getStructMembers parse error " + st->getName() + " " + st->getRawContent());
 	}
 	/**
 	 * return struct of method call data as mapstruct
 	 */
-	mapstruct getData(const TreeNode *root) {
-		if(root->getName() == "methodCall") {
-			const TreeNode *st=root->child("params")->child("param")->child("value")->child("struct");
-			return getStructMembers(st);
-		}
-		throw HttpException(badRequestCode
-				,"RPC/XML getData parse error");
+	mapstruct getData() {
+		return this->data;
 	}
 	/**
 	 * return list of files as mapstruct
 	 */
-	mapstruct getFiles(const TreeNode *files) {
-		return getStructMembers(files);
+	mapstruct getFiles() {
+		return getStructMembers(this->data["files"]);
+	}
+	/**
+	 * return list of files encoding as mapstruct
+	 */
+	mapstruct getFileEncoding() {
+		if (this->data.find("fileencoding") != this->data.end()) {
+			return getStructMembers(this->data["fileencoding"]);
+		} else {
+			return mapstruct();
+		}
+	}
+
+	/**
+	 * return list of files to delete as mapstruct
+	 */
+	mapstruct getFileToDelete() {
+		if (this->data.find("filestodelete") != this->data.end()) {
+			return getStructMembers(this->data["filestodelete"]);
+		} else {
+			return mapstruct();
+		}
 	}
 
 };

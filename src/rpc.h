@@ -5,7 +5,7 @@
  **/
 
 #ifndef RPC_INC_H
-#define PPC_INC_H
+#define RPC_INC_H
 
 #include "xml.h"
 #include "util.h"
@@ -14,7 +14,12 @@
  * Class to prepare and process XML-RPC messages
  */
 class RPC {
+protected:
+	TreeNode *root;
 public:
+	RPC() {
+		this->root = NULL;
+	}
 	/**
 	 * return a ready response
 	 */
@@ -31,50 +36,24 @@ public:
 	/**
 	 * return method call name
 	 */
-	virtual string methodName(const TreeNode *root){
-		if(root->getName() == "methodCall"){
-			const TreeNode *method=root->child("methodName");
-			return method->getContent();
-		}
-		throw HttpException(badRequestCode
-				,"RPC/XML methodName parse error");
-	}
-	/**
-	 * return struct value as a mapstruct
-	 */
-	virtual mapstruct getStructMembers(const TreeNode *st){
-		if(st->getName() == "struct"){
-			mapstruct ret;
-			for(size_t i=0; i< st->nchild(); i++){
-				ret[st->child(i)->child("name")->getString()]=st->child(i)->child("value")->child(0);
-			}
-			return ret;
-		}else if(st->getName() == "array" && st->nchild() == 0){
-			//An empty array
-			mapstruct ret;
-			return ret;
-		}
-		syslog(LOG_ERR,"Expected struct/array(0) found %s",st->getName().c_str());
-		throw HttpException(badRequestCode
-				,"RPC/XML getStructMembers parse error");
-	}
+	virtual string getMethodName() = 0;
 	/**
 	 * return struct of method call data as mapstruct
 	 */
-	virtual mapstruct getData(const TreeNode *root){
-		if(root->getName() == "methodCall"){
-			const TreeNode *st=root->child("params")->child("param")->child("value")->child("struct");
-			return getStructMembers(st);
-		}
-		throw HttpException(badRequestCode
-				,"RPC/XML getData parse error");
-	}
+	virtual mapstruct getData() = 0;
 	/**
 	 * return list of files as mapstruct
 	 */
-	virtual mapstruct getFiles(const TreeNode *files){
-		return getStructMembers(files);
-	}
+	virtual mapstruct getFiles() = 0;
 
+	/**
+	 * return list of files encoding as mapstruct
+	 */
+	virtual mapstruct getFileEncoding() = 0;
+
+	/**
+	 * return list of files to delete as mapstruct
+	 */
+	virtual mapstruct getFileToDelete() = 0;
 };
 #endif

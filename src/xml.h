@@ -15,7 +15,7 @@
 #include <syslog.h>
 
 #include "httpServer.h"
-#include "datamessage.h"
+#include "requestmessage.h"
 
 using namespace std;
 class XML;
@@ -31,7 +31,7 @@ public:
 /**
  * XML data message
  */
-class XML: public DataMessage {
+class XML: public RequestMessage {
 	/**
 	 * Find the next tag from offset
 	 * @param raw string complete XML
@@ -39,10 +39,10 @@ class XML: public DataMessage {
 	 * @param tag string found
 	 * @param btag where start the tag found
 	 */
-	static bool nextTag(const string &raw,size_t &offset, string &tag, size_t &btag){
+	static bool nextTag(const string &raw, size_t &offset, string &tag, size_t &btag){
 		while (offset < raw.size()) {
 			if (raw[offset] == '<') {
-				btag=offset;
+				btag = offset;
 				while (offset < raw.size()) {
 					if (raw[offset] == '>'){ //tag from btag i to etag
 						tag = raw.substr(btag + 1, offset - (btag + 1));
@@ -52,8 +52,7 @@ class XML: public DataMessage {
 					}
 					offset++;
 				}
-				throw HttpException(badRequestCode
-						,"XML parse error: unexpected end of XML");
+				throw HttpException(badRequestCode, "XML parse error: unexpected end of XML");
 			}
 			offset++;
 		}
@@ -71,11 +70,11 @@ class XML: public DataMessage {
 					return offset;
 				} else {
 					throw HttpException(badRequestCode
-							,"XML parse error: unexpected end of tag",ntag);
+							,"XML parse error: unexpected end of tag", ntag);
 				}
 			} else if (ntag[l - 1] == '/') {
-				ntag.erase(l - 1,1);
-				node->addChild(new TreeNodeXML(raw,ntag,offset));
+				ntag.erase(l - 1, 1);
+				node->addChild(new TreeNodeXML(raw, ntag, offset));
 			} else {
 				TreeNode *child = new TreeNodeXML(raw, ntag, offset);
 				node->addChild(child);
@@ -90,7 +89,7 @@ class XML: public DataMessage {
 	 */
 	TreeNode *processRawData() {
 		size_t offset=0, aux;
-		if(raw.find("</methodCall>", raw.size() - 13) != string::npos){
+		if(raw.find("</methodCall>", raw.size() - 13) == string::npos){
 			syslog(LOG_INFO,"XML: data pass end tag of methodcall");
 		}
 		string tag;
@@ -105,7 +104,7 @@ class XML: public DataMessage {
 	
 public:
 	//parse xml
-	XML(const string &raw): DataMessage(raw) {
+	XML(const string &raw): RequestMessage(raw) {
 		root = processRawData();
 	}
 
@@ -161,43 +160,40 @@ public:
 		return ret;
 	}
 
-	static string decodeXML(const string & data){
+	static string decodeXML(const string & data) {
 		string ret;
-		for(size_t i=0; i<data.size(); i++){
-			if(data[i]=='&'){
+		for(size_t i = 0; i < data.size(); i++) {
+			if(data[i] == '&') {
 				i++;
-				size_t begin=i;
-				for(;i<data.size(); i++){
-					if(data[i]==';'){
-						string code=data.substr(begin,i-begin);
-						if(code[0]=='#'){
-							ret += (unsigned char)atoi(1+code.c_str());
-						}else if(code=="amp"){
+				size_t begin = i;
+				for(; i < data.size(); i++) {
+					if(data[i] == ';') { 
+						string code = data.substr(begin, i - begin);
+						if(code[0] == '#') {
+							ret += (unsigned char) atoi(1 + code.c_str());
+						} else if(code == "amp") {
 							ret += '&';
-						}else if(code=="lt"){
+						} else if(code == "lt") {
 							ret += '<';
-						}else if(code=="gt"){
+						} else if(code == "gt") {
 							ret += '>';
-						}else if(code=="apos"){
+						} else if(code == "apos") {
 							ret += '\'';
-						}else if(code=="quot"){
+						} else if(code == "quot") {
 							ret += '"';
-						}
-						else throw HttpException(badRequestCode
-								,"XML string decode error");
+						} else throw HttpException(badRequestCode, "XML string decode error");
 						break;
 					}
 				}
-				if(i>=data.size())
-					throw HttpException(badRequestCode
-							,"XML string decode error");
-			}else{
-				ret+=data[i];
+				if(i >= data.size()) {
+					throw HttpException(badRequestCode, "XML string decode error");
+				}
+			} else {
+				ret += data[i];
 			}
 		}
 		return ret;
 	}
-
 };
 
 #endif

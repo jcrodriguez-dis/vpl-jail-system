@@ -43,13 +43,9 @@ string Jail::commandAvailable(long long memRequested){
 	return "ready";
 }
 
-void Jail::saveParseFiles(processMonitor &pm, mapstruct &parsedata) {
-	XMLRPC rpc;
-	mapstruct files = rpc.getFiles(parsedata["files"]);
-	mapstruct fileencoding;
-	if ( parsedata.find("fileencoding") != parsedata.end() ) {
-		fileencoding = rpc.getFiles(parsedata["fileencoding"]);
-	}
+void Jail::saveParseFiles(processMonitor &pm, RPC &rpc) {
+	mapstruct files = rpc.getFiles();
+	mapstruct fileencoding = rpc.getFileEncoding();
 	//Save files to execution dir, decode data if needed
 	for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
 		string name = i->first;
@@ -67,7 +63,8 @@ void Jail::saveParseFiles(processMonitor &pm, mapstruct &parsedata) {
 	}
 }
 
-ExecutionLimits Jail::getParseExecutionLimits(mapstruct &parsedata) {
+ExecutionLimits Jail::getParseExecutionLimits(RPC &rpc) {
+	mapstruct parsedata = rpc.getData();
 	ExecutionLimits executionLimits = Configuration::getConfiguration()->getLimits();
 	syslog(LOG_INFO,"Reading parms");
 	executionLimits.syslog("Config");
@@ -81,16 +78,17 @@ ExecutionLimits Jail::getParseExecutionLimits(mapstruct &parsedata) {
 	return executionLimits;
 }
 
-void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &monitorticket,string &executionticket){
+void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,string &executionticket){
+	mapstruct parsedata = rpc.getData();
 	syslog(LOG_INFO,"Request for process");
 	processMonitor pm(adminticket, monitorticket, executionticket);
 	pid_t pid=fork();
 	if(pid==0){ //new process
 		try {
 			syslog(LOG_INFO,"Parse data %lu", (long unsigned int)parsedata.size());
-			saveParseFiles(pm, parsedata);
+			saveParseFiles(pm, rpc);
 			syslog(LOG_INFO,"Reading parms");
-			ExecutionLimits executionLimits = getParseExecutionLimits(parsedata);
+			ExecutionLimits executionLimits = getParseExecutionLimits(rpc);
 			string vpl_lang = parsedata["lang"]->getString();
 			syslog(LOG_DEBUG, "VPL_LANG %s", vpl_lang.c_str());
 			bool interactive = parsedata["interactive"]->getInt() > 0;
@@ -104,8 +102,7 @@ void Jail::commandRequest(mapstruct &parsedata, string &adminticket,string &moni
 			bool compiled = pm.FileExists(VPL_EXECUTION) || pm.FileExists(VPL_WEXECUTION) || pm.FileExists(VPL_WEBEXECUTION);
 			if (compiled) {
 				//Delete files
-				XMLRPC rpc;
-				mapstruct filestodelete = rpc.getFiles(parsedata["filestodelete"]);
+				mapstruct filestodelete = rpc.getFileToDelete();
 				for (mapstruct::iterator i = filestodelete.begin(); i != filestodelete.end(); i++) {
 					string name = i->first;
 					syslog(LOG_INFO, "Delete file %s", name.c_str());
@@ -160,18 +157,14 @@ void Jail::commandGetResult(string adminticket, string &compilation,
 	interactive = pm.isInteractive();
 }
 
-bool Jail::commandUpdate(string adminticket, mapstruct &parsedata){
+bool Jail::commandUpdate(string adminticket, RPC &rpc){
 	processMonitor pm(adminticket);
 	pid_t pid=fork();
 	if(pid==0){ //new process
 		try {
-			XMLRPC rpc;
-			syslog(LOG_INFO,"parse files %lu", (long unsigned int)parsedata.size());
-			mapstruct files = rpc.getFiles(parsedata["files"]);
-			mapstruct fileencoding;
-			if ( parsedata.find("fileencoding") != parsedata.end() ) {
-				fileencoding = rpc.getFiles(parsedata["fileencoding"]);
-			}
+			mapstruct files = rpc.getFiles();
+			syslog(LOG_INFO,"parse files %lu", (long unsigned int)files.size());
+			mapstruct fileencoding = rpc.getFileEncoding();
 			//Save files to execution dir and options, decode data if needed
 			for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
 				string name = i->first;
@@ -584,10 +577,15 @@ void Jail::process(Socket *socket){
 			}
 			server.validateRequest(httpURLPath);
 			string data = server.receive();
-			XML xml(data);
-			XMLRPC rpc;
-			string request = rpc.methodName(xml.getRoot());
-			mapstruct parsedata = rpc.getData(xml.getRoot());
+			RPC *prpc;
+			if (data[0] == '<') {
+				prpc = new XMLRPC(data);
+			} else {
+				prpc = new JSONRPC(data);
+			}
+			RPC& rpc = *prpc;
+			string request = rpc.getMethodName();
+			mapstruct parsedata = rpc.getData();
 			syslog(LOG_INFO, "Execute request '%s'", request.c_str());
 			if (request == "available") {
 				ExecutionLimits jailLimits = configuration->getLimits();
@@ -605,7 +603,7 @@ void Jail::process(Socket *socket){
 						configuration->getSecurePort()));
 			} else if(request == "request") {
 				string adminticket, monitorticket, executionticket;
-				commandRequest(parsedata, adminticket, monitorticket, executionticket);
+				commandRequest(rpc, adminticket, monitorticket, executionticket);
 				server.send200(rpc.requestResponse(adminticket,
 								monitorticket,executionticket,
 								configuration->getPort(),
@@ -632,7 +630,7 @@ void Jail::process(Socket *socket){
 				server.send200(rpc.stopResponse());
 			} else if(request == "update") {
 				string adminticket=parsedata["adminticket"]->getString();
-				bool ok = commandUpdate(adminticket, parsedata);
+				bool ok = commandUpdate(adminticket, rpc);
 				server.send200(rpc.updateResponse(ok));
 			} else { //Error
 				throw HttpException(badRequestCode, "Unknown request:" + request);

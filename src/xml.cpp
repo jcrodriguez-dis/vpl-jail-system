@@ -8,7 +8,7 @@
 
 string TreeNodeXML::getString() const {
 	if (tag == "string" || tag == "name")
-		return XML::decodeXML(getContent());
+		return XML::decodeXML(getRawContent());
 	throw HttpException(badRequestCode
 			, "Message data type error"
 			, "Expected string and found " + tag );

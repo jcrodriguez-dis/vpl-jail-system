@@ -4,8 +4,8 @@
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 
-#ifndef XML_INC_H
-#define XML_INC_H
+#ifndef JSON_INC_H
+#define JSON_INC_H
 #include <stdlib.h>
 #include <iconv.h>
 #include <limits.h>
@@ -16,7 +16,7 @@
 #include <syslog.h>
 
 #include "httpServer.h"
-#include "datamessage.h"
+#include "requestmessage.h"
 
 using namespace std;
 class JSON;
@@ -32,82 +32,166 @@ public:
 /**
  * XML data message
  */
-class JSON: public DataMessage {
-	static string whiteSpaces;
+class JSON: public RequestMessage {
+
+	static bool isWhiteSpace(char c) {
+		return c == ' ' || c == '\n' || c == '\r' || c == '\t';
+	}
 	/**
-	 * Find the next tag from offset
+	 * Advance offset ignoring white spaces
 	 * @param raw string complete JSON
-	 * @param offset search offset
-	 * @param tag string found
-	 * @param btag where start the tag found
+	 * @param offset advance start point
+	 * @return if no limit reached
 	 */
-	static bool nextTag(const string &raw,size_t &offset, string &tag, size_t &btag){
-		while (offset < raw.size()) {
-			if (raw[offset] == '<') {
-				btag=offset;
-				while (offset < raw.size()) {
-					if (raw[offset] == '>'){ //tag from btag i to etag
-						tag = raw.substr(btag + 1, offset - (btag + 1));
-						//syslog(LOG_DEBUG,"tag: %s",tag.c_str());
-						offset++;
-						return true;
-					}
-					offset++;
-				}
-				throw HttpException(badRequestCode
-						,"XML parse error: unexpected end of XML");
-			}
+	static void ignoreWhiteSpaces(const string &raw,size_t &offset){
+		size_t limit = raw.size();
+		while (offset < limit && isWhiteSpace(raw[offset])) {
 			offset++;
 		}
-		return false;
+		if (offset >= limit) {
+			throw HttpException(badRequestCode, "JSON parse error: unexpected en of JSON");
+		};
 	}
-	size_t processNode(TreeNode *node) {
-		size_t offset = node->getOffset(), ontag;
-		string ntag;
-		while (nextTag(raw, offset, ntag, ontag)) {
-			size_t l = ntag.size();
-			if (ntag[0] == '/') {
-				ntag.erase(0,1);
-				if (node->getName() == ntag) {
-					node->setLen(ontag - node->getOffset());
-					return offset;
-				} else {
-					throw HttpException(badRequestCode
-							,"XML parse error: unexpected end of tag",ntag);
+
+	void ignoreWhiteSpaces(size_t &offset){
+		ignoreWhiteSpaces(raw, offset);
+	}
+
+	size_t processObjectNode(TreeNode *node) {
+		size_t length = raw.size();
+		size_t offset = node->getOffset() + 1;
+		while( offset < length) {
+			ignoreWhiteSpaces(offset);
+			char c = raw[offset];
+			if ( c == '}' ) {
+				node->setLen(offset - node->getOffset());
+				return offset + 1;
+			} else if ( c == '"' ) {
+				TreeNodeJSON name(raw, "name", offset);
+				offset = processNode(&name);
+				ignoreWhiteSpaces(offset);
+				if ( raw[offset] != ':' ) {
+					throw HttpException(badRequestCode, "JSON parse error: expected ':' not found");
 				}
-			} else if (ntag[l - 1] == '/') {
-				ntag.erase(l - 1,1);
-				node->addChild(new TreeNodeJSON(raw,ntag,offset));
+				offset++;
+				ignoreWhiteSpaces(offset);
+				TreeNode* newNodeValue = new TreeNodeJSON(raw, "value", offset);
+				offset = processNode(newNodeValue);
+				newNodeValue->setTag(name.getString());
+				node->addChild(newNodeValue);
+				ignoreWhiteSpaces(offset);
+				if ( raw[offset] == ',' ) {
+					offset++;
+				} else if ( raw[offset] != '}' ) {
+					throw HttpException(badRequestCode, "JSON parse error: Object bad format");
+				}
+
 			} else {
-				TreeNode *child = new TreeNodeJSON(raw, ntag, offset);
-				node->addChild(child);
-				offset = processNode(child);
+				throw HttpException(badRequestCode, "JSON parse error: unexpected char in object. Offset " + Util::itos(offset));
 			}
 		}
-		throw HttpException(badRequestCode
-				,"XML parse error: end tag not found");
+		throw HttpException(badRequestCode, "JSON parse error: end of object not found");
 	}
+
+	size_t processArrayNode(TreeNode *node) {
+		size_t length = raw.size();
+		size_t offset = node->getOffset() + 1;
+		while (offset < length) {
+			ignoreWhiteSpaces(offset);
+			char c = raw[offset];
+			if ( c == ']' ) {
+				node->setLen(offset - node->getOffset());
+				return offset + 1;
+			} else {
+				TreeNode* newNode = new TreeNodeJSON(raw, "node", offset);
+				offset = processNode(newNode);
+				node->addChild(newNode);
+				ignoreWhiteSpaces(offset);
+				if ( raw[offset] == ',' ) {
+					offset++;
+				} else if ( raw[offset] != ']' ) {
+					throw HttpException(badRequestCode, "JSON parse error: Array bad format");
+				}
+			}
+		}
+		throw HttpException(badRequestCode, "JSON parse error: end of array not found");
+	}
+
+	size_t processStringNode(TreeNode *node) {
+		size_t length = raw.size();
+		node->setOffset(node->getOffset() + 1);
+		for(size_t offset = node->getOffset(); offset < length; offset++) {
+			char c = raw[offset];
+			if ( c == '\\' ) {
+				offset++;
+				if (raw[offset] == 'u' && offset + 4 < length) {
+					offset += 4;
+				};
+			} else if (c == '"') {
+				node->setLen(offset - node->getOffset());
+				return offset + 1;
+			}
+		}
+		throw HttpException(badRequestCode, "JSON parse error: end of string not found");
+	}
+
+	size_t processNode(TreeNode *node) {
+		size_t offset = node->getOffset();
+		char c = raw[offset];
+		if (c == '{') { // Objet
+			node->setTag("object");
+			return processObjectNode(node);
+		} else if (c == '[') { //Array
+			node->setTag("array");
+			return processArrayNode(node);
+		} else if (c == '"') { //String
+			node->setTag("string");
+			return processStringNode(node);
+		} else if (c == '-' || std::isdigit(c)) {
+			node->setTag("number");
+			size_t limit = raw.size();
+			while (offset < limit) {
+				char c = raw[offset];
+				if ( c == ',' || c == '}' || c == ']') {
+					break;
+				}
+				offset ++;
+			}
+			node->setLen(offset - node->getOffset());
+			return offset;
+		} else if (raw.substr(offset, 4) == "true") {
+			node->setTag("boolean");
+			node->setLen(4);
+			return offset + 4;			
+		}else if (raw.substr(offset, 5) == "false") {
+			node->setTag("boolean");
+			node->setLen(5);
+			return offset + 5;			
+		} else if (raw.substr(offset, 4) == "null"){
+			node->setTag("null");
+			node->setLen(4);				
+			return offset + 4;			
+		} else {
+				throw HttpException(badRequestCode
+						,"JSON parse error: unexpected value", "Error found at offset " + Util::itos(offset));
+		}
+	}
+
 	/**
 	 * parse content of a tag generating child
 	 */
 	TreeNode *processRawData() {
 		size_t offset=0, aux;
-		if(raw.find("</methodCall>", raw.size() - 13) != string::npos){
-			syslog(LOG_INFO,"XML: data pass end tag of methodcall");
-		}
-		string tag;
-		if(!nextTag(raw, offset, tag, aux) || !nextTag(raw,offset,tag,aux)){
-			throw HttpException(badRequestCode
-					,"XML parse error: start tag not found");
-		}
-		TreeNode* newroot = new TreeNodeJSON(raw, tag, offset);
+		size_t limit = raw.size();
+		ignoreWhiteSpaces(offset);
+		TreeNode* newroot = new TreeNodeJSON(raw, "root", offset);
 		processNode(newroot);
 		return newroot;
 	}
 	
 public:
 	//parse JSON
-	JSON(const string &raw): DataMessage(raw) {
+	JSON(const string &raw): RequestMessage(raw) {
 		root = processRawData();
 	}
 
@@ -139,49 +223,62 @@ public:
 		return ret;
 	}
 
-	static string decodeHexadigits(const string &data, size_t &i) {
+	static string decodeHexaUnicodeToUTF8(const string &data, size_t &i) {
 		if (i + 4 >= data.size()) {
 			throw "JSON string coding \\u error";
 		} else {
-			size_t value;   
+			size_t unicode;
+			string result;
     		std::stringstream ss;
-    		ss << std::hex << data.substr(i + 1, 4);
-    		ss >> value;
-			string result = "XX";
-			result[0] = (unsigned char) (value / 256);
-			result[1] = (unsigned char) (value % 256);
-			i += 4;
+    		ss << std::hex << data.substr(i, 4);
+    		ss >> unicode;
+			if (unicode <= 0x007F) {
+				result = "X";
+				result[0] = (unsigned char) unicode;
+			} else if (unicode <= 0x07FF) {
+				result = "XX";
+				result[0] = (unsigned char) (((unicode >> 6) & 0x1F) | 0xC0);
+				result[1] = (unsigned char) ((unicode & 0x3F) | 0x80);
+			} else {
+				result = "XXX";
+				result[0] = (unsigned char) (((unicode >> 12) & 0x0F) | 0xE0);
+				result[1] = (unsigned char) (((unicode >>  6) & 0x3F) | 0x80);
+				result[2] = (unsigned char) ((unicode & 0x3F) | 0x80);
+			}
+			i += 3;
 			return result;
 		}
 
 	}
-	static string decodeJSONString(const string &data, size_t &i) {
+	static string decodeJSONString(const string &data, size_t i, size_t len) {
 		string ret;
-		size_t length = data.size();
-		for(; i < length; i++){
+		size_t limit = i + len <= data.size() ? i + len : data.size();
+		for(; i < limit; i++){
 			char c = data[i];
 			if ( c == '\\' ) {
 				i++;
 				char next = data[i];
 				switch(next) {
-					case '\\':ret += "\\";
+					case '\\': ret += "\\";
 					break;
-					case '"':ret += "\"";
+					case '"': ret += "\"";
 					break;
-					case '/':ret += "/";
+					case '/': ret += "/";
 					break;
-					case 'b':ret += "\b";
+					case 'b': ret += "\b";
 					break;
-					case 'f':ret += "\f";
+					case 'f': ret += "\f";
 					break;
-					case 'n':ret += "\n";
+					case 'n': ret += "\n";
 					break;
-					case 'r':ret += "\r";
+					case 'r': ret += "\r";
 					break;
-					case 't':ret += "\t";
+					case 't': ret += "\t";
 					break;
-					case 'u':
-						ret += decodeHexadigits(data, i);
+					case 'u': 
+						i++;
+						ret += decodeHexaUnicodeToUTF8(data, i);
+					break;
 					default: 
 						throw "JSON coding error: bad escape secuence";
 					break;
@@ -197,20 +294,7 @@ public:
 		return ret;
 	}
 
-	static double decodeJSONNumber(const string &data, size_t &i) {
-		string snumber;
-		size_t length = data.size();
-		string c = "X";
-		for(; i < length; i++) {
-			c[0] = data[i];
-			if ( whiteSpaces.find(c) != string::npos ) {
-				break;
-			}
-			snumber += c;
-		}
-		if (snumber.size() == 0) {
-			throw "JSON string coding \\u error";
-		}
+	static double decodeJSONNumber(const string &snumber) {
 		double value;   
 		std::stringstream ss(snumber);
 		ss >> value;

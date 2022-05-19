@@ -46,8 +46,10 @@ function runTests() {
 		testresult=$?
 		if [ "$testresult" != "0" -a "$testresult" != "111" ] ; then
 			writeError "Errors found" " $X_MARK"
-			head -n 10 $ferrors
-			head -n 10 $fmessages
+			writeInfo "Standard error" " max 100 lines"
+			head -n 100 $ferrors
+			writeInfo "Standard output" " max 100 lines"
+			head -n 100 $fmessages
 			rm $fmessages 2> /dev/null
 			rm $ferrors 2> /dev/null
 			exit 1
@@ -85,7 +87,7 @@ function Unit_tests() {
 	if test -f program-test ; then
 		rm -R cgroup.test 2> /dev/null
 		cp -a cgroup cgroup.test
-		./program-test
+		valgrind ./program-test
 		result=$?
 		rm -R cgroup.test 2> /dev/null
 		rm program-test

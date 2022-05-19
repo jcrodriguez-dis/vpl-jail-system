@@ -25,6 +25,8 @@ using namespace std;
 
 #include "processMonitor.h"
 #include "websocket.h"
+#include "xmlrpc.h"
+#include "jsonrpc.h"
 
 /**
  * class Jail
@@ -40,13 +42,13 @@ protected:
 	void changeUser(processMonitor &pm);
 	void setLimits(processMonitor &pm);
 	void transferExecution(processMonitor &pm,string fileName);
-	void saveParseFiles(processMonitor &pm, mapstruct &parsedata);
-	ExecutionLimits getParseExecutionLimits(mapstruct &parsedata);
+	void saveParseFiles(processMonitor &pm, RPC &rpc);
+	ExecutionLimits getParseExecutionLimits(RPC &rpc);
 	//Action commands
 	string commandAvailable(long long memRequested);
-	void commandRequest(mapstruct &parsedata, string &adminticket,string &monitorticket,string &executionticket);
+	void commandRequest(RPC &rpc, string &adminticket,string &monitorticket,string &executionticket);
 	void commandGetResult(string adminticket,string &compilation,string &execution,bool &executed,bool &interactive);
-	bool commandUpdate(string adminticket, mapstruct &parsedata);
+	bool commandUpdate(string adminticket, RPC &rpc);
 	bool commandRunning(string adminticket);
 	void commandStop(string adminticket);
 	void commandMonitor(string userticket,Socket *s);

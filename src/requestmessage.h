@@ -4,8 +4,8 @@
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 
-#ifndef DATAMESSAGE_INC_H
-#define DATAMESSAGE_INC_H
+#ifndef REQUESTMESSAGE_INC_H
+#define REQUESTMESSAGE_INC_H
 #include <stdlib.h>
 #include <iconv.h>
 #include <limits.h>
@@ -24,17 +24,17 @@ using namespace std;
 class TreeNode {
 protected:
 	const string &raw;			//Reference to raw data
-	const string tag;			//Tag name, no parm
-	const size_t tag_offset;	//Tag offset in raw
+	string tag;					//Tag name, no parm
+	size_t tag_offset;			//Tag offset in raw
 	size_t tag_len;				//Length of tag information
 	vector<TreeNode*> children;	//List of child tags
 public:
 	TreeNode(const string &raw, string tag, size_t tag_offset):
-		raw(raw),tag(tag),tag_offset(tag_offset){
+		raw(raw), tag(tag), tag_offset(tag_offset) {
 		tag_len=0;
 	}
 	virtual ~TreeNode(){
-		for(size_t i=0; i<children.size(); i++){
+		for(size_t i=0; i<children.size(); i++) {
 			delete children[i];
 		}
 	}
@@ -54,28 +54,36 @@ public:
 	}
 
 	void setLen(size_t len) {
-		tag_len = len;
+		this->tag_len = len;
+	}
+
+	void setOffset(size_t offset) {
+		this->tag_offset = offset;
+	}
+
+	void setTag(const string &tag) {
+		this->tag = tag;
 	}
 
 	/**
 	 * return raw tag content
 	 */
-	string getContent() const {
-		return raw.substr(tag_offset,tag_len);
+	string getRawContent() const {
+		return raw.substr(tag_offset, tag_len);
 	}
 	/**
 	 * return content as int
 	 */
 	int getInt() const {
 		if (tag == "int") {
-			long long value = atoll(getContent().c_str());
+			long long value = atoll(getRawContent().c_str());
 			if ( value > INT_MAX ) {
 				return INT_MAX;
 			}
 			return (int) value;
 		}
 		if (tag == "double") {
-			double value = atof(getContent().c_str());
+			double value = atof(getRawContent().c_str());
 			if(value > INT_MAX) return INT_MAX;
 			return (int) value;
 		}
@@ -87,18 +95,7 @@ public:
 	 * return content as long long
 	 */
 	long long getLong() const {
-		if (tag == "int") {
-			return atoll(getContent().c_str());
-		}
-		if (tag == "double") {
-			double value = atof(getContent().c_str());
-			if (value > numeric_limits<long long>::max())
-				return numeric_limits<long long>::max();
-			return (long long) value;
-		}
-		throw HttpException(badRequestCode
-				, "Message data type error"
-				, "Expected long long int found " + tag);
+		return atoll(getRawContent().c_str());
 	}
 	/**
 	 * return content as string
@@ -119,20 +116,20 @@ public:
 		return children[i];
 	}
 	TreeNode* child(string stag) const {
-		for(size_t i=0; i<children.size(); i++){
-			if(children[i]->getName()==stag)
+		for(size_t i=0; i<children.size(); i++) {
+			if(children[i]->getName() == stag)
 				return children[i];
 		}
 		throw HttpException(badRequestCode
-				,"The child or attribute name requested does not exist");
+				,"The child or attribute name requested does not exist " + stag);
 	}
 };
 
 
 /**
- * Data recived in request
+ * Request Message
  */
-class DataMessage {
+class RequestMessage {
 protected:
 	const string raw;
 public:
@@ -142,20 +139,20 @@ protected:
 	TreeNode *root; //root node of parsed message
 public:
 	
-	DataMessage(const string &rawdata):raw(rawdata){
+	RequestMessage(const string &rawdata):raw(rawdata) {
 		root = NULL;
 	}
 
-	~DataMessage(){
+	~RequestMessage() {
 		delete root;
 	}
 
-	const TreeNode *getRoot(){
+	TreeNode *getRoot() {
 		return root;
 	}
 };
 
-//mapstruct map of DataMessage struct value
+//mapstruct map of RequestMessage struct value
 typedef map<string, const TreeNode *> mapstruct;
 
 #endif

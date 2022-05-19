@@ -282,7 +282,7 @@ configuration.cpp configuration.h\
 processMonitor.cpp processMonitor.h\
 socket.cpp socket.h\
 websocket.cpp websocket.h\
-util.cpp util.h datamessage.h rpc.h xmlrpc.h xml.h xml.cpp jail_limits.h lock.h\
+util.cpp util.h requestmessage.h rpc.h xmlrpc.h xml.h xml.cpp jail_limits.h lock.h\
 cgroup.cpp cgroup.h vplregex.h
 
 

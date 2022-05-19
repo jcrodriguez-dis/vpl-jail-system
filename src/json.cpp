@@ -7,10 +7,8 @@
 #include "json.h"
 
 string TreeNodeJSON::getString() const {
-	return "";
-	throw HttpException(badRequestCode
-			, "Message data type error"
-			, "Expected string and found " + tag );
+	if (this->nchild() > 0) {
+		return "Object/Array";
+	}
+	return JSON::decodeJSONString(this->raw, this->getOffset(), this->getLen());
 }
-
-string JSON::whiteSpaces = " \n\r\t";
