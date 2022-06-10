@@ -15,4 +15,4 @@ jobs:
           path: ~
 
       - name: Run tests
-        run: ./runTests.sh
+        run: ./runTest.sh
