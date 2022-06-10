@@ -1,0 +1,27 @@
+name: RPC server CI of VPL Moodle Plugin
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          path: ~
+
+      - name: Install required software
+        run: |
+          sudo apt install -y make
+          sudo apt install -y g++
+          sudo apt install -y automake
+          sudo apt install -y autoconf
+          sudo apt install -y python-pip
+          pip install websokets
+
+      - name: Run tests
+        run: ./runTests.sh
