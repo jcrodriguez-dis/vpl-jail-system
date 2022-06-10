@@ -70,7 +70,7 @@ int webSocket::frameSize(const string &data
 		control_size +=2; //for len extension
 		payload_size = (rawdata[2] << 8)+rawdata[3];
 	}else if (payload_size == 127){
-		//NOTE payload large than int32 NOT unsupported
+		//NOTE payload large than int32 NOT supported
 		control_size +=8;
 		payload_size = (rawdata[7] << 16)
 			        		  +(rawdata[8] << 8)
@@ -80,79 +80,79 @@ int webSocket::frameSize(const string &data
 }
 
 bool webSocket::isFrameComplete(const string &data){
-	int control_size,mask_size,payload_size;
-	int fSize=frameSize(data,control_size,mask_size,payload_size);
+	int control_size,mask_size, payload_size;
+	int fSize = frameSize(data,control_size,mask_size,payload_size);
 	if(fSize == -1) return false;
 	return (int) data.size() >= fSize;
 }
 
 string webSocket::decodeFrame(string &data, FrameType &ft){
-	int control_size,mask_size,payload_size;
-	int fSize=frameSize(data,control_size,mask_size,payload_size);
+	int control_size, mask_size,payload_size;
+	int fSize = frameSize(data,control_size,mask_size,payload_size);
 	//syslog(LOG_DEBUG,"Decoding frame %d=%d+%d+%d",fSize,control_size,mask_size,payload_size);
 	if(fSize==-1 || (int) data.size() < fSize){
-		ft=ERROR_FRAME;
+		ft = ERROR_FRAME;
 		return "Frame size too large";
 	}
-	if(mask_size==0){
-		ft=ERROR_FRAME;
+	if (mask_size == 0) {
+		ft = ERROR_FRAME;
 		return "Frame must be masked";
 	}
-	const unsigned char *rawdata=(const unsigned char *)data.data();
-	if(rawdata[0] & 0x70){
-		ft=ERROR_FRAME;
+	const unsigned char *rawdata = (const unsigned char *)data.data();
+	if (rawdata[0] & 0x70) {
+		ft = ERROR_FRAME;
 		return "Websocket extensions unsupported";
 	}
 
-	ft = (FrameType)(rawdata[0] & 0x0f);
+	ft = (FrameType) (rawdata[0] & 0x0f);
 	//syslog(LOG_DEBUG,"Frame type %d",(int)ft);
-	string ret(payload_size,'\0');
-	unsigned char *rawret=(unsigned char *)ret.c_str();
-	const unsigned char *mask= (const unsigned char *)rawdata+control_size;
-	const unsigned char *payload= (const unsigned char *)rawdata+(control_size+mask_size);
-	for(int i=0; i< payload_size; i++)
+	string ret(payload_size, '\0');
+	unsigned char *rawret = (unsigned char *)ret.c_str();
+	const unsigned char *mask = (const unsigned char *)rawdata + control_size;
+	const unsigned char *payload = (const unsigned char *)rawdata + (control_size + mask_size);
+	for(int i = 0; i < payload_size; i++)
 		rawret[i] = payload[i] ^ mask[i%4];
-	data.erase(0,fSize);
-	if(base64 && ft==TEXT_FRAME) {
+	data.erase(0, fSize);
+	if (base64 && ft == TEXT_FRAME) {
 		ft = BINARY_FRAME;
-		string ret64=Base64::decode( ret );
+		string ret64 = Base64::decode( ret );
 		//syslog(LOG_DEBUG,"Base64::decode %s",ret64.c_str());
 		return ret64;
 	}
 	return ret;
 }
 
-string webSocket::encodeFrame(const string &rdata,FrameType ft){
-	int control_size=2;
-	string data=rdata;
-	if(base64 && ft==BINARY_FRAME){
+string webSocket::encodeFrame(const string &rdata, FrameType ft){
+	int control_size =2 ;
+	string data = rdata;
+	if(base64 && ft == BINARY_FRAME){
 		data = Base64::encode(data);
 		//syslog(LOG_DEBUG,"Base64::encode %s",data.c_str());
 		ft = TEXT_FRAME;
 	}
-	int payload_size=data.size();
+	int payload_size = data.size();
 	if(payload_size > 125)
-		control_size+=2;
+		control_size += 2;
 	if(payload_size > 0xFFFF)
-		control_size+=6;
-	string ret(control_size+payload_size,'\0');
-	ret[0]=0x80|ft;
+		control_size += 6;
+	string ret(control_size+payload_size, '\0');
+	ret[0] = 0x80 | ft;
 	if(payload_size < 126){
-		ret[1]=payload_size;
+		ret[1] = payload_size;
 	}else if(payload_size < 0xffff){
-		ret[1]=126;
-		ret[2]=payload_size>>8;
-		ret[3]=payload_size & 0XFF;
+		ret[1] = 126;
+		ret[2] = payload_size >> 8;
+		ret[3] = payload_size & 0XFF;
 	}else{
-		ret[1]=127;
-		for(int i=2;i<7;i++)
-			ret[i]=0;
-		ret[7]=payload_size>>16;
-		ret[8]=(payload_size>>8)&0xff;
-		ret[9]=payload_size&0xff;
+		ret[1] = 127;
+		for(int i = 2 ; i < 7 ; i++)
+			ret[i] = 0;
+		ret[7] = payload_size >> 16;
+		ret[8] =( payload_size >> 8) & 0xff;
+		ret[9] = payload_size & 0xff;
 	}
-	for(int i=0; i< payload_size; i++)
-		ret[i+control_size] = data[i];
+	for(int i = 0; i < payload_size; i++)
+		ret[i + control_size] = data[i];
 	return ret;
 }
 
@@ -164,39 +164,38 @@ webSocket::webSocket(Socket *s){
 }
 
 string webSocket::receive(){
-	receiveBuffer+=socket->receive();
-	if(isFrameComplete(receiveBuffer)){
-		FrameType ft;
+	receiveBuffer += socket->receive();
+	if (isFrameComplete(receiveBuffer)) {
 		//syslog(LOG_INFO,"Websocket receive frame \"%s\"",receiveBuffer.c_str());
-		string data=decodeFrame(receiveBuffer,ft);
+		string data = decodeFrame(receiveBuffer, lFrameType);
 		//syslog(LOG_INFO,"Websocket receive type %d data \"%s\"",ft,data.c_str());
-		switch(ft){
-		case CONTINUATION_FRAME:
-		case TEXT_FRAME:
-		case BINARY_FRAME:
-			return data;
-			break;
-		case CONNECTION_CLOSE_FRAME:
-		{
-			close(data);
-			socket->close();
-			break;
-		}
-		case PING_FRAME:
-		{
-			string pong=encodeFrame("Hello",PONG_FRAME);
-			socket->send(pong);
-			break;
-		}
-		case PONG_FRAME: //Do nothing
-			break;
-		default:
-		case ERROR_FRAME:
-		{
-			close("Error");
-			socket->close();
-			break;
-		}
+		switch(lFrameType) {
+			case CONTINUATION_FRAME:
+			case TEXT_FRAME:
+			case BINARY_FRAME:
+				return data;
+				break;
+			case CONNECTION_CLOSE_FRAME:
+			{
+				close(data);
+				socket->close();
+				break;
+			}
+			case PING_FRAME:
+			{
+				string pong=encodeFrame("Hello", PONG_FRAME);
+				socket->send(pong);
+				break;
+			}
+			case PONG_FRAME: //Do nothing
+				break;
+			default:
+			case ERROR_FRAME:
+			{
+				close("Error");
+				socket->close();
+				break;
+			}
 		}
 	}
 	return "";
@@ -204,7 +203,7 @@ string webSocket::receive(){
 
 void webSocket::send(const string &s, FrameType ft){
 	//syslog(LOG_INFO,"Websocket framing type %d data \"%s\"",ft,s.c_str());
-	string frame=encodeFrame(s,ft);
+	string frame = encodeFrame(s, ft);
 	//syslog(LOG_INFO,"Frame send \"%s\"",frame.c_str());
 	socket->send(frame);
 }

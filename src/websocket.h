@@ -21,6 +21,7 @@ class webSocket{
 	bool base64;
 	Socket *socket;
 	string receiveBuffer;
+	FrameType lFrameType;
 	string getHandshakeAnswer();
 	int frameSize(const string &data
 			,int &control_size,int &mask_size, int &payload_size);
@@ -35,6 +36,7 @@ public:
 	bool isWriteBuffered() { return socket->isWriteBuffered();}
 	bool isClosed(){return socket->isClosed();}
 	string receive();
+	FrameType lastFrameType() { return lFrameType;}
 	void send(const string &s, FrameType ft=TEXT_FRAME);
 	bool wait(const int msec=50);
 };
