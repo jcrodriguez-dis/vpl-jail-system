@@ -1,30 +1,43 @@
 import time
-import websocket
-def checkEcho(conn, value):
-    print ('Sending ', value)
-    conn.send(value)
+import asyncio
+import websockets
+async def checkEcho(conn, value):
+    # print ('Sending ', value)
+    await conn.send(value)
     time.sleep(0.1)
-    result = str(conn.recv())
-    print ('Received', result)
+    result = await conn.recv()
+    # print ('Received', result)
     if result != value:
-        print ('Error incorrect response')
-        return False
-    else:
-        return True
+        print ('Error incorrect response:', result)
+        exit(1)
 
-conn = websocket.create_connection('ws://localhost:8080')
-print (str(conn.recv()))
-checkEcho(conn, 'Hello!')
-checkEcho(conn, 'This is other text with no ASCII chars ññññáéÇ')
-conn.send('close')
-time.sleep(0.1)
-print (str(conn.recv()))
-conn.close()
-conn = websocket.create_connection('ws://localhost:8080')
-print (str(conn.recv()))
-checkEcho(conn, 'Second try!')
-checkEcho(conn, b'Text as bynary array')
-conn.send('end')
-time.sleep(0.1)
-print (str(conn.recv()))
-conn.close()
+async def main():
+    uri = "ws://localhost:8080"
+    async with websockets.connect(uri) as websocket:
+        if "Hello from echo websocket" !=  (await websocket.recv()):
+            print ('Error incorrect hello message')
+            exit(1)
+        await checkEcho(websocket, 'Hello!')
+        await checkEcho(websocket, 'This is other text with no ASCII chars ññññáéÇ')
+        await websocket.send('close')
+        time.sleep(0.1)
+        result = (await websocket.recv())
+        if "disconnecting" !=  result:
+            print ('Error incorrect disconnected message:', result)
+            exit(1)
+
+    async with websockets.connect(uri) as websocket:
+        if "Hello from echo websocket" !=  (await websocket.recv()):
+            print ('Error incorrect hello message')
+            exit(1)
+        await checkEcho(websocket, 'Second try!')
+        await checkEcho(websocket, b'Text as bynary array')
+        await websocket.send('end')
+        time.sleep(0.1)
+        result = (await websocket.recv())
+        if "finished" !=  result:
+            print ('Error incorrect finished message:', result)
+            exit(1)
+
+if __name__ == "__main__":
+    asyncio.run(main())

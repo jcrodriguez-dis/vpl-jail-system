@@ -103,7 +103,7 @@ am_vpl_jail_server_OBJECTS = main.$(OBJEXT) vpl-jail-server.$(OBJEXT) \
 	jail.$(OBJEXT) httpServer.$(OBJEXT) redirector.$(OBJEXT) \
 	configurationFile.$(OBJEXT) configuration.$(OBJEXT) \
 	processMonitor.$(OBJEXT) socket.$(OBJEXT) websocket.$(OBJEXT) \
-	util.$(OBJEXT) xml.$(OBJEXT) cgroup.$(OBJEXT)
+	util.$(OBJEXT) xml.$(OBJEXT) json.$(OBJEXT) cgroup.$(OBJEXT)
 vpl_jail_server_OBJECTS = $(am_vpl_jail_server_OBJECTS)
 vpl_jail_server_LDADD = $(LDADD)
 AM_V_P = $(am__v_P_$(V))
@@ -124,10 +124,11 @@ am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/cgroup.Po \
 	./$(DEPDIR)/configuration.Po ./$(DEPDIR)/configurationFile.Po \
 	./$(DEPDIR)/httpServer.Po ./$(DEPDIR)/jail.Po \
-	./$(DEPDIR)/main.Po ./$(DEPDIR)/processMonitor.Po \
-	./$(DEPDIR)/redirector.Po ./$(DEPDIR)/socket.Po \
-	./$(DEPDIR)/util.Po ./$(DEPDIR)/vpl-jail-server.Po \
-	./$(DEPDIR)/websocket.Po ./$(DEPDIR)/xml.Po
+	./$(DEPDIR)/json.Po ./$(DEPDIR)/main.Po \
+	./$(DEPDIR)/processMonitor.Po ./$(DEPDIR)/redirector.Po \
+	./$(DEPDIR)/socket.Po ./$(DEPDIR)/util.Po \
+	./$(DEPDIR)/vpl-jail-server.Po ./$(DEPDIR)/websocket.Po \
+	./$(DEPDIR)/xml.Po
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
@@ -282,7 +283,7 @@ configuration.cpp configuration.h\
 processMonitor.cpp processMonitor.h\
 socket.cpp socket.h\
 websocket.cpp websocket.h\
-util.cpp util.h requestmessage.h rpc.h xmlrpc.h xml.h xml.cpp jail_limits.h lock.h\
+util.cpp util.h requestmessage.h rpc.h xmlrpc.h xml.h xml.cpp jsonrpc.h json.h json.cpp jail_limits.h lock.h\
 cgroup.cpp cgroup.h vplregex.h
 
 
@@ -383,6 +384,7 @@ include ./$(DEPDIR)/configuration.Po # am--include-marker
 include ./$(DEPDIR)/configurationFile.Po # am--include-marker
 include ./$(DEPDIR)/httpServer.Po # am--include-marker
 include ./$(DEPDIR)/jail.Po # am--include-marker
+include ./$(DEPDIR)/json.Po # am--include-marker
 include ./$(DEPDIR)/main.Po # am--include-marker
 include ./$(DEPDIR)/processMonitor.Po # am--include-marker
 include ./$(DEPDIR)/redirector.Po # am--include-marker
@@ -546,6 +548,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/configurationFile.Po
 	-rm -f ./$(DEPDIR)/httpServer.Po
 	-rm -f ./$(DEPDIR)/jail.Po
+	-rm -f ./$(DEPDIR)/json.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/processMonitor.Po
 	-rm -f ./$(DEPDIR)/redirector.Po
@@ -604,6 +607,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/configurationFile.Po
 	-rm -f ./$(DEPDIR)/httpServer.Po
 	-rm -f ./$(DEPDIR)/jail.Po
+	-rm -f ./$(DEPDIR)/json.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/processMonitor.Po
 	-rm -f ./$(DEPDIR)/redirector.Po

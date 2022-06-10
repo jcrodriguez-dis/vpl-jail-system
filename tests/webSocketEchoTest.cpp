@@ -49,7 +49,7 @@ int main() {
 		cerr << "listen failed" << endl;
 		exit(0);
 	}
-	cout << "opened " << inet_ntoa(local.sin_addr) << ":" << ntohs(local.sin_port) << endl;
+	// cout << "opened " << inet_ntoa(local.sin_addr) << ":" << ntohs(local.sin_port) << endl;
 
 	while (1) {
 		struct sockaddr_in remote;
@@ -60,7 +60,7 @@ int main() {
 			exit(0);
 		}
 		try{
-			cout << "connected " << inet_ntoa(remote.sin_addr) << ":" << ntohs(remote.sin_port) <<endl;
+			// cout << "connected " << inet_ntoa(remote.sin_addr) << ":" << ntohs(remote.sin_port) <<endl;
 			Socket socket(clientSocket);
 			socket.readHeaders();
 			webSocket ws(&socket);
@@ -80,10 +80,10 @@ int main() {
 					return EXIT_SUCCESS;
 				}
 				if(r.size()>0) {
-					ws.send(r, TEXT_FRAME);
+					ws.send(r, ws.lastFrameType());
 				}
 			}
-			cout << "disconnected" << endl;
+			// cout << "disconnected" << endl;
 		} catch(HttpException &e) {
 			cerr << "HttpException: " << e.getLog() << endl;
 		} catch(const std::exception &e){
