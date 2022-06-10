@@ -16,11 +16,7 @@ jobs:
 
       - name: Install required software
         run: |
-          sudo apt install -y make
-          sudo apt install -y g++
-          sudo apt install -y automake
-          sudo apt install -y autoconf
-          sudo apt install -y python-pip
+          sudo apt-get install -y python3-pip
           pip install websokets
 
       - name: Run tests
