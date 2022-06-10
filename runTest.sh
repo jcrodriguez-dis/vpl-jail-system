@@ -106,7 +106,6 @@ function Unit_tests() {
 function WebSocket_tests() {
 	local result
 	local running
-	pip install websockets > /dev/null
 	cd tests
 	make websocket-echo-test > /dev/null
 	if test -f websocket-echo-test ; then
