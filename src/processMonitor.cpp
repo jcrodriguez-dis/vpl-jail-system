@@ -234,10 +234,50 @@ processMonitor::processMonitor(string & adminticket, string & monitorticket, str
 		this->adminticket = adminticket;
 		this->monitorticket = monitorticket;
 		this->executionticket = executionticket;
-		this->executionticket = executionticket;
 		this->httpPassthroughticket = "";
 		startTime = time(NULL);
 		interactive = false;
+		compiler_pid = 0;
+		monitor_pid = 0;
+		runner_pid = 0;
+		writeInfo();
+	}
+}
+processMonitor::processMonitor(string & adminticket, string & executionticket) {
+	configuration = Configuration::getConfiguration();
+	security = admin;
+	string cp = configuration->getControlPath();
+	adminticket = getPartialTicket();
+	executionticket = getPartialTicket();
+	selectPrisoner();
+	executionticket += getPartialTicket();
+	adminticket += getPartialTicket();
+	{
+		Lock lock(cp);
+		while (Util::fileExists(cp + "/" + executionticket) ||
+			   Util::fileExists(cp + "/" + adminticket)) {
+			adminticket = getPartialTicket();
+			executionticket = getPartialTicket();
+			executionticket += getPartialTicket();
+			adminticket += getPartialTicket();
+		}
+		// Write tickets.
+		ConfigData data;
+		data["USER_ID"] = Util::itos(prisoner);
+		data["SECURITY"] = Util::itos(admin);
+		ConfigurationFile::writeConfiguration(cp + "/" + adminticket, data);
+		data["SECURITY"] = Util::itos(execute);
+		ConfigurationFile::writeConfiguration(cp + "/" + executionticket, data);
+		executionLimits.maxtime = 0;
+		executionLimits.maxfilesize = 0;
+		executionLimits.maxmemory = 0;
+		executionLimits.maxprocesses = 0;
+		this->adminticket = adminticket;
+		this->monitorticket = "NO_MONITOR";
+		this->executionticket = executionticket;
+		this->httpPassthroughticket = "";
+		startTime = time(NULL);
+		interactive = true;
 		compiler_pid = 0;
 		monitor_pid = 0;
 		runner_pid = 0;
@@ -400,10 +440,14 @@ void processMonitor::setCompiler() {
 	writeInfo();
 }
 
+
 bool processMonitor::isMonitored() {
 	if ( ! Util::dirExists(getProcessControlPath())) return false;
 	Lock lock(getProcessControlPath());
 	if ( monitor == 0 ) readInfo();
+	if (this->monitorticket == "NO_MONITOR" && this->isRunnig()) {
+		return true;
+	}
 	if ( monitor == 0 ) return false;
 	return Util::processExists(monitor);
 }

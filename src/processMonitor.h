@@ -70,6 +70,7 @@ class processMonitor{
 	static void cleanPrisonerFiles(string);
 public:
 	processMonitor(string & adminticket, string & monitorticket, string & executionticket);
+	processMonitor(string & adminticket, string & executionticket);
 	processMonitor(string ticket);
 	bool FileExists(string);
 	bool controlFileExists(string);
