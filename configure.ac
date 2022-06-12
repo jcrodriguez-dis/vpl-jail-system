@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([vpl jail system], [2.7.2], jcrodriguez@dis.ulpgc.es)
+AC_INIT([vpl jail system], [3.0.0], jcrodriguez@dis.ulpgc.es)
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADER([config.h])
 
