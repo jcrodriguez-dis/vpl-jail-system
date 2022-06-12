@@ -96,6 +96,8 @@ void HttpJailServer::send(int code, const string &codeText, const string &load,
 		output += "Content-Type: ";
 		if(load.find("<?xml ") == 0) {
 			output += "text/xml";
+		} else if (load.find("{") == 0) {
+			output += "application/json";
 		} else if (load.find("<!DOCTYPE svg") == 0 || load.find("<svg") == 0) {
 			output += "image/svg+xml";
 		} else if (load.find("<!DOCTYPE html") == 0 || load.find("<html") == 0) {
