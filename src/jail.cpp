@@ -149,6 +149,65 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 	}
 }
 
+void Jail::commandDirectRun(RPC &rpc, string &adminticket, string &executionticket){
+	mapstruct parsedata = rpc.getData();
+	syslog(LOG_INFO,"Request for direct run");
+	string monitorticket;
+	processMonitor pm(adminticket, executionticket);
+	pid_t pid=fork();
+	if(pid==0){ //new process
+		try {
+			syslog(LOG_INFO,"Parse data %lu", (long unsigned int)parsedata.size());
+			saveParseFiles(pm, rpc);
+			syslog(LOG_INFO,"Reading parms");
+			ExecutionLimits executionLimits = getParseExecutionLimits(rpc);
+			string vpl_lang = parsedata["lang"]->getString();
+			syslog(LOG_DEBUG, "VPL_LANG %s", vpl_lang.c_str());
+			bool interactive = true;
+			pm.setExtraInfo(executionLimits, interactive, vpl_lang);
+			pm.setCompiler();
+			syslog(LOG_INFO, "Compilation");
+			string script = parsedata["execute"]->getString();
+			string compilationOutput = run(pm, script);
+			pm.setCompilationOutput(compilationOutput);
+			bool compiled = pm.FileExists(VPL_EXECUTION);
+			if (compiled) {
+				//Delete files
+				mapstruct filestodelete = rpc.getFileToDelete();
+				for (mapstruct::iterator i = filestodelete.begin(); i != filestodelete.end(); i++) {
+					string name = i->first;
+					syslog(LOG_INFO, "Delete file %s", name.c_str());
+					pm.deleteFile(name);
+				}
+			}else{
+				syslog(LOG_INFO, "Compilation fail");
+			}
+		}
+		catch(std::exception &e){
+			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.what(), __FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		catch(string &e){
+			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.c_str(), __FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		catch(HttpException &e){
+			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.getLog().c_str(), __FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		catch(const char *e){
+			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e,__FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		catch(...){
+			syslog(LOG_ERR, "unexpected exception %s:%d", __FILE__, __LINE__);
+			_exit(EXIT_FAILURE 	);
+		}
+		_exit(EXIT_SUCCESS);
+	}
+}
+
+
 void Jail::commandGetResult(string adminticket, string &compilation,
                             string &execution, bool &executed,
 							bool &interactive){
@@ -608,7 +667,14 @@ void Jail::process(Socket *socket){
 								monitorticket,executionticket,
 								configuration->getPort(),
 								configuration->getSecurePort()));
-			} else if(request == "getresult") {
+			} else if(request == "directrun") {
+				string adminticket, executionticket;
+				commandDirectRun(rpc, adminticket, executionticket);
+				server.send200(rpc.directRunResponse(adminticket,
+								executionticket,
+								configuration->getPort(),
+								configuration->getSecurePort()));
+			}else if(request == "getresult") {
 				string adminticket, compilation, execution;
 				bool executed,interactive;
 				adminticket=parsedata["adminticket"]->getString();
@@ -948,8 +1014,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 							executionLimits.maxtime);
 					kill(newpid, stopSignal);
 					stopSignal = SIGKILL;
-				}
-				else if (pm.isOutOfMemory()) {
+				} else if (pm.isOutOfMemory()) {
 					string ml= pm.getMemoryLimit();
 					if (stopSignal != SIGKILL)
 						redirector.addMessage("\r\nJail: out of memory (" + ml + ")\n");
@@ -968,10 +1033,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 		redirector.advance();
 		usleep(100000); // 1/10 seg
 	}
-	if (noMonitor) {
-		syslog(LOG_DEBUG, "Not monitored");
-		pm.cleanTask();
-	}
+	pm.cleanTask();
 }
 
 /**
