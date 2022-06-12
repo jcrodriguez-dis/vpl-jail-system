@@ -181,8 +181,7 @@ class JSON: public RequestMessage {
 	 * parse content of a tag generating child
 	 */
 	TreeNode *processRawData() {
-		size_t offset=0, aux;
-		size_t limit = raw.size();
+		size_t offset=0;
 		ignoreWhiteSpaces(offset);
 		TreeNode* newroot = new TreeNodeJSON(raw, "root", offset);
 		processNode(newroot);

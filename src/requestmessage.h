@@ -143,7 +143,7 @@ public:
 		root = NULL;
 	}
 
-	~RequestMessage() {
+	virtual ~RequestMessage() {
 		delete root;
 	}
 

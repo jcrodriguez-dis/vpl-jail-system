@@ -104,6 +104,17 @@ public:
 		return responseWraper(response);
 	}
 
+	string directRunResponse(const string adminticket, const string executionticket,
+	                         int port,int secuport) {
+		string response;
+		response += responseMember("adminticket", adminticket);
+		response += responseMember("executionticket", executionticket);
+		response += responseMember("port", port);
+		response += responseMember("secureport", secuport);
+		return responseWraper(response);
+	}
+
+
 	string getResultResponse(const string &compilation,const string & execution, bool executed,bool interactive) {
 		string response;
 		response += responseMember("compilation",compilation);

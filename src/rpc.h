@@ -20,6 +20,9 @@ public:
 	RPC() {
 		this->root = NULL;
 	}
+
+	virtual ~RPC() {}
+
 	/**
 	 * return a ready response
 	 */
@@ -28,7 +31,8 @@ public:
 
 	virtual string requestResponse(const string adminticket,const string monitorticket,
 			const string executionticket, int port,int secuport) = 0;
-
+	virtual string directRunResponse(const string adminticket,
+			const string executionticket, int port,int secuport) = 0;
 	virtual string getResultResponse(const string &compilation,const string & execution, bool executed,bool interactive) = 0;
 	virtual string updateResponse(bool ok) = 0;
 	virtual string runningResponse(bool running) = 0;
