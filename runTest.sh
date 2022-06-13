@@ -33,13 +33,17 @@ function runTests() {
 	local test
 	local fmessages=messages.txt
 	local ferrors=errors.txt
-	local ntests="$#"
+	local ntests=$#
 	local n=1
 	local testresult
-	writeInfo "" "$ntests tests found"
+	if [ $ntests -gt 1 ] ; then
+		writeInfo "" "$ntests tests"
+	fi
 	while [ "$1" != "" ] ; do
 		test=$1
-		writeInfo "Test $n" ": $test " -n
+		if [ $ntests -gt 1 ] ; then
+			writeInfo "Test $n" ": $test " -n
+		fi
 		{
 			"$test"
 		} 1>$fmessages 2>$ferrors
@@ -65,7 +69,9 @@ function runTests() {
 	rm $fmessages 2> /dev/null
 	rm $ferrors 2> /dev/null
 	write
-	writeCorrect "All tests passed $CHECK_MARK"
+	if [ $ntests -gt 1 ] ; then
+		writeCorrect "All tests passed $CHECK_MARK"
+	fi
 }
 
 function Autotools_execution() {
@@ -128,10 +134,11 @@ function WebSocket_tests() {
 	return 1
 }
 
-writeHeading "Tests of the vpl-jail-system"
 if [ "$1" != "" ] ; then
+	writeHeading "$1 of the vpl-jail-system"
 	runTests $1
 else
+	writeHeading "Tests of the vpl-jail-system"
 	runTests Autotools_execution Packaging_for_distribution Unit_tests WebSocket_tests
 fi
 

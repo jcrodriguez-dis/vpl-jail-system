@@ -19,5 +19,14 @@ jobs:
           pip install websockets
           sudo apt-get install valgrind
 
-      - name: Run tests
-        run: ./runTest.sh
+      - name: Run tests of autotools
+        run: ./runTest.sh Autotools_execution
+
+      - name: Run tests of packaging code for distribution
+        run: ./runTest.sh Packaging_for_distribution
+
+      - name: Run unit tests
+        run: ./runTest.sh Unit_tests
+
+      - name: Run WebSocket tests
+        run: ./runTest.sh WebSocket_tests

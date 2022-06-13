@@ -52,7 +52,7 @@ public:
                 }
             }
 		}
-		cout << "Unit tests finish" << endl;
+		cout << "Unit tests finished" << endl;
         return fail? 1 : 0;
     }
 };
