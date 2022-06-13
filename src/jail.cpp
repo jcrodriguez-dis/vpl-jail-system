@@ -986,7 +986,6 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 	syslog(LOG_INFO, "Redirector start terminal control");
 	time_t startTime = time(NULL);
 	time_t lastTime = startTime;
-	bool noMonitor = false;
 	int stopSignal = SIGTERM;
 	int status;
 	syslog(LOG_INFO,"run: start redirector loop");
@@ -1000,7 +999,6 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 				lastTime = now;
 				if (elapsedTime > JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()) {
 					syslog(LOG_INFO, "Not monitored");
-					noMonitor = true;
 					if(stopSignal != SIGKILL)
 						redirector.addMessage("\r\nJail: process stopped\n");
 					redirector.stop();
