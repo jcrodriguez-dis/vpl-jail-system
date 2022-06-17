@@ -94,7 +94,7 @@ class JSONRPCTest: public BaseTest {
 		assert(root->child("jsonrpc")->getString() == "2.0");
 		assert(root->child("id")->getString() == rpc.getId());
 		TreeNode* response = root->child("result");
-		assert( 1 == response->child("running")->getLong());
+		assert( 1 == response->child("running")->getInt());
 		JSON responseJSONFalse(rpc.runningResponse(false));
 		assert( 0 == responseJSONFalse.getRoot()->child("result")->child("running")->getLong());
 	}
@@ -116,7 +116,7 @@ class JSONRPCTest: public BaseTest {
 		assert(data["userid"]->getString() == "3");
 		assert(data["activityid"]->getString() == "7");
 		assert(data["execute"]->getString() == "vpl_run.sh");
-		assert(data["interactive"]->getLong() == 1);
+		assert(data["interactive"]->getInt() == 1);
 		assert(data["lang"]->getString() == "en_US.UTF-8");
 		assert(data["pluginversion"]->getLong() == 2021061600L);
 
@@ -135,7 +135,7 @@ class JSONRPCTest: public BaseTest {
 		assert(files["common_script.sh"]->getString() == correct);
 		assert(files.size() == 5);
 		mapstruct filestodelete = rpc.getFileToDelete();
-		assert(filestodelete["vpl_run.sh"]->getLong() == 1);
+		assert(filestodelete["vpl_run.sh"]->getInt() == 1);
 		assert(filestodelete.size() == 1);
 		mapstruct fileencoding = rpc.getFileEncoding();
 		assert(fileencoding["vpl_run.sh"]->getLong() == 0);
