@@ -701,6 +701,7 @@ void Jail::process(Socket *socket){
 			} else { //Error
 				throw HttpException(badRequestCode, "Unknown request:" + request);
 			}
+			delete prpc;
 		} else { //Websocket
 			if(socket->getMethod() != "GET"){
 				throw "ws(s) Unsupported METHOD "+httpMethod;
