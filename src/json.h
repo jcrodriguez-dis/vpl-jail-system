@@ -25,7 +25,22 @@ class TreeNodeJSON: public TreeNode {
 public:
 	TreeNodeJSON(const string &raw, string tag, size_t tag_offset): TreeNode(raw, tag, tag_offset) {
 	}
-
+	/**
+	 * return content as int
+	 */
+	int getInt() const {
+		long long value = atoll(getRawContent().c_str());
+		if ( value > INT_MAX ) {
+			return INT_MAX;
+		}
+		return (int) value;
+	}
+	/**
+	 * return content as long long
+	 */
+	long long getLong() const {
+		return atoll(getRawContent().c_str());
+	}
 	string getString() const;
 };
 

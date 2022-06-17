@@ -74,7 +74,7 @@ public:
 	/**
 	 * return content as int
 	 */
-	int getInt() const {
+	virtual int getInt() const {
 		if (tag == "int") {
 			long long value = atoll(getRawContent().c_str());
 			if ( value > INT_MAX ) {
@@ -94,8 +94,19 @@ public:
 	/**
 	 * return content as long long
 	 */
-	long long getLong() const {
-		return atoll(getRawContent().c_str());
+	virtual long long getLong() const {
+		if (tag == "int") {
+			long long value = atoll(getRawContent().c_str());
+			return value;
+		}
+		if (tag == "double") {
+			double value = atof(getRawContent().c_str());
+			if(value > INT_MAX) return INT_MAX;
+			return (long long) value;
+		}
+		throw HttpException(badRequestCode
+				, "Message data type error"
+				, "Expected int found " + tag);
 	}
 	/**
 	 * return content as string
