@@ -406,12 +406,17 @@ processState processMonitor::getState() {
 	}
 	bool aliveCompiler = Util::processExists(compiler_pid);
 	if (aliveCompiler && runner_pid == 0) return compiling;
-	if (monitor_pid == 0 && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
+	if (monitor_pid == 0 && monitorticket != "NO_MONITOR" && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
 		syslog(LOG_INFO, "Execution without monitor timeout reached %d. ", JAIL_MONITORSTART_TIMEOUT);
 		cleanTask();
 		return stopped;
 	}
 	if (runner_pid == 0) {
+		if (monitor_pid == 0 && monitorticket == "NO_MONITOR" && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
+			syslog(LOG_INFO, "Execution not started with no monitor, timeout reached %d. ", JAIL_MONITORSTART_TIMEOUT);
+			cleanTask();
+			return stopped;
+		}
 		if (interactive) return beforeRunning;
 		if (controlFileExists("compilation")) return retrieve;
 		syslog(LOG_INFO, "Execution stopped, not interactive, not runner, no compilation file");
