@@ -68,12 +68,24 @@ ExecutionLimits Jail::getParseExecutionLimits(RPC &rpc) {
 	ExecutionLimits executionLimits = Configuration::getConfiguration()->getLimits();
 	syslog(LOG_INFO,"Reading parms");
 	executionLimits.syslog("Config");
-	executionLimits.maxtime = min(parsedata["maxtime"]->getInt(), executionLimits.maxtime);
-	executionLimits.maxfilesize = min(Util::fixMemSize(parsedata["maxfilesize"]->getLong()),
-                                      executionLimits.maxfilesize);
-	executionLimits.maxmemory = min(Util::fixMemSize(parsedata["maxmemory"]->getLong()),
-								    executionLimits.maxmemory);
-	executionLimits.maxprocesses = min(parsedata["maxprocesses"]->getInt(), executionLimits.maxprocesses);
+	const TreeNode* maxtime = parsedata["maxtime"];
+	const TreeNode* maxfilesize = parsedata["maxfilesize"];
+	const TreeNode* maxmemory = parsedata["maxmemory"];
+	const TreeNode* maxprocesses = parsedata["maxprocesses"];
+	if (maxtime != NULL) {
+		executionLimits.maxtime = min(maxtime->getInt(), executionLimits.maxtime);
+	}
+	if (maxfilesize != NULL) {
+		executionLimits.maxfilesize = min(Util::fixMemSize(maxfilesize->getLong()),
+                                      	executionLimits.maxfilesize);
+	}
+	if (maxmemory != NULL) {
+		executionLimits.maxmemory = min(Util::fixMemSize(maxmemory->getLong()),
+								    	executionLimits.maxmemory);
+	}
+	if (maxprocesses != NULL) {
+		executionLimits.maxprocesses = min(maxprocesses->getInt(), executionLimits.maxprocesses);
+	}
 	executionLimits.syslog("Request");
 	return executionLimits;
 }
@@ -152,10 +164,9 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 void Jail::commandDirectRun(RPC &rpc, string &adminticket, string &executionticket){
 	mapstruct parsedata = rpc.getData();
 	syslog(LOG_INFO,"Request for direct run");
-	string monitorticket;
 	processMonitor pm(adminticket, executionticket);
-	pid_t pid=fork();
-	if(pid==0){ //new process
+	pid_t pid = fork();
+	if (pid == 0) { //new process
 		try {
 			syslog(LOG_INFO,"Parse data %lu", (long unsigned int)parsedata.size());
 			saveParseFiles(pm, rpc);
