@@ -56,7 +56,7 @@ struct ExecutionLimits {
 	int maxprocesses;
 	void syslog(const char *s){
 		::syslog(LOG_DEBUG,"%s: maxtime: %d seg, maxfilesize: %lld Kb, maxmemory %lld Kb, maxprocesses: %d",
-				s,maxtime, maxfilesize/1024, maxmemory/1024, maxprocesses);
+				s, maxtime, maxfilesize/1024, maxmemory/1024, maxprocesses);
 	}
 };
 
