@@ -85,8 +85,51 @@ class XMLRPCTest: public BaseTest {
 		assert(fileencoding["vpl_environment.sh"]->getLong() == 0);
 		assert(fileencoding["common_script.sh"]->getLong() == 0);
 		assert(fileencoding.size() == 4);
-
 	}
+
+	void testDirectrun() {
+		string rawdata = Util::readFile("./xmlrpcdata/directrun.xml");
+		XMLRPC rpc(rawdata);
+		string method = rpc.getMethodName();
+		assert(method == "directrun");
+		mapstruct data = rpc.getData();
+		assert(data["maxtime"]->getLong() == 1000000);
+		assert(data["maxfilesize"]->getLong() == 1000000000);
+		assert(data["maxmemory"]->getLong() == 1000000000);
+		assert(data["maxprocesses"]->getLong() == 10000);
+		assert(data["runscript"]->getString() == "");
+		assert(data["debugscript"]->getString() == "");
+		assert(data["userid"]->getString() == "3");
+		assert(data["activityid"]->getString() == "4382");
+		assert(data["execute"]->getString() == ".vpl_directrun.sh");
+		assert(data["interactive"]->getLong() == 1);
+		assert(data["lang"]->getString() == "en_US.UTF-8");
+		assert(data["pluginversion"]->getLong() == 2021052513L);
+
+		mapstruct files = rpc.getFiles();
+		string filecontent;
+		filecontent = "test file .vpl_directrun.sh";
+		filecontent = XML::decodeXML(filecontent);
+		assert(files[".vpl_directrun.sh"]->getString() == filecontent);
+		filecontent = "test file a.c";
+		filecontent = XML::decodeXML(filecontent);
+		assert(files["a.c"]->getString() == filecontent);
+		filecontent = "test file b.c";
+		filecontent = XML::decodeXML(filecontent);
+		assert(files["b.c"]->getString() == filecontent);
+		assert(files.size() == 3);
+
+		mapstruct filestodelete = rpc.getFileToDelete();
+		assert(filestodelete[".vpl_directrun.sh"]->getLong() == 1);
+		assert(filestodelete.size() == 1);
+
+		mapstruct fileencoding = rpc.getFileEncoding();
+		assert(fileencoding[".vpl_directrun.sh"]->getLong() == 0);
+		assert(fileencoding["a.c"]->getLong() == 0);
+		assert(fileencoding["b.c"]->getLong() == 0);
+		assert(fileencoding.size() == 3);
+	}
+
 public:
 	string name() {
 		return "XMLRPC class";
@@ -97,6 +140,7 @@ public:
 		testStop();
 		testRunning();
 		testRequest();
+		testDirectrun();
 	}
 };
 

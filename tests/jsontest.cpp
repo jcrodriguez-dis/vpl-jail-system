@@ -158,6 +158,55 @@ class JSONRPCTest: public BaseTest {
 		assert( 9000 == response->child("secureport")->getLong());
 	}
 
+	void testDirectrun() {
+		string rawdata = Util::readFile("./jsondata/directrun.json");
+		JSONRPC rpc(rawdata);
+		
+		string method = rpc.getMethodName();
+		assert(rpc.getId() == "3-79866-684945600");
+		assert(method == "directrun");
+		mapstruct data = rpc.getData();
+		assert(data["maxtime"]->getLong() == 1000000);
+		assert(data["maxfilesize"]->getLong() == 1000000000);
+		assert(data["maxmemory"]->getLong() == 1000000000);
+		assert(data["maxprocesses"]->getLong() == 10000);
+		assert(data["execute"]->getString() == ".vpl_directrun.sh");
+		assert(data["interactive"]->getInt() == 1);
+		assert(data["lang"]->getString() == "en_US.UTF-8");
+		assert(data["pluginversion"]->getLong() == 2021061600L);
+
+		mapstruct files = rpc.getFiles();
+		string correct, calculated;
+		correct = "test file a.c";
+		assert(files["a.c"]->getString() == correct);
+		correct = "test file b.c";
+		assert(files["b.c"]->getString() == correct);
+		correct = "test file .vpl_directrun.sh";
+		calculated = files[".vpl_directrun.sh"]->getString();
+		assert(calculated == correct);
+		assert(files.size() == 3);
+		mapstruct filestodelete = rpc.getFileToDelete();
+		assert(filestodelete[".vpl_directrun.sh"]->getInt() == 1);
+		assert(filestodelete.size() == 1);
+		mapstruct fileencoding = rpc.getFileEncoding();
+		assert(fileencoding[".vpl_directrun.sh"]->getLong() == 0);
+		assert(fileencoding["a.c"]->getLong() == 0);
+		assert(fileencoding["b.c"]->getLong() == 0);
+		assert(fileencoding.size() == 3);
+
+		string reponseString = rpc.directRunResponse("/home/p12003", "sfdkjhkwehrweisdfh", "uiekhf\n\\ldsfkj", 8000, 9000);
+		JSON responseJSON(reponseString);
+		TreeNode* root = responseJSON.getRoot();
+		assert(root->child("jsonrpc")->getString() == "2.0");
+		assert(root->child("id")->getString() == rpc.getId());
+		TreeNode* response = root->child("result");
+		assert( "/home/p12003" == response->child("homepath")->getString());
+		assert( "sfdkjhkwehrweisdfh" == response->child("adminticket")->getString());
+		assert( "uiekhf\n\\ldsfkj" == response->child("executionticket")->getString());
+		assert( 8000 == response->child("port")->getLong());
+		assert( 9000 == response->child("secureport")->getLong());
+	}
+
 public:
 	string name() {
 		return "JSONRPC class";
@@ -169,6 +218,7 @@ public:
 		testStop();
 		testRunning();
 		testRequest();
+		testDirectrun();
 	}
 };
 

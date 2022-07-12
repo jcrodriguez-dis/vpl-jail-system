@@ -161,10 +161,11 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 	}
 }
 
-void Jail::commandDirectRun(RPC &rpc, string &adminticket, string &executionticket){
+void Jail::commandDirectRun(RPC &rpc, string &homepath, string &adminticket, string &executionticket){
 	mapstruct parsedata = rpc.getData();
 	syslog(LOG_INFO,"Request for direct run");
 	processMonitor pm(adminticket, executionticket);
+	homepath = pm.getRelativeHomePath();
 	pid_t pid = fork();
 	if (pid == 0) { //new process
 		try {
@@ -679,9 +680,10 @@ void Jail::process(Socket *socket){
 								configuration->getPort(),
 								configuration->getSecurePort()));
 			} else if(request == "directrun") {
-				string adminticket, executionticket;
-				commandDirectRun(rpc, adminticket, executionticket);
-				server.send200(rpc.directRunResponse(adminticket,
+				string homepath, adminticket, executionticket;
+				commandDirectRun(rpc, homepath, adminticket, executionticket);
+				server.send200(rpc.directRunResponse(homepath,
+								adminticket,
 								executionticket,
 								configuration->getPort(),
 								configuration->getSecurePort()));

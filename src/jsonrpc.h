@@ -82,9 +82,10 @@ public:
 		return responseWraper(response);
 	}
 
-	string directRunResponse(const string adminticket, const string executionticket,
-	                         int port, int secuport) {
+	string directRunResponse(const string homepath, const string adminticket,
+							 const string executionticket, int port, int secuport) {
 		string response = "{";
+		response += responseMember("homepath", homepath) + ",";
 		response += responseMember("adminticket", adminticket) + ",";
 		response += responseMember("executionticket", executionticket) + ",";
 		response += responseMember("port", port) + ",";

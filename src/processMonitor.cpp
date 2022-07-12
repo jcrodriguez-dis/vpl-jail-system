@@ -89,18 +89,25 @@ void processMonitor::stopPrisonerProcess(int prisoner, bool soft) {
 }
 
 /**
+ * return prisoner relative home page
+ */
+string processMonitor::prisonerRelativeHomePath() {
+	char buf[100];
+	sprintf(buf, "/home/p%d", prisoner);
+	return buf;
+}
+
+/**
  * return prisoner home page
  * if user root absolute path if prisoner relative to jail path
  */
 string processMonitor::prisonerHomePath() {
-	char buf[100];
-	sprintf(buf, "/home/p%d", prisoner);
 	uid_t uid = getuid();
 	if (uid != 0) {
 		syslog(LOG_ERR, "Security problem? prisonerHomePath %d", uid);
-		return buf;
+		return prisonerRelativeHomePath();
 	}
-	return configuration->getJailPath() + buf;
+	return configuration->getJailPath() + prisonerRelativeHomePath();
 }
 
 /**

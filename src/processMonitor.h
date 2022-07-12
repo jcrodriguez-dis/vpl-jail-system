@@ -44,7 +44,6 @@ class processMonitor{
 	ConfigData readInfo();
 	void writeState();
 	void readState();
-	string prisonerHomePath();
 	void selectPrisoner();
 	void removePrisonerHome();
 	static void catchSIGTERM(int n){}
@@ -72,6 +71,8 @@ public:
 	processMonitor(string & adminticket, string & monitorticket, string & executionticket);
 	processMonitor(string & adminticket, string & executionticket);
 	processMonitor(string ticket);
+	string prisonerRelativeHomePath();
+	string prisonerHomePath();
 	bool FileExists(string);
 	bool controlFileExists(string);
 	string readFile(string);
