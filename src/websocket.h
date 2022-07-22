@@ -23,10 +23,10 @@ class webSocket{
 	string receiveBuffer;
 	FrameType lFrameType;
 	string getHandshakeAnswer();
-	int frameSize(const string &data
-			,int &control_size,int &mask_size, int &payload_size);
+	long long frameSize(const string &data
+			,int &control_size,int &mask_size, long long &payload_size);
 	bool isFrameComplete(const string &data);
-	string decodeFrame(string &data, FrameType &);
+	string decodeFrame(string &data, FrameType &, bool &);
 	string encodeFrame(const string &rdata, FrameType);
 public:
 	webSocket(Socket *s);

@@ -53,44 +53,49 @@ string webSocket::getHandshakeAnswer(){
 	return ret;
 }
 
-int webSocket::frameSize(const string &data
-		,int &control_size,int &mask_size, int &payload_size){
-	control_size=2;
-	mask_size=0;
-	payload_size=0;
-	const unsigned char *rawdata=(const unsigned char *)data.data();
-	if((int) data.size() <
-			control_size+mask_size+payload_size) return -1;
-	//Is masked frame (must be musked)
-	mask_size=(rawdata[1]&0x80) ? 4:0;
-	payload_size=rawdata[1]&0x7f;
-	if((int) data.size() <
-			control_size+mask_size+payload_size) return -1;
-	if(payload_size == 126){
-		control_size +=2; //for len extension
-		payload_size = (rawdata[2] << 8)+rawdata[3];
-	}else if (payload_size == 127){
-		//NOTE payload large than int32 NOT supported
-		control_size +=8;
-		payload_size = (rawdata[7] << 16)
-			        		  +(rawdata[8] << 8)
-			        		  +rawdata[9];
+long long webSocket::frameSize(const string &data
+		,int &control_size,int &mask_size, long long &payload_size){
+	control_size = 2;
+	mask_size = 0;
+	payload_size = 0;
+	const unsigned char *rawdata = (const unsigned char *)data.data();
+	if (data.size() < control_size + mask_size + payload_size) {
+		return -1;
 	}
-	return control_size+mask_size+payload_size;
+	//Is masked frame (must be musked)
+	mask_size = (rawdata[1] & 0x80) ? 4:0;
+	payload_size = rawdata[1] & 0x7f;
+	if( data.size() < control_size + mask_size + payload_size) {
+		return -1;
+	}
+	if (payload_size == 126) {
+		control_size += 2; //for len extension
+		payload_size = (((unsigned int) rawdata[2]) << 8);
+		payload_size += rawdata[3];
+	}else if (payload_size == 127) {
+		payload_size += ((unsigned long long) rawdata[5] << 32);
+		payload_size += ((unsigned long long) rawdata[6] << 24);
+		payload_size += ((unsigned long long) rawdata[7] << 16);
+		payload_size += ((unsigned long long) rawdata[8] << 8);
+		payload_size += rawdata[9];
+	}
+	return control_size + mask_size + payload_size;
 }
 
 bool webSocket::isFrameComplete(const string &data){
-	int control_size,mask_size, payload_size;
-	int fSize = frameSize(data,control_size,mask_size,payload_size);
-	if(fSize == -1) return false;
+	int control_size, mask_size;
+	long long payload_size;
+	long long fSize = frameSize(data, control_size, mask_size, payload_size);
+	if (fSize == -1) return false;
 	return (int) data.size() >= fSize;
 }
 
-string webSocket::decodeFrame(string &data, FrameType &ft){
-	int control_size, mask_size,payload_size;
-	int fSize = frameSize(data,control_size,mask_size,payload_size);
+string webSocket::decodeFrame(string &data, FrameType &ft, bool &fin){
+	int control_size, mask_size;
+	long long payload_size;
+	int fSize = frameSize(data, control_size, mask_size, payload_size);
 	//syslog(LOG_DEBUG,"Decoding frame %d=%d+%d+%d",fSize,control_size,mask_size,payload_size);
-	if(fSize==-1 || (int) data.size() < fSize){
+	if(fSize == -1 || (int) data.size() < fSize){
 		ft = ERROR_FRAME;
 		return "Frame size too large";
 	}
@@ -103,8 +108,10 @@ string webSocket::decodeFrame(string &data, FrameType &ft){
 		ft = ERROR_FRAME;
 		return "Websocket extensions unsupported";
 	}
-
-	ft = (FrameType) (rawdata[0] & 0x0f);
+	fin = (rawdata[0] & 0x80) > 0;
+	if ((FrameType) (rawdata[0] & 0x0f) != CONTINUATION_FRAME) {
+		ft = (FrameType) (rawdata[0] & 0x0f);
+	}
 	//syslog(LOG_DEBUG,"Frame type %d",(int)ft);
 	string ret(payload_size, '\0');
 	unsigned char *rawret = (unsigned char *)ret.c_str();
@@ -123,32 +130,34 @@ string webSocket::decodeFrame(string &data, FrameType &ft){
 }
 
 string webSocket::encodeFrame(const string &rdata, FrameType ft){
-	int control_size =2 ;
+	int control_size = 2;
 	string data = rdata;
-	if(base64 && ft == BINARY_FRAME){
+	if (base64 && ft == BINARY_FRAME) {
 		data = Base64::encode(data);
 		//syslog(LOG_DEBUG,"Base64::encode %s",data.c_str());
 		ft = TEXT_FRAME;
 	}
-	int payload_size = data.size();
-	if(payload_size > 125)
+	long long int payload_size = data.size();
+	if (payload_size > 125)
 		control_size += 2;
-	if(payload_size > 0xFFFF)
+	if (payload_size > 0xFFFF)
 		control_size += 6;
-	string ret(control_size+payload_size, '\0');
+	string ret(control_size + payload_size, '\0');
 	ret[0] = 0x80 | ft;
-	if(payload_size < 126){
+	if (payload_size <= 125) {
 		ret[1] = payload_size;
-	}else if(payload_size < 0xffff){
+	} else if (payload_size <= 0xffff) {
 		ret[1] = 126;
 		ret[2] = payload_size >> 8;
 		ret[3] = payload_size & 0XFF;
-	}else{
+	} else {
 		ret[1] = 127;
-		for(int i = 2 ; i < 7 ; i++)
+		for(int i = 2 ; i < 5 ; i++)
 			ret[i] = 0;
-		ret[7] = payload_size >> 16;
-		ret[8] =( payload_size >> 8) & 0xff;
+		ret[5] = (payload_size >> 32) & 0xff;
+		ret[6] = (payload_size >> 24) & 0xff;
+		ret[7] = (payload_size >> 16) & 0xff;
+		ret[8] = (payload_size >> 8) & 0xff;
 		ret[9] = payload_size & 0xff;
 	}
 	for(int i = 0; i < payload_size; i++)
@@ -164,38 +173,48 @@ webSocket::webSocket(Socket *s){
 }
 
 string webSocket::receive(){
+	static string previous_data;
 	receiveBuffer += socket->receive();
 	if (isFrameComplete(receiveBuffer)) {
 		//syslog(LOG_INFO,"Websocket receive frame \"%s\"",receiveBuffer.c_str());
-		string data = decodeFrame(receiveBuffer, lFrameType);
+		bool fin;
+		string data = decodeFrame(receiveBuffer, lFrameType, fin);
 		//syslog(LOG_INFO,"Websocket receive type %d data \"%s\"",ft,data.c_str());
-		switch(lFrameType) {
-			case CONTINUATION_FRAME:
+		switch (lFrameType) {
 			case TEXT_FRAME:
 			case BINARY_FRAME:
-				return data;
+				if (fin) {
+					if (previous_data.size() > 0 ) {
+						data = previous_data + data;
+						previous_data = "";
+					}
+					return data;
+				} else {
+					previous_data += data;
+					return "";
+				}
 				break;
 			case CONNECTION_CLOSE_FRAME:
-			{
-				close(data);
-				socket->close();
-				break;
-			}
+				{
+					close("Bye");
+					socket->close();
+					break;
+				}
 			case PING_FRAME:
-			{
-				string pong=encodeFrame("Hello", PONG_FRAME);
-				socket->send(pong);
-				break;
-			}
+				{
+					string pong=encodeFrame("Hello", PONG_FRAME);
+					socket->send(pong);
+					break;
+				}
 			case PONG_FRAME: //Do nothing
 				break;
 			default:
 			case ERROR_FRAME:
-			{
-				close("Error");
-				socket->close();
-				break;
-			}
+				{
+					close("Error");
+					socket->close();
+					break;
+				}
 		}
 	}
 	return "";
@@ -209,9 +228,9 @@ void webSocket::send(const string &s, FrameType ft){
 }
 void webSocket::close(string t){
 	if(!closeSent){
-		string bye=encodeFrame(t,CONNECTION_CLOSE_FRAME);
+		string bye = encodeFrame(t, CONNECTION_CLOSE_FRAME);
 		socket->send(bye);
-		closeSent=true;
+		closeSent = true;
 	}
 }
 

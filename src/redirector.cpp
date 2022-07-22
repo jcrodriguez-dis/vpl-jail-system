@@ -281,79 +281,79 @@ void RedirectorVNC::advance() {
 		state=connecting;
 	}
 	/* no break */
-	case connecting:{
+	case connecting: {
 		struct sockaddr_in sdir;
 		memset(&sdir, 0, sizeof(sdir));
 		sdir.sin_family = AF_INET;
 		inet_pton(AF_INET,"127.0.0.1",&sdir.sin_addr);
 		sdir.sin_port = htons( port );
-		if(connect(sock, (const sockaddr*)&sdir, sizeof(sdir))==0){
+		if (connect(sock, (const sockaddr*)&sdir, sizeof(sdir))==0) {
 			//fdblock(sock,true);
-			state=connected;
+			state = connected;
 			break;
 		}else{
 			syslog(LOG_INFO, "socket connect to (127.0.0.1:%d) error: %m",(int)port);
 			usleep(100000); // 1/10 seg
 		}
-		if(timeout<time(NULL)){
+		if (timeout < time(NULL)) {
 			syslog(LOG_ERR, "socket connect timeout: %m");
-			state=error;
+			state = error;
 		}
 		break;
 	}
 	case connected:{
 		//Poll to write and read from program and net
-		if(ws->isClosed()){
-			syslog(LOG_INFO,"Websocket closed by client");
+		if (ws->isClosed()) {
+			syslog(LOG_INFO, "Websocket closed by client");
 			state = end;
 			break;
 		}
-		if(ws->isReadBuffered())
+		if (ws->isReadBuffered())
 			netbuf += ws->receive(); //Read client data
 		struct pollfd devices[2];
-		devices[0].fd=sock;
-		devices[1].fd=ws->getSocket();
-		char buf[MAX];
-		if(netbuf.size()) devices[0].events=POLLREAD|POLLOUT;
-		else devices[0].events=POLLREAD;
-		devices[1].events=POLLREAD;
-		int res=poll(devices,2,polltimeout);
-		if(res==-1) { //Error
+		devices[0].fd = sock;
+		devices[1].fd = ws->getSocket();
+		if(netbuf.size()) devices[0].events = POLLREAD|POLLOUT;
+		else devices[0].events = POLLREAD;
+		devices[1].events = POLLREAD;
+		int res = poll(devices, 2, polltimeout);
+		if (res == -1) { //Error
 			syslog(LOG_INFO,"pool error %m");
 			state = error;
 			break;
 		}
-		if(res==0) break; //Nothing to do
-		syslog(LOG_INFO,"poll: server socket %d %s",
+		if (res == 0) break; //Nothing to do
+		syslog(LOG_INFO, "poll: server socket %d %s",
 				devices[0].revents,eventsToString(devices[0].revents).c_str());
-	    syslog(LOG_INFO,"poll: client socket %d %s",
+	    syslog(LOG_INFO, "poll: client socket %d %s",
 				devices[1].revents,eventsToString(devices[1].revents).c_str());
 		if(devices[1].revents & POLLREAD){ //Read vnc client data
 			netbuf += ws->receive();
 		}
 		if(devices[0].revents & POLLREAD){ //Read vncserver data
-			int readsize=read(sock,buf,MAX);
+			char buf[MAX];
+			int readsize = read(sock, buf, MAX);
 			if(readsize <= 0){ //Socket closed or error
 				if(readsize < 0)
 					syslog(LOG_INFO,"Receive from vncserver error: %m");
 				else
 					syslog(LOG_INFO,"Receive from vncserver size==0: %m");
-				state=ending;
+				state = ending;
 				break;
 			}
-			ws->send(string(buf,readsize),BINARY_FRAME);
+			ws->send(string(buf, readsize), BINARY_FRAME);
 		}
-		if(netbuf.size()>0 && (devices[0].revents & POLLOUT)){ //Write to vncserver
-			int written=write(sock,netbuf.data(),netbuf.size());
-			if(written <=0) { //close or error
-				if(written<0)
+		if (netbuf.size()>0 && (devices[0].revents & POLLOUT)) { //Write to vncserver
+			int written = write(sock, netbuf.data(), netbuf.size());
+			if (written <= 0) { //close or error
+				if ( written < 0)
 					syslog(LOG_INFO,"Send to vncserver error: %m");
-				state=ending;
+				state = ending;
 				break;
 			}
-			netbuf.erase(0,written);
+			netbuf.erase(0, written);
 		}
-		if((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)){
+		if ((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)) {
 			syslog(LOG_INFO,"Vncserver end or I/O error: %m %d %s",devices[0].revents,eventsToString(devices[0].revents).c_str());
 			state=ending;
 			break;
@@ -365,12 +365,14 @@ void RedirectorVNC::advance() {
 		/* no break */
 	case end:
 	case error:
-		if(ws->isClosed())
+		if (ws->isClosed()) {
 			usleep(50000);
-		else ws->close();
+		} else {
+			ws->close();
+		}
 		break;
 	}
-	if(oldstate != state)
+	if (oldstate != state)
 		syslog(LOG_INFO,"New redirector state %d => %d",oldstate,state);
 }
 
