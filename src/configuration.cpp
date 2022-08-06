@@ -68,12 +68,13 @@ void Configuration::readConfigFile(){
 	configDefault["LOGLEVEL"] = "0";
 	configDefault["FAIL2BAN"] = "0";
 	configDefault["SSL_CIPHER_LIST"] = "";
+	configDefault["SSL_CIPHER_SUITES"] = "";
 	configDefault["SSL_CERT_FILE"] = "/etc/vpl/cert.pem";
 	configDefault["SSL_KEY_FILE"] = "/etc/vpl/key.pem";
 	configDefault["USE_CGROUP"] = "false";
 	configDefault["REQUEST_MAX_SIZE"] = "128 Mb";
 	configDefault["RESULT_MAX_SIZE"] = "32 Kb";
-	ConfigData data=ConfigurationFile::readConfiguration(configPath, configDefault);
+	ConfigData data = ConfigurationFile::readConfiguration(configPath, configDefault);
 	minPrisoner = atoi(data["MIN_PRISONER_UGID"].c_str());
 	if(minPrisoner < JAIL_MIN_PRISONER_UID)
 		throw "Incorrect MIN_PRISONER_UGID config value" + data["MIN_PRISONER_UGID"];
@@ -109,6 +110,7 @@ void Configuration::readConfigFile(){
 	logLevel = atoi(data["LOGLEVEL"].c_str());
 	fail2ban = atoi(data["FAIL2BAN"].c_str());
 	SSLCipherList = data["SSL_CIPHER_LIST"];
+	SSLCipherSuites = data["SSL_CIPHER_SUITES"];
 	SSLCertFile = data["SSL_CERT_FILE"];
 	SSLKeyFile = data["SSL_KEY_FILE"];
 	useCgroup = Util::toUppercase(data["USE_CGROUP"]) == "TRUE";

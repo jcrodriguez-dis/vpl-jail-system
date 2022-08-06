@@ -40,6 +40,7 @@ class SSLBase{
 	void createContext() {
 		Configuration* configuration = Configuration::getConfiguration();
 		const string cipherList = configuration->getSSLCipherList();
+		const string cipherSuites = configuration->getSSLCipherSuites();
 		const string certFile = configuration->getSSLCertFile();
 		const string keyFile = configuration->getSSLKeyFile();
 		#ifdef HAVE_TLS_SERVER_METHOD
@@ -69,9 +70,19 @@ class SSLBase{
 		} else if ( !SSL_CTX_check_private_key(newContext) ) {
 			syslog(LOG_EMERG,"SSL_CTX_check_private_key() fail: %s", getError());
 			fail = true;
-		} else if ( cipherList[0] && SSL_CTX_set_cipher_list(newContext, cipherList.c_str()) == 0) {
+		} else if ( cipherList.size() && SSL_CTX_set_cipher_list(newContext, cipherList.c_str()) == 0) {
 			syslog(LOG_EMERG,"SSL_CTX_set_cipher_list() fail: %s", getError());
 			fail = true;
+		} else if ( cipherSuites.size() ) {
+			#ifdef HAVE_SSL_CTX_SET_CIPHERSUITES
+				if (SSL_CTX_set_ciphersuites(newContext, cipherSuites.c_str()) == 0) {
+					syslog(LOG_EMERG,"SSL_CTX_set_ciphersuites() fail: %s", getError());
+					fail = true;
+				}
+			#else
+				syslog(LOG_EMERG,"SSL_CTX_set_ciphersuites() not available but parameter SSL_CIPHER_SUITES set");
+				fail = true;
+			#endif
 		}
 		if ( fail ) {
 			if (this->context == NULL) {

@@ -100,6 +100,10 @@ HOMESIZE=2G
 #In case of wanting to have Forward Secrecy the option must be: ECDHE
 SSL_CIPHER_LIST = EDFG
 
+#SSL_CIPHER_SUITES This parameters configure the available TLSv1.3 ciphersuites.
+#The parameter is a colon (":") separated TLSv1.3 ciphersuite names in order of preference.
+SSL_CIPHER_SUITES=MYSUITE:OTHERSUITE
+
 #SSL_CERT_FILE Indicates the path to the server's certificate
 # If your Certification Authority is not a root authority
 # you may need to add the chain of certificates of the intermediate CAs to this file.

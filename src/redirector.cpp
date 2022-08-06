@@ -313,7 +313,7 @@ void RedirectorVNC::advance() {
 		struct pollfd devices[2];
 		devices[0].fd = sock;
 		devices[1].fd = ws->getSocket();
-		if(netbuf.size()) devices[0].events = POLLREAD|POLLOUT;
+		if (netbuf.size()) devices[0].events = POLLREAD | POLLOUT;
 		else devices[0].events = POLLREAD;
 		devices[1].events = POLLREAD;
 		int res = poll(devices, 2, polltimeout);
@@ -327,10 +327,10 @@ void RedirectorVNC::advance() {
 				devices[0].revents,eventsToString(devices[0].revents).c_str());
 	    syslog(LOG_INFO, "poll: client socket %d %s",
 				devices[1].revents,eventsToString(devices[1].revents).c_str());
-		if(devices[1].revents & POLLREAD){ //Read vnc client data
+		if (devices[1].revents & POLLREAD) { //Read vnc client data.
 			netbuf += ws->receive();
 		}
-		if(devices[0].revents & POLLREAD){ //Read vncserver data
+		if (devices[0].revents & POLLREAD) { //Read vncserver data.
 			char buf[MAX];
 			int readsize = read(sock, buf, MAX);
 			if(readsize <= 0){ //Socket closed or error

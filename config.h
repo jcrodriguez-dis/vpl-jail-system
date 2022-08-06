@@ -69,6 +69,9 @@
 /* Define to 1 if you have the `socket' function. */
 #define HAVE_SOCKET 1
 
+/* Define to 1 if you have the `SSL_CTX_set_ciphersuites' function. */
+#define HAVE_SSL_CTX_SET_CIPHERSUITES 1
+
 /* Define to 1 if stdbool.h conforms to C99. */
 #define HAVE_STDBOOL_H 1
 

@@ -5718,7 +5718,8 @@ $as_echo "#define malloc rpl_malloc" >>confdefs.h
 fi
 
 
-for ac_func in getcwd inet_ntoa lchown memset mkdir regcomp rmdir socket strerror TLS_server_method
+for ac_func in getcwd inet_ntoa lchown memset mkdir regcomp rmdir socket\
+                strerror TLS_server_method SSL_CTX_set_ciphersuites
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"

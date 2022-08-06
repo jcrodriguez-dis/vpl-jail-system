@@ -43,7 +43,8 @@ AC_FUNC_CHOWN
 AC_FUNC_FORK
 AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
 AC_FUNC_MALLOC
-AC_CHECK_FUNCS([getcwd inet_ntoa lchown memset mkdir regcomp rmdir socket strerror TLS_server_method])
+AC_CHECK_FUNCS([getcwd inet_ntoa lchown memset mkdir regcomp rmdir socket\
+                strerror TLS_server_method SSL_CTX_set_ciphersuites])
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile])

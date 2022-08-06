@@ -49,6 +49,7 @@ class ConfigurationTest: public BaseTest {
 		assert(config->getLogLevel() == 0);
 		assert(config->getFail2Ban() == 0);
 		assert(config->getSSLCipherList() == "");
+		assert(config->getSSLCipherSuites() == "");
 		assert(config->getSSLCertFile() == "/etc/vpl/cert.pem");
 		assert(config->getSSLKeyFile() == "/etc/vpl/key.pem");
 		assert(config->getUseCGroup() == false);
@@ -82,6 +83,7 @@ class ConfigurationTest: public BaseTest {
 		assert(config->getLogLevel() == 1);
 		assert(config->getFail2Ban() == 7);
 		assert(config->getSSLCipherList() == "EDFG");
+		assert(config->getSSLCipherSuites() == "MYSUITE:OTHERSUITE");
 		assert(config->getSSLCertFile() == "/etc/ssl/public/cert.pem");
 		assert(config->getSSLKeyFile() == "/etc/ssl/private/key.pem");
 		assert(config->getUseCGroup() == true);
