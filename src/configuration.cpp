@@ -69,6 +69,7 @@ void Configuration::readConfigFile(){
 	configDefault["FAIL2BAN"] = "0";
 	configDefault["SSL_CIPHER_LIST"] = "";
 	configDefault["SSL_CIPHER_SUITES"] = "";
+	configDefault["HSTS_MAX_AGE"] = "";
 	configDefault["SSL_CERT_FILE"] = "/etc/vpl/cert.pem";
 	configDefault["SSL_KEY_FILE"] = "/etc/vpl/key.pem";
 	configDefault["USE_CGROUP"] = "false";
@@ -111,6 +112,10 @@ void Configuration::readConfigFile(){
 	fail2ban = atoi(data["FAIL2BAN"].c_str());
 	SSLCipherList = data["SSL_CIPHER_LIST"];
 	SSLCipherSuites = data["SSL_CIPHER_SUITES"];
+	HSTSMaxAge = -1;
+	if (port > 0 && data["HSTS_MAX_AGE"].size() > 0) {
+		HSTSMaxAge = atoi(data["HSTS_MAX_AGE"].c_str());
+	}
 	SSLCertFile = data["SSL_CERT_FILE"];
 	SSLKeyFile = data["SSL_KEY_FILE"];
 	useCgroup = Util::toUppercase(data["USE_CGROUP"]) == "TRUE";

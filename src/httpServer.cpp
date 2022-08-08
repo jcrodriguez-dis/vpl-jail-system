@@ -92,6 +92,10 @@ void HttpJailServer::send(int code, const string &codeText, const string &load,
 			output += extraHeader;
 		}
 		output += "Content-Length: " + Util::itos(load.size()) + "\r\n";
+		int HSTSMaxAge = Configuration::getConfiguration()->getHSTSMaxAge();
+		if (HSTSMaxAge >= 0) {
+			output += "Strict-Transport-Security: max-age=" + Util::itos(HSTSMaxAge) + "\r\n";
+		}
 		syslog(LOG_DEBUG,"Response Content-Length: %lu",(unsigned long)load.size());
 		output += "Content-Type: ";
 		if(load.find("<?xml ") == 0) {

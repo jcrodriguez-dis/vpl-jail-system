@@ -29,6 +29,7 @@ private:
 	int sport; // Ciphered communications port number
 	int logLevel; //Log level 0 to 8, 0 = no log, 8 += do not remove home dir.
 	int fail2ban; //Fail to ban configuration. Relation fail / success to ban IP
+	int HSTSMaxAge; // Max-age of HSTS response header
 	string SSLCipherList;
 	string SSLCipherSuites;
 	string SSLCertFile;
@@ -66,6 +67,7 @@ public:
 	const string &  getSSLCipherSuites() const { return SSLCipherSuites;}
 	const string &  getSSLCertFile() const { return SSLCertFile;}
 	const string &  getSSLKeyFile() const { return SSLKeyFile;}
+	int getHSTSMaxAge() const { return HSTSMaxAge;};
 	bool getUseCGroup() const { return useCgroup;};
 	int getRequestMaxSize() const { return requestMaxSize;};
 	int getResultMaxSize() const { return resultMaxSize;};
