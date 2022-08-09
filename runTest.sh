@@ -134,11 +134,28 @@ function WebSocket_tests() {
 	return 1
 }
 
+function create_docs() {
+	local result
+	rm docs.zip 2> /dev/null
+	cd docs
+	make clean 1> /dev/null
+	make html 1> /dev/null
+	result=$?
+	cd build
+	zip -r ../../docs.zip html 1> /dev/null
+	cd ../..
+	if [ "$result" != "0" ] ; then
+		return 1
+	else
+		return 111
+	fi
+}
+
 if [ "$1" != "" ] ; then
 	writeHeading "$1 of the vpl-jail-system"
 	runTests $1
 else
 	writeHeading "Tests of the vpl-jail-system"
-	runTests Autotools_execution Packaging_for_distribution Unit_tests WebSocket_tests
+	runTests Autotools_execution Packaging_for_distribution Unit_tests WebSocket_tests create_docs
 fi
 
