@@ -2,6 +2,38 @@
 Release notes
 *************
 
+V3.0.0
+======
+
+This release includes new features and improvements.
+
+* Adds a new run mode for web apps.
+  This mode allows accessing web apps from the client browser directly instead of interacting with a browser running on the server.
+  This will drastically reduce the server resources used by this type of app.
+
+* Adds support for JSON-RPC. The server detects if the request is XML-RPC or JSON-RPC and responds appropriately.
+  This feature allows using the server with older clients (Moodle VPL plugin version < 4.0.0)
+  and new clients that run on PHP 8 or higher without XML-RPC support.
+  Using JSON-RPC also removes the limits of XML-RPC ints.
+
+* Adds a new RPC call named "update".
+  This RPC call allows updating files in the execution environment from the client without stopping the executing task.
+  This call is useful for interpreted languages such as PHP in a web app.
+
+* Adds a new RPC call named "directrun".
+  This RPC call will allow new future features.
+
+* The WebSocket protocol is improved to accept larges packets and fragmented packets.
+
+* Adds :ref:`SSL_CIPHER_SUITES` configuration parameter.
+  This parameter is used to set ciphers for TLSv1.3 if available.
+
+* Adds :ref:`HSTS_MAX_AGE` configuration parameter.
+  This parameter allows HTTP Strict-Transport-Security by setting the max-age parameter of the Strict-Transport-Security header.
+  This parameter requires the use of :ref:`PORT` = 0.
+
+* The installer adds **Julia programming language** to the list of development software installable.
+
 V2.7.2
 ======
 

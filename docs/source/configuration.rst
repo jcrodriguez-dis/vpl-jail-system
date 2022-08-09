@@ -48,6 +48,8 @@ Example:
 Network parameters
 ==================
 
+.. _PORT:
+
 PORT
 ^^^^
 Socket port number to listen for *http* and *ws* connections (no ciphers). The default value is 80.
@@ -91,7 +93,7 @@ SSL_CIPHER_LIST
 ^^^^^^^^^^^^^^^
 .. versionadded:: 2.6.0
 
-This parameter specifies ciphering options for SSL.
+This parameter specifies ciphers for TSL version lower than v1.3.
 In case of wanting to have Forward Secrecy, the value must be ECDHE.
 The default value is SSL_CIPHER_LIST=
 
@@ -100,6 +102,38 @@ Example:
 .. code:: bash
 
 	SSL_CIPHER_LIST=ECDHE
+
+.. _SSL_CIPHER_SUITES:
+
+SSL_CIPHER_SUITES
+^^^^^^^^^^^^^^^^^
+.. versionadded:: 3.0.0
+
+This parameter specifies ciphers for TSLv1.3.
+The parameter is a colon (":") separated list of TLSv1.3 ciphers names in order of preference.
+The default value is SSL_CIPHER_SUITES=
+
+Example:
+
+.. code:: bash
+
+	SSL_CIPHER_SUITES=ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384
+
+.. _HSTS_MAX_AGE:
+
+HSTS_MAX_AGE
+^^^^^^^^^^^^
+.. versionadded:: 3.0.0
+
+This parameter allows HTTP Strict-Transport-Security by setting the max-age parameter of the Strict-Transport-Security HTTP header.
+This parameter requires not accepting non-ciphered requests, then you must also use `PORT`_ = 0.
+With the proper ciphers and this feature activated you will get A+ in the server check of the SSL Labs.
+
+Example:
+
+.. code:: bash
+
+	HSTS_MAX_AGE=31536000
 
 SSL_CERT_FILE
 ^^^^^^^^^^^^^
