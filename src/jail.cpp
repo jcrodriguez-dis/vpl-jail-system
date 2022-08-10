@@ -230,51 +230,43 @@ void Jail::commandGetResult(string adminticket, string &compilation,
 
 bool Jail::commandUpdate(string adminticket, RPC &rpc){
 	processMonitor pm(adminticket);
-	pid_t pid=fork();
-	if(pid==0){ //new process
-		try {
-			mapstruct files = rpc.getFiles();
-			syslog(LOG_INFO,"parse files %lu", (long unsigned int)files.size());
-			mapstruct fileencoding = rpc.getFileEncoding();
-			//Save files to execution dir and options, decode data if needed
-			for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
-				string name = i->first;
-				string data = i->second->getString();
-				if ( fileencoding.find(name) != fileencoding.end()
-					 && fileencoding[name]->getInt() == 1 ) {
-					syslog(LOG_INFO, "Decoding file %s from b64", name.c_str());
-					data = Base64::decode(data);
-					if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
-						name = name.substr(0, name.length() - 4);
-					}
+	try {
+		mapstruct files = rpc.getFiles();
+		syslog(LOG_INFO,"parse files %lu", (long unsigned int)files.size());
+		mapstruct fileencoding = rpc.getFileEncoding();
+		//Save files to execution dir and options, decode data if needed
+		for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
+			string name = i->first;
+			string data = i->second->getString();
+			if ( fileencoding.find(name) != fileencoding.end()
+					&& fileencoding[name]->getInt() == 1 ) {
+				syslog(LOG_INFO, "Decoding file %s from b64", name.c_str());
+				data = Base64::decode(data);
+				if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
+					name = name.substr(0, name.length() - 4);
 				}
-				syslog(LOG_INFO, "Write file %s data size %lu", name.c_str(), (long unsigned int)data.size());
-				pm.writeFile(name, data);
 			}
+			syslog(LOG_INFO, "Write file %s data size %lu", name.c_str(), (long unsigned int)data.size());
+			pm.writeFile(name, data);
 		}
-		catch(std::exception &e){
-			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.what(), __FILE__, __LINE__);
-			_exit(EXIT_FAILURE 	);
-		}
-		catch(string &e){
-			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.c_str(), __FILE__, __LINE__);
-			_exit(EXIT_FAILURE 	);
-		}
-		catch(HttpException &e){
-			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.getLog().c_str(), __FILE__, __LINE__);
-			_exit(EXIT_FAILURE 	);
-		}
-		catch(const char *e){
-			syslog(LOG_ERR, "unexpected exception: %s %s:%d", e,__FILE__, __LINE__);
-			_exit(EXIT_FAILURE 	);
-		}
-		catch(...){
-			syslog(LOG_ERR, "unexpected exception %s:%d", __FILE__, __LINE__);
-			_exit(EXIT_FAILURE 	);
-		}
-		_exit(EXIT_SUCCESS);
+		return true;
 	}
-	return true;
+	catch(std::exception &e){
+		syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.what(), __FILE__, __LINE__);
+	}
+	catch(string &e){
+		syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.c_str(), __FILE__, __LINE__);
+	}
+	catch(HttpException &e){
+		syslog(LOG_ERR, "unexpected exception: %s %s:%d", e.getLog().c_str(), __FILE__, __LINE__);
+	}
+	catch(const char *e){
+		syslog(LOG_ERR, "unexpected exception: %s %s:%d", e,__FILE__, __LINE__);
+	}
+	catch(...){
+		syslog(LOG_ERR, "unexpected exception %s:%d", __FILE__, __LINE__);
+	}
+	return false;
 }
 
 bool Jail::commandRunning(string adminticket){
