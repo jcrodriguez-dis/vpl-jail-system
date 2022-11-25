@@ -20,8 +20,18 @@ class JSONRPCTest: public BaseTest {
 		data = "\\\nsome \rlines\n\t   \n";
 		converted = JSON::decodeJSONString(JSON::encodeJSONString(data), 0, 10000);
 		assert(data == converted);
-		data = "\\áéíóúÑñ\n";
+		data = "\\áéíóúÑñ";
 		converted = JSON::decodeJSONString(JSON::encodeJSONString(data), 0, 10000);
+		assert(data == converted);
+		string encoded = "\\\\\\u00e1\\u00e9\\u00ed\\u00f3\\u00fa\\u00d1\\u00f1";
+		converted = JSON::decodeJSONString(encoded, 0, 10000);
+		assert(data == converted);
+		data = "😀😇👺🤜🔲🔢";
+		converted = JSON::decodeJSONString(JSON::encodeJSONString(data), 0, 10000);
+		assert(data == converted);
+		encoded = "\\ud83d\\ude00\\ud83d\\ude07\\ud83d\\udc7a"
+		 		  "\\ud83e\\udd1c\\ud83d\\udd32\\ud83d\\udd22";
+		converted = JSON::decodeJSONString(encoded, 0, 10000);
 		assert(data == converted);
 	}
 

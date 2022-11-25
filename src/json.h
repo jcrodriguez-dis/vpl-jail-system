@@ -238,32 +238,56 @@ public:
 	}
 
 	static string decodeHexaUnicodeToUTF8(const string &data, size_t &i) {
-		if (i + 4 >= data.size()) {
-			throw "JSON string coding \\u error";
-		} else {
-			size_t unicode;
-			string result;
-    		std::stringstream ss;
-    		ss << std::hex << data.substr(i, 4);
-    		ss >> unicode;
-			if (unicode <= 0x007F) {
-				result = "X";
-				result[0] = (unsigned char) unicode;
-			} else if (unicode <= 0x07FF) {
-				result = "XX";
-				result[0] = (unsigned char) (((unicode >> 6) & 0x1F) | 0xC0);
-				result[1] = (unsigned char) ((unicode & 0x3F) | 0x80);
-			} else {
-				result = "XXX";
-				result[0] = (unsigned char) (((unicode >> 12) & 0x0F) | 0xE0);
-				result[1] = (unsigned char) (((unicode >>  6) & 0x3F) | 0x80);
-				result[2] = (unsigned char) ((unicode & 0x3F) | 0x80);
-			}
-			i += 3;
-			return result;
+		if (i + 4 > data.size()) {
+			i = data.size() - 1;
+			return "�"; // The replacement character
 		}
-
+		size_t unicode;
+		string result;
+		std::stringstream ss;
+		ss << std::hex << data.substr(i, 4);
+		ss >> unicode;
+		if (unicode <= 0x007F) {
+			result = "X";
+			result[0] = (unsigned char) unicode;
+		} else if (unicode <= 0x07FF) {
+			result = "XX";
+			result[0] = (unsigned char) (((unicode >> 6) & 0x1F) | 0xC0);
+			result[1] = (unsigned char) ((unicode & 0x3F) | 0x80);
+		} else if (unicode >= 0xD800lu && unicode < 0xDC00lu) { // Supplementary Planes
+			// Supplementary Planes (0x10000-0x10FFFF) are encoded using surrogate pairs UTF-16
+			size_t high_su = unicode;
+			size_t low_su;
+			if (data.substr(i + 4, 2) != "\\u" || i + 10 > data.size()) {
+				i += 3;
+				return "�";  // The replacement character
+			}
+			ss.clear();
+			ss << std::hex << data.substr(i + 6, 4);
+			ss >> low_su;
+			if (!(low_su >= 0xDC00lu && low_su <= 0xDFFFlu)) {
+				i += 6;
+				return "��";  // The replacement character
+			}
+			unicode = (((high_su & 0x3FFlu) << 10) | (low_su & 0x3FFlu)) + 0x10000lu;
+			result = "XXXX";
+			result[0] = (unsigned char) (((unicode >> 18) & 0x07lu) | 0xF0lu);
+			result[1] = (unsigned char) (((unicode >>  12) & 0x3Flu) | 0x80lu);
+			result[2] = (unsigned char) (((unicode >>  6) & 0x3Flu) | 0x80lu);
+			result[3] = (unsigned char) ((unicode & 0x3Flu) | 0x80lu);
+			i += 6;
+		} else if (unicode >= 0xDC00lu && unicode <= 0xDFFFlu) { // Supplementary Planes
+			result = "�";  // The replacement character
+		} else {
+			result = "XXX";
+			result[0] = (unsigned char) (((unicode >> 12) & 0x0F) | 0xE0);
+			result[1] = (unsigned char) (((unicode >>  6) & 0x3F) | 0x80);
+			result[2] = (unsigned char) ((unicode & 0x3F) | 0x80);
+		}
+		i += 3;
+		return result;
 	}
+
 	static string decodeJSONString(const string &data, size_t i, size_t len) {
 		string ret;
 		size_t limit = i + len <= data.size() ? i + len : data.size();
