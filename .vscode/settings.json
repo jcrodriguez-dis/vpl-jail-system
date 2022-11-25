@@ -66,6 +66,8 @@
         "locale": "cpp",
         "queue": "cpp",
         "stack": "cpp",
-        "cstdbool": "cpp"
-    }
+        "cstdbool": "cpp",
+        "set": "cpp"
+    },
+    "esbonio.sphinx.confDir": "${workspaceFolder}/docs/source"
 }
