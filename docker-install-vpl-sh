@@ -1,0 +1,264 @@
+#!/bin/bash
+# package:		Part of vpl-jail-system
+# copyright:    Copyright (C) 2014 Juan Carlos Rodriguez-del-Pino
+# license:      GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl.txt
+# Description:  Script to install vpl-jail-system (Ubuntu 12 and CentOS)
+echo "INSTALLING VPL-JAIL-SYSTEM"
+echo "=========================="
+LOGFILE=/var/log/vpl_installation.log
+VPL_PROGRAMS_DIR=/usr/sbin/vpl
+VPL_CONFIG_DIR=/etc/vpl
+date >$LOGFILE
+exec &> >(tee $LOGFILE)
+
+echo "Using APT package manager"
+echo "Updating distribution software DB"
+apt-get update >>$LOGFILE
+function vpl_install_base {
+	apt-get -q -y --allow-unauthenticated install $1 >>$LOGFILE
+	return $?
+}
+function vpl_install_check {
+	apt-cache pkgnames $1 | grep -q -x -F $1
+	return $?
+}
+
+echo "Using system V service manager"	 
+function vpl_install_service {
+	cp vpl-jail-system.initd /etc/init.d/vpl-jail-system
+	chmod +x /etc/init.d/vpl-jail-system
+	if [ "$(command -v update-rc.d)" != "" ] ; then
+		update-rc.d -f vpl-jail-system remove >>$LOGFILE
+		update-rc.d vpl-jail-system defaults >>$LOGFILE
+	else
+		if [ "$(command -v chkconfig)" != "" ] ; then
+			chkconfig --add vpl-jail-system  >>$LOGFILE
+		else
+			echo "ERROR installing the service. Not found update-rc.d or chkconfig"
+		fi
+	fi
+}
+function vpl_stop_service {
+	service vpl-jail-system stop
+}
+
+function vpl_check_selinux {
+	if [ "$(command -v setenforce)" != "" ] ; then
+		echo "Your system seems to be using SELinux."
+		echo "You may need to disable or configure SELinux to install and run vpl-jail-system service"
+		echo "To reactivate the vpl-jail-system service run:"
+		echo "systemctl daemon-reload"
+		echo "systemctl enable vpl-jail-system"
+		echo "systemctl start vpl-jail-system"
+	fi
+}
+function vpl_install {
+	local found=0
+	local checked=""
+	echo -n "Installing $1: "
+	shift
+	while [ "$#" != "0" ] ; do
+		checked="$checked $1"
+   		vpl_install_check $1
+		if [ $? -eq 0 ] ; then
+	   	   echo -n $1
+	       vpl_install_base $1
+	   	   if [ $? -eq 0 ] ; then
+	   	   		found=1
+	   	   		echo " [OK]"
+	   	   else
+	   	   		echo " [ERROR]"
+	   	   fi
+	       break
+   	   fi
+       shift
+   done
+   if [ $found -eq 0 ] ; then
+   	   echo "[Package not found. Checked$checked]"
+   fi
+}
+
+function vpl_install_npm_check {
+    vpl_install_check npm
+	if [ $? -eq 0 ] ; then
+		vpl_install_base npm
+	fi
+}
+
+function vpl_install_npm {
+    vpl_install_check npm
+	if [ $? -eq 0 ] ; then
+		vpl_install_base npm
+	fi
+	local found=1
+	local checked=""
+	echo -n "Installing $1 (using npm): "
+	shift
+	while [ "$#" != "0" ] ; do
+	    checked="$checked $1"
+   	    npm install -g $1 &> /dev/null
+   	    if [ $? -eq 0 ] ; then
+   	   	    echo " [OK]"
+	        found=0
+   	   	    break
+   	    fi
+        shift
+   done
+   if [ $found -eq 1 ] ; then
+   	   echo "[Package npm not found. Checked $checked"
+   fi
+}
+
+function vpl_install_daemon() {
+	echo "Preparing daemon compilation"
+	./configure >>$LOGFILE
+	echo "Compiling daemon (vpl-jail-server)"
+	make >>$LOGFILE
+	if [ -d $VPL_CONFIG_DIR ] ; then
+		echo "Updating installation => $VPL_CONFIG_DIR"
+		#Stop service
+		vpl_stop_service >>$LOGFILE
+	else
+		echo "Installing => $VPL_CONFIG_DIR"
+		mkdir $VPL_CONFIG_DIR
+	fi
+	if [ ! -d $VPL_PROGRAMS_DIR ] ; then
+		mkdir $VPL_PROGRAMS_DIR
+	fi
+	#Copy daemon 
+	cp src/vpl-jail-server $VPL_PROGRAMS_DIR
+}
+echo "Installation log file => $LOGFILE"
+if [ "$1" == "update" ] ; then
+	vpl_install_daemon
+	vpl_start_service >>$LOGFILE
+	exit
+fi
+echo "Preparing the installation"
+
+if [ "$(command -v add-apt-repository)" != "" ] ; then
+	add-apt-repository universe &> /dev/null
+fi
+vpl_install "make" make
+vpl_install "LSB" lsb lsb-core lsb-compat
+vpl_install "C++ compiler" g++
+vpl_install "SSL library" openssl
+vpl_install "SSL library" libssl-dev
+vpl_install "Firewall" iptables
+vpl_install "X system" xorg
+vpl_install "dbus-x11" dbus-x11
+vpl_install "VNC server" tightvncserver
+vpl_install "Fonts" xfonts-75dpi
+vpl_install "Fonts" xfonts-100dpi
+vpl_install "Window manager" openbox
+vpl_install "Configuration DB system" gconf2
+vpl_install "xterm" xterm
+if [ "$(command -v gconftool-2)" != "" ] ; then
+	gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
+fi
+vpl_install "Web browser" firefox firefox-esr
+vpl_install "wget" wget
+vpl_install "curl" curl
+vpl_install "net-tools" net-tools
+vpl_install "bc" bc
+vpl_install_daemon
+#Copy configuration file
+VPL_CONFIGFILE=$VPL_CONFIG_DIR/vpl-jail-system.conf
+cp vpl-jail-system.conf $VPL_CONFIGFILE
+chmod 600 $VPL_CONFIGFILE
+# Copy launch scripts
+cp vpl_*.sh $VPL_PROGRAMS_DIR
+chmod +x $VPL_PROGRAMS_DIR/*.sh
+
+vpl_install_service
+
+#create default control dir
+if [ ! -d /var/vpl-jail-system ] ; then
+	mkdir /var/vpl-jail-system
+fi
+chmod 0600 /var/vpl-jail-system
+
+echo "Installing"
+echo "  (Ada, Assambler, C, C++, C#, DDD, Fortran, gdb, Haskell, Java, "
+echo "   JUnit, Node.js, Octave, Pascal, Perl, PHP, Python, Ruby, Scala,"
+echo "   Scheme, TCL, valgrind)"
+echo "Installing"
+echo "  (Clisp, Clojure, Cobol, CoffeScript, D, Erlang, Go, Haxe, JQuery,"
+echo "   Lua, R, Xquery, VHDL)"
+echo "This installation may take a long time"
+vpl_install "Ada compiler (GNU)" gnat
+vpl_install "Assembler" nasm
+vpl_install "C compiler (GNU)" gcc
+vpl_install "C# development framework (mono)" mono-complete
+vpl_install "DDD graphical front end debugger (GNU)" ddd
+vpl_install "Fortran compiler (GNU)" gfortran
+vpl_install "General purpose debugger (GNU)" gdb
+vpl_install "Haskell" hgc hugs
+vpl_install "Java runtime" default-jre openjdk-11-jre openjdk-8-jre openjdk-7-jre
+vpl_install "Java jdk" default-jdk openjdk-11-jdk openjdk-8-jdk openjdk-7-jdk
+if [ "$(command -v update-alternatives)" != "" ] ; then
+	update-alternatives --auto java
+	update-alternatives --auto javac
+fi
+vpl_install "JavaFX" openjfx
+vpl_install "Java Checkstyle" checkstyle
+vpl_install "Junit framework" junit4 junit
+vpl_install "JavaScript (Nodejs)" nodejs
+vpl_install "JavaScript (Nodejs-legacy)" nodejs-legacy
+vpl_install_npm "TypeScript" typescript
+vpl_install_npm "Sass" sass
+vpl_install "Octave (GNU)" octave
+vpl_install "Pascal compiler" fp-compiler
+vpl_install "Perl interpreter" perl
+vpl_install "PHP interpreter" php-cli php5-cli
+vpl_install "PHP readline" php-readline
+vpl_install "Sqlite for PHP" php-sqlite3 php5-sqlite
+vpl_install "Prolog" swi-prolog
+vpl_install "Python2 interpreter" python python2
+vpl_install "Python2 pydb" pydb
+vpl_install "Python2 pudb" python-pudb
+vpl_install "Python2 Tk" python-tk
+vpl_install "Python2 NumPy" python-numpy
+vpl_install "Python2 pandas" python-pandas
+vpl_install "Python2 Matplotlib" python-matplotlib
+vpl_install "Python3" python3
+vpl_install "Python3 Tk" python3-tk
+vpl_install "Python3 NumPy" python3-numpy
+vpl_install "Python3 pandas" python3-pandas
+vpl_install "Python3 Matplotlib" python3-matplotlib
+vpl_install "Python3 pudb" python3-pudb
+vpl_install "Python3 pycodestyle" python3-pycodestyle
+vpl_install "Python3 NetworkX" python3-networkx
+vpl_install "Python mypy" mypy
+vpl_install "Python pycodestyle" pycodestyle
+vpl_install "Python pydocstyle" pydocstyle
+vpl_install "Pythom Thonny" thonny
+vpl_install "Ruby interpreter" ruby
+vpl_install "Scala programming language" scala
+vpl_install "Scheme interpreter" plt-scheme racket
+vpl_install "SQL interpreter" sqlite3
+vpl_install "TCL interpreter" tcl
+vpl_install "Valgrind tool" valgrind
+echo "This installation may take a long time"
+vpl_install "Clisp" clisp
+vpl_install "Clojure" clojure clojure1.6 clojure1.4
+vpl_install "Cobol" open-cobol
+vpl_install "CoffeeScript" coffeescript
+vpl_install "D compiler (GNU)" gdc
+vpl_install "Erlang" erlang
+vpl_install "Go programming language compiler" golang
+vpl_install "Haxe programming language" haxe
+vpl_install "JQuery JavaScript Lib" libjs-jquery
+vpl_install "JQuery-UI JavaScript Lib" libjs-jquery-ui
+vpl_install "Julia" julia
+vpl_install "Lua compiler 5.1" lua5.1
+vpl_install "R statistical computation and graphics system (GNU)" r-base
+vpl_install "MIPS R2000/R3000 emulator" spim
+vpl_install "MiniZinc constraint modeling language" minizinc
+vpl_install "XQuery interpreter" galax
+vpl_install "Verilog compiler" iverilog
+vpl_install "VHDL compiler" freehdl
+vpl_install "libtool required for VHDL" libtool-bin
+vpl_install "Groovy programming language" groovy
+
+vpl_check_selinux
