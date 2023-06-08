@@ -2,7 +2,7 @@
 # package:		Part of vpl-jail-system
 # copyright:    Copyright (C) 2014 Juan Carlos Rodriguez-del-Pino
 # license:      GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl.txt
-# Description:  Script to install vpl-jail-system (Ubuntu 12 and CentOS)
+# Description:  Script to install vpl-jail-system
 echo "INSTALLING VPL-JAIL-SYSTEM"
 echo "=========================="
 LOGFILE=/var/log/vpl_installation.log
@@ -12,7 +12,7 @@ date >$LOGFILE
 exec &> >(tee $LOGFILE)
 
 if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
-    echo "This script need to be run as root and is run as $USER uid $UID euid $EUID"
+    echo "This script need to be run as user root and is run as user $USER uid $UID euid $EUID"
     exit 1;
 fi
 # Detect package manager (YUM/APT)
