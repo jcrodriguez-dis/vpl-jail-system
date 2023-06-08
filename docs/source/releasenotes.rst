@@ -2,6 +2,26 @@
 Release notes
 *************
 
+V3.0.1
+======
+
+This release brings with it a number of fixes and enhancements.
+
+* Added support for supplementary planes of UTF-8 in JSON:
+  This update extends the scope of our system's compatibility by including
+  all corresponding Unicode characters in UTF-8's supplementary planes for JSON formatting.
+
+* The installer switches the preferred VHDL Compiler:
+  The installer now employs GHDL as the default VHDL compiler, replacing FreeHDL due to its unavailability in the new Ubuntu releases.
+  Note that GHDL is used from version 4.1.1 of VPL.
+
+* VNC Server launch improvements: We've fixed the vncconfig detection when launching the VNC server.
+
+* SELinux Status Check:
+  The service launcher now performs a check of the usage and current state of SELinux.
+  It will display a message if SELinux is installed and not in a disabled state.
+  Note that the VPL Jail server is not compatible with SELinux.
+
 V3.0.0
 ======
 
