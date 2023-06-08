@@ -74,10 +74,10 @@ function read_config_var {
 	             | tail -n 1 \
 	             | sed -e "s/^[ \\t]*$1[ \\t]*=[ \\t]*\\(.*\\)\$/\\1/I")
 	    if [ "$RES" == "" ] ; then
-	    	echo "Param using default $1=$2" >> $LOGFILE
+	    	echo "$1=$2 (using the default value)" >> $LOGFILE
 	    	export $1=$2
 	    else
-	    	echo "Param read from config $1=$RES" >> $LOGFILE
+	    	echo "$1=$RES" >> $LOGFILE
 	    	export $1=$RES
 	    fi
 		shift
@@ -108,7 +108,7 @@ function run_root_script {
 		if [ "$(stat -c '%u' $1)" = "0" ] ; then
 			$1
 		else
-			log_failure_msg $"Security error: script $1 not owned by root then not ran" 
+			log_failure_msg $"Security error: script $1 did not run, due to not being owned by the user root"
 		fi
 	fi
 }
@@ -341,6 +341,11 @@ function unset_controldir {
 	fi
 }
 
+function check_selinux_vpl {
+	if [ -x "$(command -v sestatus)" ] && [ ! "$(sestatus | grep -i 'disable')" ] ; then
+		log_failure_msg "SELinux state: enforcing or permissive. SELinux must be You must disabled"
+	fi
+}
 
 function start_vpl {
 	if [ -f $PIDFILE ] ; then
@@ -348,6 +353,7 @@ function start_vpl {
 	fi
 	{
 		pre_start
+		check_selinux_vpl
 		read_config start
 		local JAIL_LIVE="$CONTROLPATH/jail_live"
 		local JAIL_WORK="$CONTROLPATH/jail_work"
