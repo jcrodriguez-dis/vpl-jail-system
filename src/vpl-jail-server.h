@@ -229,9 +229,9 @@ class Daemon{
 			throw string("Error poll sockets in accept: ") + strerror(errno);
 		}
 		if (res==0) return; //No request
-		for ( int port = 0; port < nSockets; port++ ) {
-			if (sockets[port].revents & POLLIN) { // Any type http/https or ws/wss
-				launch(sockets[port].fd, isSecureSocket[port]);
+		for ( int ns = 0; ns < nSockets; ns++ ) {
+			if (sockets[ns].revents & POLLIN) { // Any type http/https or ws/wss
+				launch(sockets[ns].fd, isSecureSocket[ns]);
 			}
 		}
 	}
@@ -243,7 +243,7 @@ class Daemon{
 		struct sockaddr_in local;
 		memset(&local, 0, sizeof(local));
 		local.sin_family = AF_INET;
-		if(this->interface>"")
+		if(this->interface > "")
 			local.sin_addr.s_addr = inet_addr(interface.c_str());
 		else
 			local.sin_addr.s_addr = INADDR_ANY;
@@ -267,7 +267,7 @@ class Daemon{
 		}
 		if ( bindResult == -1)
 			throw string("bind() to ") + type + " error: " + strerror(errno);
-		if (listen(socketfd, 100) == -1) //100 queue size
+		if (listen(socketfd, 100) == -1) // queue size = 100
 			throw "listen() error";
 		syslog(LOG_INFO,"Listening at %s %s:%d", type, inet_ntoa(local.sin_addr), port);
 		return socketfd;
@@ -278,26 +278,26 @@ class Daemon{
 		this->sport = configuration->getSecurePort();
 		this->interface = configuration->getInterface();
 		this->listenSocket = this->initSocket(this->port, "http plain port");
-		this->secureListenSocket = this->initSocket(this->sport, "https secure port");;
+		this->secureListenSocket = this->initSocket(this->sport, "https secure port");
 		this->nSockets = 0;
 
 		if (this->listenSocket >= 0) {
-			sockets[nSockets].fd = this->listenSocket;
-			sockets[nSockets].events = POLLIN;
-			isSecureSocket[nSockets] = false;
+			sockets[this->nSockets].fd = this->listenSocket;
+			sockets[this->nSockets].events = POLLIN;
+			isSecureSocket[this->nSockets] = false;
 			this->nSockets++;
 		}
 		if (this->sport >= 0) {
-			sockets[nSockets].fd = this->secureListenSocket;
-			sockets[nSockets].events = POLLIN;
-			isSecureSocket[nSockets] = true;
+			sockets[this->nSockets].fd = this->secureListenSocket;
+			sockets[this->nSockets].events = POLLIN;
+			isSecureSocket[this->nSockets] = true;
 			this->nSockets++;
 		}
 		if ( this->nSockets == 0) {
 			syslog(LOG_CRIT,"No PORT or SECURE_PORT defined");
 			_exit(EXIT_FAILURE);
 		}
-		actualSocket=-1;
+		actualSocket = -1;
 	}
 
 	void demonize(){
@@ -317,14 +317,14 @@ class Daemon{
 			exit(EXIT_FAILURE);
 		}
 		if(grandchild_pid > 0) _exit(EXIT_SUCCESS); //parent exit
-		FILE *fd=fopen("/run/vpl-jail-server.pid","w");
-		fprintf(fd,"%d",(int)getpid());
+		FILE *fd=fopen("/run/vpl-jail-server.pid", "w");
+		fprintf(fd, "%d", (int)getpid());
 		fclose(fd);
 	}
 	Daemon(){
-		signal(SIGPIPE,SIG_IGN);
-		signal(SIGTERM,SIGTERMHandler);
-		this->listenSocket=-1;
+		signal(SIGPIPE, SIG_IGN);
+		signal(SIGTERM, SIGTERMHandler);
+		this->listenSocket = -1;
 		this->secureListenSocket=-1;
 		configuration=Configuration::getConfiguration();
 		checkJail();
@@ -341,17 +341,17 @@ public:
 	static void closeSockets(){
 		Daemon* daemon=getDaemon();
 		daemon->nSockets = 0;
-		if(daemon->listenSocket>0){
+		if(daemon->listenSocket > 0){
 			close(daemon->listenSocket);
-			daemon->listenSocket=-1;
+			daemon->listenSocket = -1;
 		}
-		if(daemon->secureListenSocket>0){
+		if(daemon->secureListenSocket > 0){
 			close(daemon->secureListenSocket);
-			daemon->secureListenSocket=-1;
+			daemon->secureListenSocket = -1;
 		}
-		if(daemon->actualSocket>0){
+		if(daemon->actualSocket > 0){
 			close(daemon->actualSocket);
-			daemon->actualSocket=-1;
+			daemon->actualSocket = -1;
 		}
 	}
 	void periodicTasks() {
