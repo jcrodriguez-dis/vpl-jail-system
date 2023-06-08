@@ -60,8 +60,8 @@ activity and you must see your server with the *Current status* to *ready*.
 Troubleshooting
 ---------------
 
-Reviewing logs
-^^^^^^^^^^^^^^
+Reviewing VPL jail service logs
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You can see the log of the last installation at "/var/log/vpl_installation.log"
 and the service start/stop log at "/var/log/vpl-jail-service.log".
@@ -75,21 +75,42 @@ You may filter and explore the vpl logs with the following command
 
    grep vpl /var/log/syslog | less
 
-Reporting a bug
-^^^^^^^^^^^^^^^
+
+Reviewing brwoser logs
+^^^^^^^^^^^^^^^^^^^^^^
+
+All modern browsers have the capability to display JavaScript error logs and network connection logs.
+These logs can prove invaluable for examining events occurring on the browser side.
+Please be aware that the browser connects with the Moodle server using HTTP GET/POST requests
+and transmits data through a JSON payload.
+Furthermore, it uses WebSocket connections to communicate with the jail server.
+
+To access the JavaScript console or Network log you can right-click anywhere on a webpage
+and select 'Inspect' or 'Inspect Element'. In the panel that opens up, click on the 'Console' or 'Network' tab.
+Remember to refresh your webpage if you want to see all the load-time logs.
+
+Bug Reporting Guidelines
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. _Github repository: https://github.com/jcrodriguez-dis/vpl-xmlrpc-jail/issues
 
-If you think you found a bug, please, report it at the `Github repository`_.
+If you believe you've discovered a bug, we kindly request you to report it on our `Github repository`_.
 
-Please, describe your system configuration and *how to reproduce* the problem. Typical system configuration contains:
+To help us investigate and resolve the issue efficiently, please provide a detailed description of
+your system configuration and steps to reproduce the problem. A typical system configuration report includes:
 
-- Operating system version
-- VPL-jail-system version
-- VPL-jail-system configuration file content
-- Network configuration (how your system reach the internet)
-- Screenshots
-- Other data you think is relevant
+- Operating System Version: The exact version of the operating system you are currently running.
+- VPL-Jail-System Version: Specify the version of VPL-Jail-System you're using.
+- VPL-Jail-System Configuration File: Please share the content of the VPL-Jail-System configuration file.
+- Network Configuration: Describe how your system connects to the internet.
+- Browser Logs: If you have significant or relevant information from your browser logs, kindly include it. 
+- Screenshots: Including screenshots can be extremely helpful in visualizing the issue.
+  Capture any error messages or unusual behavior you're experiencing.
+- Other Relevant Information: If there's any additional information you think might be relevant to diagnose the issue,
+  please share that as well. 
+
+By providing a detailed bug report, you contribute significantly to expedite the process of identifying and resolving the problem.
+Thank you for your cooperation!
 
 Asking for help
 ^^^^^^^^^^^^^^^
@@ -99,11 +120,4 @@ Asking for help
 
 If you don't found the problem, ask for help in the `VPL Moodle forum`_.
 
-Please, describe your system configuration and *how to reproduce* the problem. Typical system configuration contains:
-
-- Operating system version
-- VPL-jail-system version
-- VPL-jail-system configuration file content
-- Network configuration (how your system reach the internet)
-- Screenshots
-- Other data you think is relevant
+Please, describe your system configuration and *how to reproduce* the problem.
