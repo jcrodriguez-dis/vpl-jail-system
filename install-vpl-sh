@@ -542,7 +542,7 @@ else
 		vpl_install "MiniZinc constraint modeling language" minizinc
         vpl_install "XQuery interpreter" galax
         vpl_install "Verilog compiler" iverilog
-        vpl_install "VHDL compiler" freehdl
+        vpl_install "VHDL compiler" ghdl freehdl
         vpl_install "libtool required for VHDL" libtool-bin
         vpl_install "Groovy programming language" groovy
     fi
