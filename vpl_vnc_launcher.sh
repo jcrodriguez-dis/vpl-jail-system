@@ -25,7 +25,7 @@ unset SESSION_MANAGER
 xrdb
 xsetroot -solid MidnightBlue 
 #activate clipboard
-[ -x vncconfig ] && vncconfig -iconic 2>/dev/null &
+[ -x "$(command -v vncconfig)" ] && vncconfig -iconic 2>/dev/null &
 #start window manager
 if [ -x "$(command -v icewm)" ] ; then
 	mkdir .icewm
