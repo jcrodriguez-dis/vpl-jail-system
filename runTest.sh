@@ -45,14 +45,19 @@ function runTests() {
 			writeInfo "Test $n" ": $test " -n
 		fi
 		{
-			"$test"
+			if [ $(type -t "$test") == "function" ] || [ -x "$test" ] ; then
+				"$test"
+			else
+				echo "$test is not a function or command" > /dev/stderr
+				"$test" &> /dev/null
+			fi
 		} 1>$fmessages 2>$ferrors
 		testresult=$?
 		if [ "$testresult" != "0" -a "$testresult" != "111" ] ; then
 			writeError "Errors found" " $X_MARK"
-			writeInfo "Standard error" " max 100 lines"
+			writeInfo "Standard error" " (max 100 lines)"
 			head -n 100 $ferrors
-			writeInfo "Standard output" " max 100 lines"
+			writeInfo "Standard output" " (max 100 lines)"
 			head -n 100 $fmessages
 			rm $fmessages 2> /dev/null
 			rm $ferrors 2> /dev/null
@@ -151,11 +156,13 @@ function create_docs() {
 	fi
 }
 
+if [ -f ./config.h ] ; then
+	VERSION=$(grep -E "PACKAGE_VERSION" ./config.h | sed -e "s/[^\"]\+\"\([^\"]\+\).*/\1/")
+fi
 if [ "$1" != "" ] ; then
-	writeHeading "$1 of the vpl-jail-system"
+	writeHeading "$1 of the vpl-jail-system $VERSION"
 	runTests $1
 else
-	writeHeading "Tests of the vpl-jail-system"
+	writeHeading "Tests of the vpl-jail-system $VERSION"
 	runTests Autotools_execution Packaging_for_distribution Unit_tests WebSocket_tests create_docs
 fi
-
