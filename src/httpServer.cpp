@@ -74,14 +74,15 @@ void HttpJailServer::sendRaw(const string &data){
 }
 
 /**
- * send a response to client
+ * Prepare a HTTP response
  * @param code http code
  * @param codeText http code text
  * @param load Payload to send
  * @param headMethod if HEAD method no payload send (optional)
  * @param extraHeader Extra headers to add (optional)
+ * @return string HTTP format
  */
-void HttpJailServer::send(int code, const string &codeText, const string &load,
+string HttpJailServer::prepare_HTTP(int code, const string &codeText, const string &load,
                           const bool headMethod, const string extraHeader) {
 	string output;
 	output +="HTTP/1.1 "+ Util::itos(code)+" "+codeText+"\r\n";
@@ -116,7 +117,20 @@ void HttpJailServer::send(int code, const string &codeText, const string &load,
 	}else{
 		output += "\r\n";
 	}
-	sendRaw(output);
+	return output;
+}
+
+/**
+ * send a response to client
+ * @param code http code
+ * @param codeText http code text
+ * @param load Payload to send
+ * @param headMethod if HEAD method no payload send (optional)
+ * @param extraHeader Extra headers to add (optional)
+ */
+void HttpJailServer::send(int code, const string &codeText, const string &load,
+                          const bool headMethod, const string extraHeader) {	
+	sendRaw(prepare_HTTP(code, codeText, load, headMethod, extraHeader));
 	if(code != 100){ //If code != CONTINUE
 		socket->close();
 	}
