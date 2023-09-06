@@ -351,12 +351,13 @@ string processMonitor::readFile(string name) {
 void processMonitor::writeFile(string name, const string &data) {
 	string homePath = getHomePath();
 	string fullName = homePath + "/" + name;
-	bool isScript = name.size()>4 && name.rfind(".sh", name.size()-3)!=string::npos;
+	bool isScript = name.size()>4 && name.substr(name.size()-3) == ".sh";
 	if (isScript) { //Endline converted to linux
 		string newdata;
 		for (size_t i = 0; i < data.size(); i++) {
-			if (data[i] != '\r') newdata += data[i];
-			else{
+			if (data[i] != '\r') {
+				newdata += data[i];
+			} else {
 				char p = ' ', n = ' ';
 				if (i > 0) p = data[i-1];
 				if (i + 1 < data.size()) n = data[i + 1];

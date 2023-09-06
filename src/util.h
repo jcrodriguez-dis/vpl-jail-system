@@ -468,7 +468,7 @@ public:
 		fclose(fd);
 		if (lchown(name.c_str(),user,user))
 			syslog(LOG_ERR, "Can't change file owner %m");
-		bool isScript = name.size() > 4 && name.rfind(".sh", name.size() - 3) !=string::npos;
+		bool isScript = name.size() > 4 && name.substr(name.size() - 3) == ".sh";
 		if (chmod(name.c_str(), isScript ? 0700 : 0600))
 			syslog(LOG_ERR, "Can't change file perm %m");
 	}
