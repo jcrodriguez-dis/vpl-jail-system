@@ -10,20 +10,26 @@
 
 class JSONRPCTest: public BaseTest {
 	void testJSON() {
-		string data, converted;
+		string data, converted, encoded;
 		data = "Hello";
+		encoded = "Hello";
+		assert(encoded == JSON::encodeJSONString(data));
 		converted = JSON::decodeJSONString(JSON::encodeJSONString(data), 0, 10000);
 		assert(data == converted);
-		data = "Hello\nsome lines\n\t   \n";
+		data = "Hello\nsome lines\n\t   \n \ralgo";
+		encoded = "Hello\\nsome lines\\n\\t   \\n \\ralgo";
+		assert(encoded == JSON::encodeJSONString(data));
 		converted = JSON::decodeJSONString(JSON::encodeJSONString(data), 0, 10000);
 		assert(data == converted);
-		data = "\\\nsome \rlines\n\t   \n";
+		data = "\\\nsome \r\nlines\n\t   \n";
+		encoded = "\\\\\\nsome \\r\\nlines\\n\\t   \\n";
+		assert(encoded == JSON::encodeJSONString(data));
 		converted = JSON::decodeJSONString(JSON::encodeJSONString(data), 0, 10000);
 		assert(data == converted);
 		data = "\\áéíóúÑñ";
 		converted = JSON::decodeJSONString(JSON::encodeJSONString(data), 0, 10000);
 		assert(data == converted);
-		string encoded = "\\\\\\u00e1\\u00e9\\u00ed\\u00f3\\u00fa\\u00d1\\u00f1";
+		encoded = "\\\\\\u00e1\\u00e9\\u00ed\\u00f3\\u00fa\\u00d1\\u00f1";
 		converted = JSON::decodeJSONString(encoded, 0, 10000);
 		assert(data == converted);
 		data = "😀😇👺🤜🔲🔢";

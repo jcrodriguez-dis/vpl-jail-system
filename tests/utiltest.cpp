@@ -125,11 +125,18 @@ class UtilTest: public BaseTest {
 	}
 
 	void testWriteReadRemoveFile(){
-		Util::writeFile("/tmp/to_be_or_not_to_be", "mi texto único", getuid());
-		assert( Util::fileExists("/tmp/to_be_or_not_to_be") );
-		assert( Util::readFile("/tmp/to_be_or_not_to_be") == "mi texto único" );
-		Util::deleteFile("/tmp/to_be_or_not_to_be");
-		assert( ! Util::fileExists("/tmp/to_be_or_not_to_be") );
+		string fileName = "/tmp/to_be_or_not_to_be";
+		Util::writeFile(fileName, "mi texto único", getuid());
+		assert( Util::fileExists(fileName) );
+		assert( Util::readFile(fileName) == "mi texto único" );
+		Util::deleteFile(fileName);
+		assert( ! Util::fileExists(fileName) );
+
+		fileName += ".txt";
+		string text = "\\r\\nHello!\nBye\r\n   \\\r    \n";
+		Util::writeFile(fileName, text);
+		assert( Util::readFile(fileName) == text );
+		Util::deleteFile(fileName);
 	}
 
 	void testMemSizeToBytesl() {
