@@ -7,6 +7,7 @@
 		export LC_ALL=en_US.utf8
 	fi
 	export TERM=dumb
+	stty raw iutf8 nl
 } &>/dev/null
 ./vpl_execution
 exit
