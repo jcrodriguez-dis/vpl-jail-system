@@ -497,13 +497,6 @@ else
         vpl_install "PHP readline" php-readline
         vpl_install "Sqlite for PHP" php-sqlite3 php5-sqlite
         vpl_install "Prolog" swi-prolog
-        vpl_install "Python2 interpreter" python python2
-        vpl_install "Python2 pydb" pydb
-        vpl_install "Python2 pudb" python-pudb
-        vpl_install "Python2 Tk" python-tk
-        vpl_install "Python2 NumPy" python-numpy
-        vpl_install "Python2 pandas" python-pandas
-        vpl_install "Python2 Matplotlib" python-matplotlib
         vpl_install "Python3" python3
         vpl_install "Python3 Tk" python3-tk
         vpl_install "Python3 NumPy" python3-numpy
@@ -517,6 +510,7 @@ else
 		vpl_install "Python pydocstyle" pydocstyle
         vpl_install "Pythom Thonny" thonny
         vpl_install "Ruby interpreter" ruby
+		vpl_install "Rush compiler" rushc
         vpl_install "Scala programming language" scala
         vpl_install "Scheme interpreter" plt-scheme racket
         vpl_install "SQL interpreter" sqlite3
