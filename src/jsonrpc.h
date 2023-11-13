@@ -22,14 +22,18 @@ protected:
 	mapstruct data;
 	void processRoot() {
 		if(root->getName() != "object") {
-			throw HttpException(badRequestCode,"RPC/JSON root must be object");
-		}
-		if(root->nchild() != 3) {
-			throw HttpException(badRequestCode,"RPC/JSON root must have 3 attributes");
+			throw HttpException(badRequestCode,"JSONRPC root must be object");
 		}
 		this->method = this->root->child("method")->getString();
 		this->data = getStructMembers(this->root->child("params"));
 		this->id = this->root->child("id")->getString();
+		if(root->nchild() == 4 && this->root->child("jsonrpc")->getString() == "2.0") {
+			return;
+		}
+		if(root->nchild() != 3) { // For compatibility with buggy plugin
+			throw HttpException(badRequestCode,"JSONRPC root must have 4 attributes");
+		}
+
 	}
 public:
 	JSONRPC(string rawData) {
