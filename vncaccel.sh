@@ -42,9 +42,9 @@ cp -a $1/.??* $VNCACCELDIR
 rm -Rf $VNCACCELDIR/.vnc > /dev/null
 rm $VNCACCELDIR/.??* 2> /dev/null
 #Change access mode
-chown -R nobody.nogroup $VNCACCELDIR/.??* 2>/dev/null
+chown -R nobody:nogroup $VNCACCELDIR/.??* 2>/dev/null
 if [ $? -ne 0 ] ; then
-    chown -R nobody.nobody $VNCACCELDIR/.??* 2>/dev/null
+    chown -R nobody:nobody $VNCACCELDIR/.??* 2>/dev/null
 fi
 find $VNCACCELDIR -type d -print0 | xargs -0 chmod a+xr
 find $VNCACCELDIR -type f -print0 | xargs -0 chmod a+x
