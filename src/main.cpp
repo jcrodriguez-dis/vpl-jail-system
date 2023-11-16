@@ -7,49 +7,57 @@
 #include <exception>
 #include "vpl-jail-server.h"
 #include "configuration.h"
+#include "log.h"
 
 using namespace std;
-void setLogLevel(int level){
-	openlog("vpl-jail-system",LOG_PID,LOG_DAEMON);
-	if(level>7 || level<0) level=7;
-	int mlevels[8]={LOG_EMERG, LOG_ALERT, LOG_CRIT, LOG_ERR, LOG_WARNING,
-			LOG_NOTICE, LOG_INFO, LOG_DEBUG};
 
-	setlogmask(LOG_UPTO(mlevels[level]));
-	syslog(LOG_INFO,"Set log mask up to %d", level);
-}
 #ifndef TEST
 /**
- * main accept command line [-d level] [-uri URI]
- * where level is the syslog log level and URI is the xmlrpc server uri
+ * main accept command line "online" to go nondemonize run.
  */
 int main(int const argc, const char ** const argv, char * const * const env) {
-	setLogLevel(3);
+	bool online = false;
+	for (int i = 1; i < argc; i++) {
+		if (string(argv[i]) == "online") {
+			online = true;
+		}
+	}
+	Logger::setLogLevel(LOG_ERR, online);
 	Configuration *conf = Configuration::getConfiguration();
-	setLogLevel(conf->getLogLevel());
+	Logger::setLogLevel(conf->getLogLevel(), online);
 	if ( conf->getLogLevel() >= LOG_INFO) {
 		conf->readConfigFile(); // Reread configuration file to show values in log
 	}
 	int exitStatus=static_cast<int>(internalError);
 	try{
-		Daemon::getDaemon()->loop();
-		exitStatus=EXIT_SUCCESS;
+		Daemon* runner = Daemon::getRunner();
+		if (online) {
+			runner->online();
+		} else {
+			runner->demonize();
+		}
+		runner->loop();
+		exitStatus = EXIT_SUCCESS;
 	}
-	catch(HttpException &exception){
-		syslog(LOG_ERR,"%s",exception.getLog().c_str());
+	catch(HttpException &exception) {
+		Logger::log(LOG_ERR, "%s", exception.getLog().c_str());
 		exitStatus=static_cast<int>(httpError);
 	}
-	catch(const string &me){
-		syslog(LOG_ERR,"%s",me.c_str());
+	catch(const string &me) {
+		exitStatus = EXIT_FAILURE;
+		Logger::log(LOG_ERR, "%s", me.c_str());
 	}
-	catch(const char * const me){
-		syslog(LOG_ERR,"%s",me);
+	catch(const char * const me) {
+		exitStatus = EXIT_FAILURE;
+		Logger::log(LOG_ERR, "%s",me);
 	}
-	catch(std::exception &e){
-		syslog(LOG_ERR,"unexpected exception: %s %s:%d",e.what(),__FILE__,__LINE__);
+	catch(std::exception &e) {
+		exitStatus = EXIT_FAILURE;
+		Logger::log(LOG_ERR, "Unexpected exception: %s %s:%d", e.what(), __FILE__, __LINE__);
 	}
 	catch(...){
-		syslog(LOG_ERR,"unexpected exception %s:%d",__FILE__,__LINE__);
+		exitStatus = EXIT_FAILURE;
+		Logger::log(LOG_ERR, "Unexpected exception %s:%d", __FILE__, __LINE__);
 	}
 	exit(exitStatus);
 }
