@@ -300,6 +300,23 @@ class Daemon{
 		actualSocket = -1;
 	}
 
+	Daemon(){
+		signal(SIGPIPE, SIG_IGN);
+		signal(SIGTERM, SIGTERMHandler);
+		this->listenSocket = -1;
+		this->secureListenSocket=-1;
+		configuration=Configuration::getConfiguration();
+		checkJail();
+		checkControlDir();
+		SSLBase::getSSLBase();
+		initSocketServer();
+	}
+public:
+	static Daemon* getRunner(){
+		if(singlenton == NULL) singlenton= new Daemon();
+		return singlenton;
+	}
+
 	void demonize(){
 		pid_t child_pid = fork();
 		if(child_pid < 0) {
@@ -321,37 +338,30 @@ class Daemon{
 		fprintf(fd, "%d", (int)getpid());
 		fclose(fd);
 	}
-	Daemon(){
-		signal(SIGPIPE, SIG_IGN);
-		signal(SIGTERM, SIGTERMHandler);
-		this->listenSocket = -1;
-		this->secureListenSocket=-1;
-		configuration=Configuration::getConfiguration();
-		checkJail();
-		checkControlDir();
-		SSLBase::getSSLBase();
-		initSocketServer();
-		demonize();
+
+	void online(){
+		if(setsid() < 0) {
+			throw "online() => (setsid() < 0)";
+		}
+		FILE *fd=fopen("/run/vpl-jail-server.pid", "w");
+		fprintf(fd, "%d", (int)getpid());
+		fclose(fd);
 	}
-public:
-	static Daemon* getDaemon(){
-		if(singlenton == NULL) singlenton= new Daemon();
-		return singlenton;
-	}
+
 	static void closeSockets(){
-		Daemon* daemon=getDaemon();
-		daemon->nSockets = 0;
-		if(daemon->listenSocket > 0){
-			close(daemon->listenSocket);
-			daemon->listenSocket = -1;
+		Daemon* runner = getRunner();
+		runner->nSockets = 0;
+		if(runner->listenSocket > 0){
+			close(runner->listenSocket);
+			runner->listenSocket = -1;
 		}
-		if(daemon->secureListenSocket > 0){
-			close(daemon->secureListenSocket);
-			daemon->secureListenSocket = -1;
+		if(runner->secureListenSocket > 0){
+			close(runner->secureListenSocket);
+			runner->secureListenSocket = -1;
 		}
-		if(daemon->actualSocket > 0){
-			close(daemon->actualSocket);
-			daemon->actualSocket = -1;
+		if(runner->actualSocket > 0){
+			close(runner->actualSocket);
+			runner->actualSocket = -1;
 		}
 	}
 	void periodicTasks() {
