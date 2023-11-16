@@ -7,8 +7,6 @@
 #include <climits>
 #include <sstream>
 #include "configuration.h"
-#include "configurationFile.h"
-
 #include "jail_limits.h"
 #include "util.h"
 Configuration *Configuration::singlenton=0;
@@ -48,6 +46,16 @@ void Configuration::checkConfigFile(string fileName, string men){
 		throw men + " with insecure permissions (must be 0600/0700)" + fileName;
 }
 
+void Configuration::readEnvironmentConfigVars(ConfigData &data) {
+	for(ConfigData::iterator i=data.begin();i != data.end(); i++){
+		string parameter=i->first;
+		string new_value = Util::getEnv("VPL_JAIL_" + parameter);
+        if (new_value.length() > 0) {
+			data[parameter] = new_value;
+		}
+    }
+}
+
 void Configuration::readConfigFile(){
 	ConfigData configDefault;
 	// Values used if parameter not present in configuration file
@@ -76,6 +84,7 @@ void Configuration::readConfigFile(){
 	configDefault["REQUEST_MAX_SIZE"] = "128 Mb";
 	configDefault["RESULT_MAX_SIZE"] = "32 Kb";
 	ConfigData data = ConfigurationFile::readConfiguration(configPath, configDefault);
+	readEnvironmentConfigVars(data);
 	minPrisoner = atoi(data["MIN_PRISONER_UGID"].c_str());
 	if(minPrisoner < JAIL_MIN_PRISONER_UID)
 		throw "Incorrect MIN_PRISONER_UGID config value" + data["MIN_PRISONER_UGID"];

@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 #include "util.h"
+#include "configurationFile.h"
+
 using namespace std;
 
 class Configuration {
@@ -48,6 +50,7 @@ public:
 		if(singlenton == NULL) singlenton = new Configuration();
 		return singlenton;
 	}
+	void readEnvironmentConfigVars(ConfigData& data);
 	void readConfigFile();
 	static string generateCleanPATH(string path, string dirtyPATH);
 	const ExecutionLimits & getLimits() const { return jailLimits;}
