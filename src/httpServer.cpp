@@ -97,7 +97,7 @@ string HttpJailServer::prepare_HTTP(int code, const string &codeText, const stri
 		if (HSTSMaxAge >= 0) {
 			output += "Strict-Transport-Security: max-age=" + Util::itos(HSTSMaxAge) + "\r\n";
 		}
-		syslog(LOG_DEBUG,"Response Content-Length: %lu",(unsigned long)load.size());
+		Logger::log(LOG_DEBUG,"Response Content-Length: %lu",(unsigned long)load.size());
 		output += "Content-Type: ";
 		if(load.find("<?xml ") == 0) {
 			output += "text/xml";
@@ -110,7 +110,7 @@ string HttpJailServer::prepare_HTTP(int code, const string &codeText, const stri
 		} else {
 			output += "text/plain";
 		}
-		output += "; chartype=UTF-8\r\n\r\n";
+		output += "; charset=utf-8\r\n\r\n";
 		if (! headMethod) {
 			output += load;
 		}
