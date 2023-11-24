@@ -42,6 +42,9 @@ PIDFILE=/run/vpl-jail-server.pid
 NOMOUNT="^vpl|^init|^ldap|^udev|grub|^rc[0-6S]|^pam|^cron|^apm|^logrotate"
 NOMOUNT="$NOMOUNT|^mail|^rsyslog|^shadow|^security|^ssl|^ssh|^update"
 
+if [ "$2" == "foreground" ] ; then
+	LOGFILE=/dev/stdout
+fi
 if [ "$(command -v systemctl)" = "" ] ; then
 	# Try to use lsb init-functions
 	if [ -x  /lib/lsb/init-functions ] ; then
@@ -63,6 +66,7 @@ declare -f start_daemon &> /dev/null
 if [ "$?" == "1" ] ; then 
 	function start_daemon {
 		$1 $2 $3 &
+		echo $! > "$PIDFILE"
 	}
 fi
 
@@ -74,8 +78,14 @@ function read_config_var {
 	             | tail -n 1 \
 	             | sed -e "s/^[ \\t]*$1[ \\t]*=[ \\t]*\\(.*\\)\$/\\1/I")
 	    if [ "$RES" == "" ] ; then
-	    	echo "$1=$2 (using the default value)" >> $LOGFILE
-	    	export $1=$2
+			local ENVCONFIGVAR="VPL_JAIL_$1"
+			if [ "${!ENVCONFIGVAR}" == "" ] ; then
+	    		echo "$1=$2 (using the default value)" >> $LOGFILE
+	    		export $1=$2
+			else
+	    		echo "$1=${!ENVCONFIGVAR} (using value from env var $ENVCONFIGVAR)" >> $LOGFILE
+	    		export $1=${!ENVCONFIGVAR}
+			fi
 	    else
 	    	echo "$1=$RES" >> $LOGFILE
 	    	export $1=$RES
@@ -93,14 +103,13 @@ function create_check_dir {
 		fi
 	fi
 	if [ ! -d "$1" ] ; then
-		mkdir "$1"
+		mkdir -p "$1"
+		if [ "$?" != "0" ] ; then
+			log_failure_msg $"Can't mkdir $1"
+			exit 2
+		fi
 	fi
-	if [ -d "$1" ] ; then
-		chmod $2 "$1"
-	else
-		log_failure_msg $"Can't mkdir $1"
-		exit 1
-	fi
+	chmod $2 "$1" &>/dev/null
 }
 
 function run_root_script {
@@ -111,6 +120,14 @@ function run_root_script {
 			log_failure_msg $"Security error: script $1 did not run, due to not being owned by the user root"
 		fi
 	fi
+}
+
+function vpl_umount {
+	if mount | grep -q " on $1 "; then
+	    umount -l -f "$1"
+		return $?
+	fi
+	return 1
 }
 
 function pre_start {
@@ -137,7 +154,7 @@ function set_etc {
 	done
 	chmod 644 "$GROUPFILE"
 	local SHADOWFILE="$JAILPATH/etc/shadow"
-	chown root.root "$SHADOWFILE"
+	chown root:root "$SHADOWFILE"
 	chmod 600 "$SHADOWFILE"
 }
 
@@ -157,9 +174,7 @@ function set_tmpdir {
 }
 
 function unset_tmpdir {
-	if mountpoint -q "$JAILPATH$1"; then
-		umount "$JAILPATH$1"
-	fi
+	vpl_umount "$JAILPATH$1"
 }
 
 function set_other {
@@ -171,9 +186,7 @@ function set_other {
 }
 
 function unset_other {
-	if [ -d $1 -a -d "$JAILPATH$1" ] ; then
-		umount -l -f "$JAILPATH$1"
-	fi
+	vpl_umount "$JAILPATH$1"
 }
 
 function set_snap {
@@ -282,6 +295,7 @@ function read_config {
 		read_config_var "$CONFIG_FILE" FIREWALL 0
 		read_config_var "$CONFIG_FILE" ALLOWSUID false
 		read_config_var "$CONFIG_FILE" USETMPFS true
+		read_config_var "$CONFIG_FILE" CERBOT_WEBROOT_PATH
 		if [ "${USETMPFS,,}" != "false" ] ; then
 			read_config_var "$CONFIG_FILE" HOMESIZE 30%			
 		else
@@ -294,16 +308,14 @@ function read_config {
 		fi
 	else
 		log_failure_msg $"vpl-jail-system config file not found: $CONFIG_FILE"
-		exit 1
+		exit 3
 	fi
 }
 
 function set_controldir {
 	local JAIL_LIVE="$CONTROLPATH/jail_live"
 	local JAIL_WORK="$CONTROLPATH/jail_work"
-	if [ -d "$CONTROLPATH" ] ; then
-		umount -l -f "$CONTROLPATH" &> /dev/null
-	fi
+	vpl_umount "$CONTROLPATH"
 	rm -Rf "$JAIL_LIVE" &> /dev/null
 	rm -Rf "$JAIL_WORK" &> /dev/null
 	rm -Rf "$CONTROLPATH" &> /dev/null
@@ -313,7 +325,7 @@ function set_controldir {
 	else
 		if [ `expr index "%" "$HOMESIZE"` != "0" ] ; then
 			log_failure_msg $"Please use a fixed size for HOMESIZE. E.g. 2G, 1500M"
-			exit -6
+			exit 2
 		fi
 		local CONTROLFS="${CONTROLPATH}.fs"
 		if [ -f "$CONTROLFS" ] ; then
@@ -332,9 +344,7 @@ function set_controldir {
 }
 
 function unset_controldir {
-	if [ -d "$CONTROLPATH" ] ; then
-		umount -l -f "$CONTROLPATH" &> /dev/null
-	fi
+	vpl_umount "$CONTROLPATH"
 	local CONTROLFS="${CONTROLPATH}.fs"
 	if [ -f "$CONTROLFS" ] ; then
 		rm "$CONTROLFS"
@@ -359,11 +369,14 @@ function start_vpl {
 		local JAIL_WORK="$CONTROLPATH/jail_work"
 		set_controldir
 		create_check_dir "$JAILPATH" 0755
+		if [ "$CERBOT_WEBROOT_PATH" != "" ] ; then
+			create_check_dir "$CERBOT_WEBROOT_PATH" 0700
+		fi
 		mount -t overlay overlay -olowerdir=/,upperdir=$JAIL_LIVE,workdir=$JAIL_WORK${NOSUID} "$JAILPATH"
 		chmod 0755 "$JAILPATH"
 		if [ "$?" != "0" ] ; then
 			log_failure_msg $"Error mounting jail dir"
-			exit 1
+			exit 4
 		fi
 		set_etc
 		rm -Rf "$JAILPATH/home" &> /dev/null
@@ -379,12 +392,19 @@ function start_vpl {
 		set_other /run/lock
 		set_snap
 	} 2>> $LOGFILE
-	start_daemon $DAEMON $1 $2
-	sleep 1
-	if [ -f $PIDFILE ] ; then
-		set_firewall $1
+	if [ "$1" == "foreground" ] ; then
+		trap "signal_stop_vpl" SIGTERM
+		echo
+		echo "Starting in foreground mode (nondaemon mode)"
+		$DAEMON foreground $2 $3
 	else
-		log_failure_msg $"Daemon not started"
+		start_daemon $DAEMON $1 $2
+		sleep 1
+		if [ -f $PIDFILE ] ; then
+			set_firewall $1
+		else
+			log_failure_msg $"Daemon not started"
+		fi
 	fi
 }
 
@@ -403,11 +423,8 @@ function stop_vpl {
 		if [ -d "$JAILPATH" ] ; then
 			if [ "$(stat -c "%d:%i" /)" == "$(stat -c "%d:%i" $JAILPATH)" ] ; then
 				log_failure_msg $"vpl-jail-system error jail path is the root directory"
-				exit 1
+				exit 5
 			fi
-		else
-			log_failure_msg $"vpl-jail-system jail path error '$JAILPATH' not a directory"
-			exit 1
 		fi
 		unset_snap
 		unset_other /run/lock
@@ -416,18 +433,17 @@ function stop_vpl {
 		unset_tmpdir /dev/shm
 		unset_other /dev
 		unset_other /proc
-		local I
-		for (( I=1 ; $I < 10 ; I+=1 )) ; do
-			umount "$JAILPATH"
-			if [ "$?" == "0" ] ;  then
-				break
-			fi
-			echo -n "."
-			sleep 1
-		done
-		if [ "$I" == "10" ] ;  then
-			umount -f "$JAILPATH"
-			umount -l "$JAILPATH"
+		if [ -d "$JAILPATH" ] ; then
+			local I
+			for (( I=1 ; $I < 2 ; I+=1 )) ; do
+				vpl_umount "$JAILPATH" &> /dev/null
+				if [ "$?" == "0" ] ;  then
+					break
+				fi
+				echo -n "."
+				sleep 1
+			done
+			vpl_umount "$JAILPATH"
 		fi
 		unset_controldir
 		unset_firewall
@@ -435,33 +451,43 @@ function stop_vpl {
 	} 2>> $LOGFILE
 }
 
-echo "===== vpl-jail-system ====== $1 $2 $3" >> $LOGFILE
+function signal_stop_vpl() {
+	log_success_msg $"Stopping by signal vpl-jail-system service:"
+	stop_vpl
+}
+
+echo "===== vpl-jail-system ======" >> $LOGFILE
 date >> $LOGFILE
 case "$1" in
-  start)
+	start)
 		log_success_msg $"Starting vpl-jail-system service:"
-        start_vpl $2 $3
+        start_vpl $2 $3 $4
         ;;
-  stop)
+	stop)
   		log_success_msg $"Stopping vpl-jail-system service:"
         stop_vpl
         ;;
-  restart)
+	restart)
   		log_success_msg $"Restarting vpl-jail-system service:"
         stop_vpl
-        start_vpl
+        start_vpl $2 $3 $4
         ;;
-  force-reload)
+	start_foreground)
+  		log_success_msg $"Starting vpl-jail-system service in foregorund mode:"
+        stop_vpl
+        start_vpl foreground $2 $3 $4
+        ;;
+	force-reload)
   		log_success_msg $"Force-reload vpl-jail-system service:"
         stop_vpl
-        start_vpl
+        start_vpl $2 $3 $4
         ;;
-  status)
+	status)
         pidof $DAEMON
 	    exit $? 
         ;;
-*)
+	*)
         log_failure_msg $"Usage: vpl-jail-system {start|stop|restart|force-reaload|status}"
-        exit 1
+        exit 7
 esac
 exit 0
