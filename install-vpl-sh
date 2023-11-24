@@ -1,116 +1,159 @@
 #!/bin/bash
-# package:		Part of vpl-jail-system
+# package:		Part of VPL-Jail-System
 # copyright:    Copyright (C) 2014 Juan Carlos Rodriguez-del-Pino
 # license:      GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl.txt
-# Description:  Script to install vpl-jail-system
-echo "INSTALLING VPL-JAIL-SYSTEM"
-echo "=========================="
+# Description:  Script to install VPL-Jail-System
+
 LOGFILE=/var/log/vpl_installation.log
 VPL_PROGRAMS_DIR=/usr/sbin/vpl
 VPL_CONFIG_DIR=/etc/vpl
-date >$LOGFILE
-exec &> >(tee $LOGFILE)
+{
+	date > "$LOGFILE"
+	exec &> >(tee "$LOGFILE")
+} &> /dev/null
 
-if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
-    echo "This script need to be run as user root and is run as user $USER uid $UID euid $EUID"
-    exit 1;
-fi
-# Detect package manager (YUM/APT)
-if [ "$(command -v yum)" != "" ] ; then
-	echo "Using YUM package manager" 
-    function vpl_install_base {
-        yum -y install $1 >>$LOGFILE
-        return $?
-    }
-    function vpl_install_check {
-        yum list $1 &> /dev/null
-        return $?
-	}
-    PMTYPE="1"
-else
-	if [ "$(command -v apt-get)" != "" ] ; then
+function vpl_checks_and_config() {
+	if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
+		echo "This script need to be run as user root and is run as user $USER uid $UID euid $EUID"
+		exit 1;
+	fi
+	# Detect package manager (YUM/APT)
+	if [ "$(command -v yum)" != "" ] ; then
+		echo "Using YUM package manager" 
+		function vpl_install_base {
+			yum -y install $1 >> "$LOGFILE"
+			return $?
+		}
+		function vpl_install_check {
+			yum list $1 &> /dev/null
+			return $?
+		}
+		PMTYPE="1"
+	elif [ "$(command -v apt-get)" != "" ] ; then
 		echo "Using APT package manager"
 		echo "Updating distribution software DB"
-		apt-get update >>$LOGFILE
-	    function vpl_install_base {
-            apt-get -q -y --allow-unauthenticated install $1 >>$LOGFILE
-            return $?
-	    }
-	    function vpl_install_check {
-            apt-cache pkgnames $1 | grep -q -x -F $1
-            return $?
-	    }
-    	PMTYPE="2"
-    else
-    	echo "Sorry, I can't detect the package manager of the system"
-    	exit 1
+		apt-get update >> "$LOGFILE"
+		function vpl_install_base {
+			apt-get -q -y --allow-unauthenticated install $1 >> "$LOGFILE"
+			return $?
+		}
+		function vpl_install_check {
+			apt-cache pkgnames $1 | grep -q -x -F $1
+			return $?
+		}
+		PMTYPE="2"
+	else
+		echo "Sorry, I can't detect the package manager of the system"
+		echo "Acepted package managers APT an YUM."
+		exit 1
 	fi
-fi
-# Detect service manager
-if [ "$(command -v systemctl)" != "" ] ; then
-	echo "Using systemd service manager"	 
-    function vpl_install_service {
-        cp vpl-jail-system.initd $VPL_PROGRAMS_DIR/vpl-jail-system
-        chmod +x $VPL_PROGRAMS_DIR/vpl-jail-system
-        cp vpl-jail-system.service /etc/systemd/system/vpl-jail-system.service
-        systemctl daemon-reload
-        systemctl enable vpl-jail-system
-    }
-    function vpl_stop_service {
-        systemctl stop vpl-jail-system
-	}
-    function vpl_start_service {
-        systemctl start vpl-jail-system
-	}
-	function vpl_info_using_service {
-	    echo
-        echo "-------------------------------------------"
-        echo "Notice: you may use next command to control the service"
-        echo "systemctl [start|stop|status] vpl-jail-system"
-	}
-    SMANAGER="1"
-else
-	echo "Using system V service manager"	 
-    function vpl_install_service {
-        cp vpl-jail-system.initd /etc/init.d/vpl-jail-system
-        chmod +x /etc/init.d/vpl-jail-system
-        if [ "$(command -v update-rc.d)" != "" ] ; then
-	        update-rc.d -f vpl-jail-system remove >>$LOGFILE
-			update-rc.d vpl-jail-system defaults >>$LOGFILE
-        else
-        	if [ "$(command -v chkconfig)" != "" ] ; then
-	        	chkconfig --add vpl-jail-system  >>$LOGFILE
-	        else
-            	echo "ERROR installing the service. Not found update-rc.d or chkconfig"
-        	fi
-        fi
-    }
-    function vpl_stop_service {
-        service vpl-jail-system stop
-	}
-    function vpl_start_service {
-        service vpl-jail-system start
-	}
-	function vpl_info_using_service {
-		echo
-        echo "-------------------------------------------"
-        echo "Notice: you may use next command to control the service"
-        echo "service vpl-jail-system [start|stop|status]"
-	}
-    SMANAGER="2"
-fi
+	# Detect service manager
+	if [ "$(command -v systemctl)" != "" ] ; then
+		echo "Using systemd service manager"	 
+		function vpl_install_service {
+			cp vpl-jail-system.initd $VPL_PROGRAMS_DIR/vpl-jail-system
+			chmod +x $VPL_PROGRAMS_DIR/vpl-jail-system
+			cp vpl-jail-system.service /etc/systemd/system/vpl-jail-system.service
+			systemctl daemon-reload
+			systemctl enable vpl-jail-system
+		}
+		function vpl_stop_service {
+			systemctl stop vpl-jail-system
+		}
+		function vpl_start_service {
+			systemctl start vpl-jail-system
+		}
+		function vpl_info_using_service {
+			echo
+			echo "-------------------------------------------------------"
+			echo "Notice: you may use next command to control the service"
+			echo "systemctl [start|stop|status] vpl-jail-system"
+		}
+		SMANAGER="1"
+	elif [ -x /sbin/init ] ; then
+		echo "Using system V service manager"	 
+		function vpl_install_service {
+			cp vpl-jail-system.initd $VPL_PROGRAMS_DIR/vpl-jail-system
+			chmod +x $VPL_PROGRAMS_DIR/vpl-jail-system
+			cp vpl-jail-system.initd /etc/init.d/vpl-jail-system
+			chmod +x /etc/init.d/vpl-jail-system
+			if [ "$(command -v update-rc.d)" != "" ] ; then
+				update-rc.d -f vpl-jail-system remove >> "$LOGFILE"
+				update-rc.d vpl-jail-system defaults >> "$LOGFILE"
+			else
+				if [ "$(command -v chkconfig)" != "" ] ; then
+					chkconfig --add vpl-jail-system  >> "$LOGFILE"
+				else
+					echo "ERROR installing the service. Not found update-rc.d or chkconfig"
+				fi
+			fi
+		}
+		function vpl_stop_service {
+			service vpl-jail-system stop
+		}
+		function vpl_start_service {
+			service vpl-jail-system start
+		}
+		function vpl_info_using_service {
+			echo
+			echo "-------------------------------------------------------"
+			echo "Notice: you may use next command to control the service"
+			echo "service vpl-jail-system [start|stop|status|start_foreground]"
+		}
+		SMANAGER="2"
+	else
+		echo "Unkown service manager"	 
+		function vpl_install_service {
+			cp vpl-jail-system.initd $VPL_PROGRAMS_DIR/vpl-jail-system
+			chmod +x $VPL_PROGRAMS_DIR/vpl-jail-system
+			echo "You must install the service manually."
+			echo "The script to start, stop, etc. the service is:"
+			echo "/usr/sbin/vpl/vpl-jail-system"
+		}
+		function vpl_stop_service {
+			echo "You must run:"
+			echo "/usr/sbin/vpl/vpl-jail-system stop"
+		}
+		function vpl_start_service {
+			echo "You must run:"
+			echo "/usr/sbin/vpl/vpl-jail-system start"
+		}
+		function vpl_info_using_service {
+			echo
+			echo "-------------------------------------------------------"
+			echo "Notice: you may use next command to control the service"
+			echo "/usr/sbin/vpl/vpl-jail-system [start|stop|restart|start_foreground]"
+		}
+		SMANAGER="3"
+	fi
+}
 
 function vpl_check_selinux {
 	if [ "$(command -v setenforce)" != "" ] ; then
+		echo "----------------------------------------------------"
 		echo "Your system seems to be using SELinux."
 		echo "You may need to disable or configure SELinux to install and run vpl-jail-system service"
 		echo "To reactivate the vpl-jail-system service run:"
-		echo "systemctl daemon-reload"
-		echo "systemctl enable vpl-jail-system"
-		echo "systemctl start vpl-jail-system"
+		echo "  systemctl daemon-reload"
+		echo "  systemctl enable vpl-jail-system"
+		echo "  systemctl start vpl-jail-system"
 	fi
 }
-function vpl_install {
+
+function vpl_install_package {
+	if [ "$LISTPACKAGES" != "" ] ; then
+		echo -n "  $1 -> "
+		shift
+		while [ "$#" != "0" ] ; do
+			echo -n $1
+			shift
+			if [ "$#" != "0" ] ; then
+				echo -n " or "
+			fi
+		done
+		echo ""
+		return
+	fi
 	local found=0
 	local checked=""
 	echo -n "Installing $1: "
@@ -132,7 +175,7 @@ function vpl_install {
        shift
    done
    if [ $found -eq 0 ] ; then
-   	   echo "[Package not found. Checked$checked]"
+   	   echo "[Package not found. Checked:$checked]"
    fi
 }
 
@@ -144,6 +187,19 @@ function vpl_install_npm_check {
 }
 
 function vpl_install_npm {
+	if [ "$LISTPACKAGES" != "" ] ; then
+		echo -n "  $1 -> npm "
+		shift
+		while [ "$#" != "0" ] ; do
+			echo -n $1
+			shift
+			if [ "$#" != "0" ] ; then
+				echo -n " or "
+			fi
+		done
+		echo ""
+		return
+	fi
     vpl_install_check npm
 	if [ $? -eq 0 ] ; then
 		vpl_install_base npm
@@ -163,7 +219,7 @@ function vpl_install_npm {
         shift
    done
    if [ $found -eq 1 ] ; then
-   	   echo "[Package npm not found. Checked $checked"
+   	   echo "[Package npm not found. Checked$checked"
    fi
 }
 
@@ -173,12 +229,12 @@ function vpl_installq {
    A="y"
    read A
    if [ "$A" == "y" ] ; then
-        vpl_install $@
+        vpl_install_package $@
    fi
 }
 
 function vpl_install_letsencrypt {
-	vpl_install "Let's Encrypt" certbot
+	vpl_install_package "Let's Encrypt" certbot
 	if [ "$(command -v certbot)" = "" ] ; then
 		echo "Error: certbot not installed."
 		echo "Please install cerbot manually"
@@ -243,6 +299,7 @@ function vpl_install_jgrasp {
 		fi
 	done
 }
+
 function vpl_install_kotlin {
 	local URLBASE="https://github.com/JetBrains/kotlin/releases/download/"
 	local VERSION="1.4.21"
@@ -266,7 +323,9 @@ function vpl_install_kotlin {
 				ln -s $DESTINATION/bin/kotlinc /usr/bin/kotlinc
 				break
 			else
+				echo ""
 				echo "Error uncompressing package, jgrasp dir not found. Try again"
+				echo ""
 			fi
 		else
 			echo "Version not found. Try gain."
@@ -309,15 +368,44 @@ function vpl_generate_selfsigned_certificate {
 	openssl x509 -in certini.pem -out cert.pem -req -signkey key.pem -days 1826 
 }
 
-function vpl_install_daemon() {
+function vpl_show_help() {
+	echo ""
+    echo "---------------------------------------------------"
+    echo "VPL-Jail-System Installer"
+    echo ""
+    echo "This script is used to install the VPL-Jail-System."
+    echo "Note that you can install manually all the software you want to use."
+    echo "Usage: ./install-vpl.sh [OPTIONS]"
+    echo ""
+    echo "OPTIONS:"
+    echo "  help           Show this help message and exit."
+    echo "  update         Update the VPL-Jail-System daemon restarting the servise."
+    echo "  start          Start the VPL-Jail-System service after installation."
+    echo "  noninteractive Install without user interaction."
+    echo "  minimum        Install the minimum required software packages."
+    echo "  basic          Install basic additional packages."
+    echo "  standard       Install standard additional packages."
+    echo "  full           Install full additional packages."
+	echo "  list           Show the packages to install by option"
+    echo ""
+    echo "EXAMPLES:"
+    echo "  ./install-vpl.sh update"
+	echo "         Update the VPL-Jail-System daemon."
+    echo "  ./install-vpl.sh standard noninteractive start"
+	echo "         Install standard packages and start the service."
+    echo "  ./install-vpl.sh full"
+	echo "         Install all the packages."
+}
+
+function vpl_install_update_daemon() {
 	echo "Preparing daemon compilation"
-	./configure >>$LOGFILE
+	autoreconf -f -i
+	./configure >> "$LOGFILE"
 	echo "Compiling daemon (vpl-jail-server)"
-	make >>$LOGFILE
+	make >> "$LOGFILE"
 	if [ -d $VPL_CONFIG_DIR ] ; then
 		echo "Updating installation => $VPL_CONFIG_DIR"
-		#Stop service
-		vpl_stop_service >>$LOGFILE
+		vpl_stop_service >> "$LOGFILE"
 	else
 		echo "Installing => $VPL_CONFIG_DIR"
 		mkdir $VPL_CONFIG_DIR
@@ -328,255 +416,340 @@ function vpl_install_daemon() {
 	#Copy daemon 
 	cp src/vpl-jail-server $VPL_PROGRAMS_DIR
 }
-echo "Installation log file => $LOGFILE"
-if [ "$1" == "update" ] ; then
-	vpl_install_daemon
-	vpl_start_service >>$LOGFILE
-	exit
-fi
-echo "Preparing the installation"
-if [ "$PMTYPE" == "1" ] ; then
-	vpl_install "LSB core" redhat-lsb-core
-	vpl_install "make" make
-	vpl_install "C compiler" gcc
-	vpl_install "C++ compiler" gcc-c++
-	vpl_install "SSL library" openssl		
-	vpl_install "SSL library" openssl-devel	
-	vpl_install "Firewall" iptables
-	vpl_install "Window manager" metacity
-	vpl_install "xterm" xterm
-	vpl_install "VNC server" tigervnc-server
-	vpl_install "Web browser" firefox
-else
-	if [ "$(command -v add-apt-repository)" != "" ] ; then
-		add-apt-repository universe &> /dev/null
-	fi
-	vpl_install "make" make
-	vpl_install "LSB" lsb lsb-core lsb-compat
-	vpl_install "C++ compiler" g++
-	vpl_install "SSL library" openssl
-	vpl_install "SSL library" libssl-dev
-	vpl_install "Firewall" iptables
-	vpl_install "X system" xorg
-	vpl_install "dbus-x11" dbus-x11
-	vpl_install "VNC server" tightvncserver
-	vpl_install "Fonts" xfonts-75dpi
-	vpl_install "Fonts" xfonts-100dpi
-	vpl_install "Window manager" openbox
-	vpl_install "Configuration DB system" gconf2
-	vpl_install "xterm" xterm
-	if [ "$(command -v gconftool-2)" != "" ] ; then
-		gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
-	fi
-	vpl_install "Web browser" firefox firefox-esr
-	vpl_install "wget" wget
-	vpl_install "curl" curl
-	vpl_install "net-tools" net-tools
-	vpl_install "bc" bc
-fi
-vpl_install_daemon
-#Copy configuration file
-VPL_CONFIGFILE=$VPL_CONFIG_DIR/vpl-jail-system.conf
-if [ -f $VPL_CONFIGFILE ] ; then
-	echo "Replace current configuration file with a fresh one?"
-	echo -n "(y/n)"
-	read A
-	if [ "$A" == "y" ] ; then
-		cp vpl-jail-system.conf $VPL_CONFIGFILE
-		echo "Configuration file replaced"
-	fi
-else
-	cp vpl-jail-system.conf $VPL_CONFIGFILE
-	if [ "$PMTYPE" == "1"  ] ; then
-		echo "" >> $VPL_CONFIGFILE
-		echo "ENVPATH=/usr/bin:/bin" >> $VPL_CONFIGFILE
-		echo "Configuration file changed for CentOS. Added ENVPATH"
-	fi
-fi
-chmod 600 $VPL_CONFIGFILE
-# Copy launch scripts
-cp vpl_*.sh $VPL_PROGRAMS_DIR
-chmod +x $VPL_PROGRAMS_DIR/*.sh
 
-vpl_install_service
-
-#create default control dir
-if [ ! -d /var/vpl-jail-system ] ; then
-	mkdir /var/vpl-jail-system
-fi
-chmod 0600 /var/vpl-jail-system
-
-if [ ! -f $VPL_CONFIG_DIR/key.pem ] ; then
-	echo "VPL execution server needs SSL certificates to accept https:"
-	echo "and wss: requests."
-	echo "If you have certificates then copy the key and the certificate file"
-	echo "in pem format to $VPL_CONFIG_DIR/key.pem and $VPL_CONFIG_DIR/cert.pem"
-	echo "If you don't have certificate the intaller can install and configure Let's Encrypt for you."
-	echo "Notice that this machine must be accesible from internet and has port 80 available."
-	echo -n "Install Let's Encrypt to get free certificates?"
-	echo -n "(y/n)"
-	read A	
-	if [ "$A" != "n" ] ; then
-		vpl_install_letsencrypt	
+function vpl_install_update_extra_files() {
+	local VPL_CONFIGFILE=$VPL_CONFIG_DIR/vpl-jail-system.conf
+	if [ -f $VPL_CONFIGFILE ] ; then
+		A=""
+		if [ "$NONINTERACTIVE" == "" ] ; then
+			echo "Replace current configuration file with a fresh one?"
+			echo -n "(y/n)"
+			read A
+		fi
+		if [ "$A" == "y" ] ; then
+			cp vpl-jail-system.conf $VPL_CONFIGFILE
+			echo "Configuration file replaced"
+		else
+			echo "Configuration file keeped"
+		fi
 	else
-		echo "If you want the intaller can generate a selfsigned certificate for you."
-		echo -n "Generate the certificate?"
-		read A
-		if [ "$A" != "n" ] ; then
-			vpl_generate_selfsigned_certificate
-			cp key.pem $VPL_CONFIG_DIR
-			cp cert.pem $VPL_CONFIG_DIR
-			chmod 600 $VPL_CONFIG_DIR/*.pem
-			rm key.pem keyini.pem certini.pem cert.pem
+		cp vpl-jail-system.conf $VPL_CONFIGFILE
+		echo "Default configuration file installed"
+		if [ "$PMTYPE" == "1"  ] ; then
+			echo "" >> $VPL_CONFIGFILE
+			echo "ENVPATH=/usr/bin:/bin" >> $VPL_CONFIGFILE
+			echo "Configuration file changed for CentOS. Added ENVPATH"
 		fi
 	fi
-else
-	echo "Found SSL certificate => Don't create a new one"
-fi
-if [ "$PMTYPE" = "1" ] ; then
-    echo "Do you want to install development software? (C, C++, Java, etc.) (y/n)"
-    read A
-    if [ "$A" != "n" ] ; then
-        vpl_install "Ada compiler (GNU)" gcc-gnat
-        vpl_install "Assembler" nasm
-        vpl_install "C compiler (GNU)" gcc
-        vpl_install "Fortran compiler (GNU)" gcc-gfortran
-        vpl_install "General purpose debugger (GNU)" gdb
-        vpl_install "Java (OpenJDK)" java-1.8.0-openjdk-devel java-1.7.0-openjdk-devel
-        vpl_install "Junit framework" junit
-        vpl_install "Perl interpreter" perl
-        vpl_install "PHP interpreter" php-cli
-        vpl_install "Prolog" pl
-        vpl_install "Python interpreter" python
-        vpl_install "Ruby interpreter" ruby
-        vpl_install "SQL interpreter" sqlite
-        vpl_install "TCL interpreter" tcl
-        vpl_install "Valgrind tool" valgrind
-    fi
-    echo "IMPORTANT: Please, set properly the ENVPATH in the config file /etc/vpl/vpl-jail-system.conf" 
-    echo "           e.g. \"ENVPATH=/usr/bin:/bin:/usr/sbin\" and restart the service"
-else
-    echo "Do you want to install development software?"
-    echo "  (Ada, Assambler, C, C++, C#, DDD, Fortran, gdb, Haskell, Java, "
-    echo "   JUnit, Node.js, Octave, Pascal, Perl, PHP, Python, Ruby, Scala,"
-    echo "   Scheme, TCL, valgrind)"
-    echo -n "(y/n)"
-    read A1
-    echo "Do you want to install other development software?"
-    echo "  (Clisp, Clojure, Cobol, CoffeScript, D, Erlang, Go, Haxe, JQuery,"
-    echo "   Lua, R, Xquery, VHDL)"
-    echo -n "(y/n)"
-    read A2
-    if [ "$A1" != "n" ] ; then
-    	echo "This installation may take a long time"
-        vpl_install "Ada compiler (GNU)" gnat
-        vpl_install "Assembler" nasm
-        vpl_install "C compiler (GNU)" gcc
-        vpl_install "C# development framework (mono)" mono-complete
-        vpl_install "DDD graphical front end debugger (GNU)" ddd
-        vpl_install "Fortran compiler (GNU)" gfortran
-        vpl_install "General purpose debugger (GNU)" gdb
-        vpl_install "Haskell" hgc hugs
-        vpl_install "Java runtime" default-jre openjdk-11-jre openjdk-8-jre openjdk-7-jre
-        vpl_install "Java jdk" default-jdk openjdk-11-jdk openjdk-8-jdk openjdk-7-jdk
-        if [ "$(command -v update-alternatives)" != "" ] ; then
+	chmod 600 $VPL_CONFIGFILE
+	# Copy launch scripts
+	cp vpl_*.sh $VPL_PROGRAMS_DIR
+	chmod +x $VPL_PROGRAMS_DIR/*.sh
+	echo "Installing launch scripts"
+	# Create default control dir
+	if [ ! -d /var/vpl-jail-system ] ; then
+		mkdir /var/vpl-jail-system
+	fi
+	chmod 0600 /var/vpl-jail-system
+}
+
+function vpl_install_minimum() {
+	echo ""
+	echo "Minimum required packages"
+	if [ "$PMTYPE" == "1" ] ; then
+		vpl_install_package "LSB core" redhat-lsb-core
+		vpl_install_package "make" make
+		vpl_install_package "C compiler" gcc
+		vpl_install_package "C++ compiler" gcc-c++
+		vpl_install_package "SSL library" openssl		
+		vpl_install_package "SSL library" openssl-devel	
+		vpl_install_package "Firewall" iptables
+		vpl_install_package "Window manager" metacity
+		vpl_install_package "xterm" xterm
+		vpl_install_package "VNC server" tigervnc-server
+		vpl_install_package "Web browser" firefox
+	else
+		if [ "$(command -v add-apt-repository)" != "" ] ; then
+			add-apt-repository universe &> /dev/null
+		fi
+		vpl_install_package "apt-utils" apt-utils
+		vpl_install_package "make" make
+		vpl_install_package "automake tools" automake
+		vpl_install_package "LSB" lsb lsb-core lsb-compat
+		vpl_install_package "C++ compiler" g++
+		vpl_install_package "SSL library" openssl
+		vpl_install_package "SSL library" libssl-dev
+		vpl_install_package "Firewall" iptables
+		vpl_install_package "X system" xorg
+		vpl_install_package "dbus-x11" dbus-x11
+		vpl_install_package "VNC server" tightvncserver
+		vpl_install_package "Fonts" xfonts-75dpi
+		vpl_install_package "Fonts" xfonts-100dpi
+		vpl_install_package "Window manager" openbox
+		vpl_install_package "Configuration DB system" gconf2
+		vpl_install_package "xterm" xterm
+		if [ "$(command -v gconftool-2)" != "" ] ; then
+			gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
+		fi
+		vpl_install_package "Web browser" firefox firefox-esr
+		vpl_install_package "wget" wget
+		vpl_install_package "curl" curl
+		vpl_install_package "net-tools" net-tools
+		vpl_install_package "bc" bc
+	fi
+	echo
+}
+
+function vpl_install_basic() {
+	echo ""
+	echo "Basic aditional packages"
+	if [ "$PMTYPE" = "1" ] ; then
+		vpl_install_package "C compiler (GNU)" gcc
+		vpl_install_package "General purpose debugger (GNU)" gdb
+		vpl_install_package "Java (OpenJDK)" java-1.8.0-openjdk-devel java-1.7.0-openjdk-devel
+		vpl_install_package "Junit framework" junit
+		vpl_install_package "PHP interpreter" php-cli
+		vpl_install_package "Python interpreter" python
+		vpl_install_package "SQL interpreter" sqlite
+		echo "IMPORTANT: Please, set properly the ENVPATH in the config file /etc/vpl/vpl-jail-system.conf" 
+		echo "           e.g. \"ENVPATH=/usr/bin:/bin:/usr/sbin\" and restart the service"
+	else
+		vpl_install_package "C compiler (GNU)" gcc
+		vpl_install_package "DDD graphical front end debugger (GNU)" ddd
+		vpl_install_package "General purpose debugger (GNU)" gdb
+		vpl_install_package "Java runtime" default-jre openjdk-11-jre openjdk-8-jre openjdk-7-jre
+		vpl_install_package "Java jdk" default-jdk openjdk-11-jdk openjdk-8-jdk openjdk-7-jdk
+		if [ "$(command -v update-alternatives)" != "" -a "$LISTPACKAGES" == "" ] ; then
 			update-alternatives --auto java
 			update-alternatives --auto javac
 		fi
-        vpl_install "JavaFX" openjfx
-        vpl_install "Java Checkstyle" checkstyle
-        vpl_install "Junit framework" junit4 junit
-        vpl_install "JavaScript (Nodejs)" nodejs
-        vpl_install "JavaScript (Nodejs-legacy)" nodejs-legacy
-        vpl_install_npm "TypeScript" typescript
-        vpl_install_npm "Sass" sass
-        vpl_install "Octave (GNU)" octave
-        vpl_install "Pascal compiler" fp-compiler
-        vpl_install "Perl interpreter" perl
-        vpl_install "PHP interpreter" php-cli php5-cli
-        vpl_install "PHP readline" php-readline
-        vpl_install "Sqlite for PHP" php-sqlite3 php5-sqlite
-        vpl_install "Prolog" swi-prolog
-        vpl_install "Python3" python3
-        vpl_install "Python3 Tk" python3-tk
-        vpl_install "Python3 NumPy" python3-numpy
-        vpl_install "Python3 pandas" python3-pandas
-        vpl_install "Python3 Matplotlib" python3-matplotlib
-        vpl_install "Python3 pudb" python3-pudb
-        vpl_install "Python3 pycodestyle" python3-pycodestyle
-        vpl_install "Python3 NetworkX" python3-networkx
-		vpl_install "Python mypy" mypy
-		vpl_install "Python pycodestyle" pycodestyle
-		vpl_install "Python pydocstyle" pydocstyle
-        vpl_install "Pythom Thonny" thonny
-        vpl_install "Ruby interpreter" ruby
-		vpl_install "Rush compiler" rushc
-        vpl_install "Scala programming language" scala
-        vpl_install "Scheme interpreter" plt-scheme racket
-        vpl_install "SQL interpreter" sqlite3
-        vpl_install "TCL interpreter" tcl
-        vpl_install "Valgrind tool" valgrind
-    fi
-    if [ "$A2" != "n" ] ; then
-    	echo "This installation may take a long time"
-    	vpl_install "Clisp" clisp
-        vpl_install "Clojure" clojure clojure1.6 clojure1.4
-        vpl_install "Cobol" open-cobol
-        vpl_install "CoffeeScript" coffeescript
-        vpl_install "D compiler (GNU)" gdc
-        vpl_install "Erlang" erlang
-        vpl_install "Go programming language compiler" golang
-        vpl_install "Haxe programming language" haxe
-        vpl_install "JQuery JavaScript Lib" libjs-jquery
-        vpl_install "JQuery-UI JavaScript Lib" libjs-jquery-ui
-		vpl_install "Julia" julia
-        vpl_install "Lua compiler 5.1" lua5.1
-        vpl_install "R statistical computation and graphics system (GNU)" r-base
-        vpl_install "MIPS R2000/R3000 emulator" spim
-		vpl_install "MiniZinc constraint modeling language" minizinc
-        vpl_install "XQuery interpreter" galax
-        vpl_install "Verilog compiler" iverilog
-        vpl_install "VHDL compiler" ghdl freehdl
-        vpl_install "libtool required for VHDL" libtool-bin
-        vpl_install "Groovy programming language" groovy
-    fi
+		vpl_install_package "JavaFX" openjfx
+		vpl_install_package "Java Checkstyle" checkstyle
+		vpl_install_package "Junit framework" junit4 junit
+		vpl_install_package "PHP interpreter" php-cli php5-cli
+		vpl_install_package "PHP readline" php-readline
+		vpl_install_package "Sqlite for PHP" php-sqlite3 php5-sqlite
+		vpl_install_package "Python3" python3
+		vpl_install_package "Python3 Tk" python3-tk
+		vpl_install_package "Python3 NumPy" python3-numpy
+		vpl_install_package "Python3 pandas" python3-pandas
+		vpl_install_package "Python3 Matplotlib" python3-matplotlib
+		vpl_install_package "Python3 pudb" python3-pudb
+		vpl_install_package "Python3 pycodestyle" python3-pycodestyle
+		vpl_install_package "Python3 NetworkX" python3-networkx
+		vpl_install_package "Python mypy" mypy
+		vpl_install_package "Python pycodestyle" pycodestyle
+		vpl_install_package "Python pydocstyle" pydocstyle
+		vpl_install_package "Pythom Thonny" thonny
+		vpl_install_package "SQL interpreter" sqlite3
+	fi
+	echo
+}
 
-    echo "Do you want to try to install Kotlin?"
-    echo -n "(y/n)"
-    read A3
-    if [ "$A3" != "n" ] ; then
-    	vpl_install_kotlin
-    fi
+function vpl_install_standard() {
+	echo ""
+	echo "Standard aditional packages"
+	if [ "$PMTYPE" = "1" ] ; then
+		vpl_install_package "Ada compiler (GNU)" gcc-gnat
+		vpl_install_package "Assembler" nasm
+		vpl_install_package "C# development framework (mono)" mono-complete
+		vpl_install_package "Fortran compiler (GNU)" gcc-gfortran
+		vpl_install_package "Perl interpreter" perl
+		vpl_install_package "Prolog" pl
+		vpl_install_package "Ruby interpreter" ruby
+		vpl_install_package "TCL interpreter" tcl
+		vpl_install_package "Valgrind tool" valgrind
+	else
+		vpl_install_package "Ada compiler (GNU)" gnat
+		vpl_install_package "Assembler" nasm
+		vpl_install_package "C# development framework (mono)" mono-complete
+		vpl_install_package "Fortran compiler (GNU)" gfortran
+		vpl_install_package "General purpose debugger (GNU)" gdb
+		vpl_install_package "Haskell" hgc hugs
+		vpl_install_package "JavaScript (Nodejs)" nodejs
+		vpl_install_package "JavaScript (Nodejs-legacy)" nodejs-legacy
+		vpl_install_npm "TypeScript" typescript
+		vpl_install_npm "Sass" sass
+		vpl_install_package "Octave (GNU)" octave
+		vpl_install_package "Pascal compiler" fp-compiler
+		vpl_install_package "Perl interpreter" perl
+		vpl_install_package "Prolog" swi-prolog
+		vpl_install_package "Ruby interpreter" ruby
+		vpl_install_package "Rust compiler" rustc
+		vpl_install_package "Scala programming language" scala
+		vpl_install_package "Scheme interpreter" plt-scheme racket
+		vpl_install_package "TCL interpreter" tcl
+		vpl_install_package "Valgrind tool" valgrind
+	fi
+	echo
+}
 
-    echo "Do you want to try to install JGrasp?"
-    echo -n "(y/n)"
-    read A4
-    if [ "$A4" != "n" ] ; then
-    	vpl_install_jgrasp
-    fi
+function vpl_install_full() {
+	echo ""
+	if [ "$PMTYPE" == "1" ] ; then
+		echo
+	else
+		echo "Full aditional packages"
+		vpl_install_package "Clisp" clisp
+		vpl_install_package "Clojure" clojure clojure1.6 clojure1.4
+		vpl_install_package "Cobol" open-cobol
+		vpl_install_package "CoffeeScript" coffeescript
+		vpl_install_package "D compiler (GNU)" gdc
+		vpl_install_package "Erlang" erlang
+		vpl_install_package "Go programming language compiler" golang
+		vpl_install_package "Haxe programming language" haxe
+		vpl_install_package "JQuery JavaScript Lib" libjs-jquery
+		vpl_install_package "JQuery-UI JavaScript Lib" libjs-jquery-ui
+		vpl_install_package "Julia" julia
+		vpl_install_package "Lua compiler 5.1" lua5.1
+		vpl_install_package "R statistical computation and graphics system (GNU)" r-base
+		vpl_install_package "MIPS R2000/R3000 emulator" spim
+		vpl_install_package "MiniZinc constraint modeling language" minizinc
+		vpl_install_package "XQuery interpreter" galax
+		vpl_install_package "Verilog compiler" iverilog
+		vpl_install_package "VHDL compiler" ghdl freehdl
+		vpl_install_package "libtool required for VHDL" libtool-bin
+		vpl_install_package "Groovy programming language" groovy
+		if [ "$LISTPACKAGES" != "" ] ; then
+			echo "  JGrasp (requires user intervention) "
+			echo "  Kotlin (requires user intervention) "
+			echo
+			return
+		fi
 
-    if [ -f /etc/init.d/apache2 ] ; then
-    	echo "If you are planning to use apache2 or other service in this system,"
-    	echo "notice that you must use different ports that in vpl-jail-system"
-    	echo "It seems that you have apache2 in your system."
-	    echo -n "Remove apache2 ? (y/n) "
-    	read A
-    	if [ "$A" == "y" ] ; then
-        	#remove apache2
-        	echo "Removing apache2"
-        	if [ "SMANAGER" == "2" ] ; then
-        		rm /etc/init.d/apache2 >/dev/null 2>&1
-        		update-rc.d apache2 remove
-        	else
-        		systemctl disable apache2
-        	fi
-    	fi
-    fi
+		if [ "$NONINTERACTIVE" == "" ] ; then
+			echo "Do you want to try to install Kotlin?"
+			echo -n "(y/n)"
+			read A3
+			if [ "$A3" != "n" ] ; then
+				vpl_install_kotlin
+			fi
+			echo "Do you want to try to install JGrasp?"
+			echo -n "(y/n)"
+			read A4
+			if [ "$A4" != "n" ] ; then
+				vpl_install_jgrasp
+			fi
+		fi
+	fi
+}
+
+function vpl_check_SSL_certificate() {
+	if [ ! -f $VPL_CONFIG_DIR/key.pem ] ; then
+		if [ "$NONINTERACTIVE" == "" ] ; then
+			echo "VPL execution server needs SSL certificates to accept https:"
+			echo "and wss: requests."
+			echo "If you have certificates then copy the key and the certificate file"
+			echo "in pem format to $VPL_CONFIG_DIR/key.pem and $VPL_CONFIG_DIR/cert.pem"
+			echo "If you don't have certificate the intaller can install and configure"
+			echo "Let's Encryptn cerbot in standalone mode for you."
+			echo "If yuo want to use cerbot in webroot mode you must install and configure it manually."
+			echo "Notice that this machine must be accesible from internet and has port 80 available."
+			echo -n "Install Let's Encrypt in standalone mode to get and renew free certificates?"
+			echo -n "(y/n)"
+			read A	
+			if [ "$A" != "n" ] ; then
+				vpl_install_letsencrypt	
+			else
+				echo "If you want the intaller can generate a selfsigned certificate for you."
+				echo -n "Generate the certificate?"
+				read A
+				if [ "$A" != "n" ] ; then
+					vpl_generate_selfsigned_certificate
+					cp key.pem $VPL_CONFIG_DIR
+					cp cert.pem $VPL_CONFIG_DIR
+					chmod 600 $VPL_CONFIG_DIR/*.pem
+					rm key.pem keyini.pem certini.pem cert.pem
+				fi
+			fi
+		fi
+	fi
+}
+
+vpl_checks_and_config
+
+echo "Installation log file => $LOGFILE"
+if [ $# -eq 0 ] ; then
+	vpl_show_help
+	exit 0
 fi
+while [ $# -gt 0 ] ; do
+	case "$1" in
+		help)
+			vpl_show_help
+			exit 0
+			;;
+		update)
+			vpl_install_update_daemon
+			vpl_start_service >> "$LOGFILE"
+			exit
+			;;
+		start)
+			export START=yes
+			;;
+ 		noninteractive)
+			export NONINTERACTIVE=yes
+			export DEBIAN_FRONTEND=noninteractive
+			;;
+		list)
+			export LISTPACKAGES=yes
+			vpl_install_minimum
+			vpl_install_basic
+            vpl_install_standard
+            vpl_install_full
+			exit
+			;;
+		minimum)		
+			export MINIMUM=yes
+			;;
+		basic)
+			export MINIMUM=yes
+			export BASIC=yes
+			;;
+		standard)
+			export MINIMUM=yes
+			export BASIC=yes
+			export STANDARD=yes
+			;;
+		full)
+			export MINIMUM=yes
+			export BASIC=yes
+			export STANDARD=yes
+			export FULL=yes
+			;;
 
-vpl_check_selinux
-echo "Starting the service (vpl-jail-system)"
-vpl_start_service
+		*)
+			echo ""
+			echo " => Error: unknow parameter '$1'"
+			vpl_show_help
+			exit 1
+			;;
+	esac
+	shift
+done
+if [ "$MINIMUM" == "" ] ; then
+	echo ""
+	echo " => Error: you must select update, minimum, basic, standard or full instalation"
+	vpl_show_help
+	exit 1
+fi
+vpl_install_minimum
+vpl_install_update_daemon
+vpl_install_update_extra_files
+vpl_install_service
+vpl_check_SSL_certificate
+
+[ "$BASIC" != "" ] && vpl_install_basic
+[ "$STANDARD" != "" ] && vpl_install_standard
+[ "$FULL" != "" ] && vpl_install_full
+
+echo "-----------------------------------------------------------------"
+echo "If you are planning to use apache2, nginx or other service,"
+echo "notice that you must use different ports that in vpl-jail-system."
+
+if [ "$START" == "yes" ] ; then
+	vpl_check_selinux
+	echo "Starting the service (vpl-jail-system)"
+	vpl_start_service
+fi
 vpl_info_using_service
-
-
