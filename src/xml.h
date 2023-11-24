@@ -46,7 +46,7 @@ class XML: public RequestMessage {
 				while (offset < raw.size()) {
 					if (raw[offset] == '>'){ //tag from btag i to etag
 						tag = raw.substr(btag + 1, offset - (btag + 1));
-						//syslog(LOG_DEBUG,"tag: %s",tag.c_str());
+						//Logger::log(LOG_DEBUG,"tag: %s",tag.c_str());
 						offset++;
 						return true;
 					}
@@ -90,7 +90,7 @@ class XML: public RequestMessage {
 	TreeNode *processRawData() {
 		size_t offset=0, aux;
 		if(raw.find("</methodCall>", raw.size() - 15) == string::npos){
-			syslog(LOG_INFO,"XML: data pass end tag of methodcall");
+			Logger::log(LOG_INFO,"XML: data pass end tag of methodcall");
 		}
 		string tag;
 		if(!nextTag(raw, offset, tag, aux) || !nextTag(raw,offset,tag,aux)){

@@ -27,7 +27,7 @@ void ConfigurationFile::parseConfigLine(ConfigData &data,const string &line){
 			param = Util::toUppercase(param);
 			Util::trimAndRemoveQuotes(value);
 			data[param] = value;
-			syslog(LOG_INFO,"Read config param %s=%s", param.c_str(), value.c_str());
+			Logger::log(LOG_INFO,"Read config param %s=%s", param.c_str(), value.c_str());
 		} else {
 			throw HttpException(internalServerErrorCode
 					,"Incorrect config file: "+line);

@@ -58,7 +58,7 @@ public:
 	}
 
 	~Cgroup(){
-		syslog(LOG_DEBUG, "Destructor called.");
+		Logger::log(LOG_DEBUG, "Destructor called.");
 	}
 
 	map<string, int> getCPUAcctStat();

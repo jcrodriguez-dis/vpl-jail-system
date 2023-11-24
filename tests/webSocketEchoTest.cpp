@@ -28,7 +28,7 @@ int main() {
 	ConfigurationTestFull::getConfiguration();
 	openlog("websocket-echo",LOG_PID,LOG_USER);
 	setlogmask(LOG_UPTO(LOG_DEBUG));
-	syslog(LOG_INFO,"Websocket echo test program started");
+	Logger::log(LOG_INFO,"Websocket echo test program started");
 	int listenSocket = socket(AF_INET, SOCK_STREAM, 0);
 	if (listenSocket == -1) {
 		cerr << "Socket error" << endl;

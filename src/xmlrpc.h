@@ -160,7 +160,7 @@ public:
 			mapstruct ret;
 			return ret;
 		}
-		syslog(LOG_ERR,"Expected struct/array(0) found %s",st->getName().c_str());
+		Logger::log(LOG_ERR,"Expected struct/array(0) found %s",st->getName().c_str());
 		throw HttpException(badRequestCode, "RPC/XML getStructMembers parse error " + st->getName() + " " + st->getRawContent());
 	}
 	/**

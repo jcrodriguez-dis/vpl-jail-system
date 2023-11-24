@@ -24,7 +24,7 @@ int processMonitor::requestsInProgress() {
 	dirent *ent;
 	DIR *dirfd = opendir(homeDir.c_str());
 	if (dirfd == NULL) {
-		syslog(LOG_ERR, "Can't open dir \"%s\": %m", homeDir.c_str());
+		Logger::log(LOG_ERR, "Can't open dir \"%s\": %m", homeDir.c_str());
 		return 0;
 	}
 	while ((ent = readdir(dirfd)) != NULL) {
@@ -52,7 +52,7 @@ void processMonitor::becomePrisoner(int prisoner) {
 		throw HttpException(internalServerErrorCode,
 				"I can't change to prisoner user 2", Util::itos(prisoner));
 	Daemon::closeSockets();
-	syslog(LOG_INFO, "change user to %d", prisoner);
+	Logger::log(LOG_INFO, "change user to %d", prisoner);
 }
 
 /**
@@ -67,7 +67,7 @@ void processMonitor::stopPrisonerProcess(bool soft) {
 }
 
 void processMonitor::stopPrisonerProcess(int prisoner, bool soft) {
-	syslog(LOG_INFO, "Sttoping prisoner process");
+	Logger::log(LOG_INFO, "Sttoping prisoner process");
 	pid_t pid = fork();
 	if (pid == 0) { //new process
 		becomePrisoner(prisoner);
@@ -104,7 +104,7 @@ string processMonitor::prisonerRelativeHomePath() {
 string processMonitor::prisonerHomePath() {
 	uid_t uid = getuid();
 	if (uid != 0) {
-		syslog(LOG_ERR, "Security problem? prisonerHomePath %d", uid);
+		Logger::log(LOG_ERR, "Security problem? prisonerHomePath %d", uid);
 		return prisonerRelativeHomePath();
 	}
 	return configuration->getJailPath() + prisonerRelativeHomePath();
@@ -132,7 +132,7 @@ void processMonitor::selectPrisoner() {
 				}
 				return;
 			} else if ( errno == EEXIST) {
-				syslog(LOG_ERR, "Exists home dir without control dir, removing ... %s", homePath.c_str());
+				Logger::log(LOG_ERR, "Exists home dir without control dir, removing ... %s", homePath.c_str());
 				Util::removeDir(homePath, getPrisonerID(), true);
 				Util::removeDir(configuration->getJailPath() + "/tmp", getPrisonerID(), false);
 				rmdir(controlPath.c_str());
@@ -380,7 +380,7 @@ void processMonitor::deleteFile(string name) {
 bool processMonitor::installScript(string to, string from) {
 	if (Util::fileExists("/usr/sbin/vpl/" + from)) {
 		string scriptCode = Util::readFile("/usr/sbin/vpl/" + from);
-		syslog(LOG_DEBUG, "Installing %s in %s", to.c_str(), from.c_str());
+		Logger::log(LOG_DEBUG, "Installing %s in %s", to.c_str(), from.c_str());
 		writeFile(to, scriptCode);
 		return true;
 	}
@@ -400,7 +400,7 @@ processState processMonitor::getState() {
 	if (compiler_pid == 0) return starting;
 	time_t currentTime = time(NULL);
 	if (startTime > currentTime || startTime == 0 ) {
-		syslog(LOG_ERR, "Internal error startTime bad %ld", startTime);
+		Logger::log(LOG_ERR, "Internal error startTime bad %ld", startTime);
 		return starting;
 	}
 	time_t elapsedTime = currentTime - startTime;
@@ -408,26 +408,26 @@ processState processMonitor::getState() {
 	tlimit += 2 * executionLimits.maxtime;
 	tlimit += JAIL_HARVEST_TIMEOUT;
 	if (tlimit < currentTime) {
-		syslog(LOG_INFO, "Execution last timeout reached %ld. ", tlimit);
+		Logger::log(LOG_INFO, "Execution last timeout reached %ld. ", tlimit);
 		cleanTask();
 		return stopped;
 	}
 	bool aliveCompiler = Util::processExists(compiler_pid);
 	if (aliveCompiler && runner_pid == 0) return compiling;
 	if (monitor_pid == 0 && monitorticket != "NO_MONITOR" && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
-		syslog(LOG_INFO, "Execution without monitor timeout reached %d. ", JAIL_MONITORSTART_TIMEOUT);
+		Logger::log(LOG_INFO, "Execution without monitor timeout reached %d. ", JAIL_MONITORSTART_TIMEOUT);
 		cleanTask();
 		return stopped;
 	}
 	if (runner_pid == 0) {
 		if (monitor_pid == 0 && monitorticket == "NO_MONITOR" && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
-			syslog(LOG_INFO, "Execution not started with no monitor, timeout reached %d. ", JAIL_MONITORSTART_TIMEOUT);
+			Logger::log(LOG_INFO, "Execution not started with no monitor, timeout reached %d. ", JAIL_MONITORSTART_TIMEOUT);
 			cleanTask();
 			return stopped;
 		}
 		if (interactive) return beforeRunning;
 		if (controlFileExists("compilation")) return retrieve;
-		syslog(LOG_INFO, "Execution stopped, not interactive, not runner, no compilation file");
+		Logger::log(LOG_INFO, "Execution stopped, not interactive, not runner, no compilation file");
 		return stopped;
 	}
 	bool aliveRunner = Util::processExists(runner_pid);
@@ -602,11 +602,11 @@ int processMonitor::removeDir(string dir, bool force) {
  */
 void processMonitor::removePrisonerHome() {
 	if ( configuration->getLogLevel() != 8 ) {
-		syslog(LOG_INFO, "Remove prisoner home (%d)", prisoner);
+		Logger::log(LOG_INFO, "Remove prisoner home (%d)", prisoner);
 		Util::removeDir(configuration->getJailPath() + "/tmp", getPrisonerID(), false); //Only prisoner files and dirs
 		Util::removeDir(prisonerHomePath(), getPrisonerID(), true); //All files and dir
 	} else {
-		syslog(LOG_INFO, "Loglevel = 8 => do not remove prisoner home (%d)", prisoner);
+		Logger::log(LOG_INFO, "Loglevel = 8 => do not remove prisoner home (%d)", prisoner);
 	}
 }
 
@@ -628,7 +628,7 @@ void processMonitor::removeTicketFile(string ticket) {
  * Remove task home dir and monitor control files
  */
 void processMonitor::cleanTask() {
-	syslog(LOG_INFO, "Cleaning task");
+	Logger::log(LOG_INFO, "Cleaning task");
 	stopPrisonerProcess(false);
 	removePrisonerHome();
 	string controlPath = configuration->getControlPath();
@@ -660,7 +660,7 @@ long long processMonitor::getMemoryUsed() {
 	dirent *ent;
 	DIR *dirfd = opendir(dir.c_str());
 	if (dirfd == NULL) {
-		syslog(LOG_ERR, "Can't open \"/proc\" dir: %m");
+		Logger::log(LOG_ERR, "Can't open \"/proc\" dir: %m");
 		return INT_MAX; //
 	}
 	static bool init = false;
@@ -712,7 +712,7 @@ vector<string> processMonitor::getPrisonersFromDir(string dir) {
 	dirent *ent;
 	DIR *dirfd = opendir(dir.c_str());
 	if (dirfd == NULL) {
-		syslog(LOG_ERR, "Can't open dir \"%s\": %m", dir.c_str());
+		Logger::log(LOG_ERR, "Can't open dir \"%s\": %m", dir.c_str());
 		return prisoners;
 	}
 	while((ent = readdir(dirfd))!=NULL) {
@@ -731,7 +731,7 @@ vector<string> processMonitor::getPrisonersFromDir(string dir) {
 }
 
 void processMonitor::cleanPrisonerFiles(string pdir) {
-	syslog(LOG_INFO, "Cleaning prisoner files");
+	Logger::log(LOG_INFO, "Cleaning prisoner files");
 	const string controlDir = Configuration::getConfiguration()->getControlPath();
 	const string jailPath = Configuration::getConfiguration()->getControlPath();
 	const string phome = jailPath + "/home" + "/" + pdir;
@@ -761,14 +761,14 @@ void processMonitor::cleanPrisonerFiles(string pdir) {
 }
 
 void processMonitor::cleanZombieTasks() {
-	syslog(LOG_INFO, "Cleaning zombie tasks");
+	Logger::log(LOG_INFO, "Cleaning zombie tasks");
 	const string controlDir = Configuration::getConfiguration()->getControlPath();
 	const string homeDir = Configuration::getConfiguration()->getJailPath() + "/home";
 	vector<string> homes = getPrisonersFromDir(homeDir);
 	vector<string> tasks = getPrisonersFromDir(controlDir);
 	for (size_t i = 0; i < tasks.size(); i++) {
 		ConfigData data;
-		syslog(LOG_INFO, "Cleaning zombie tasks: checking(1) %s", tasks[i].c_str());
+		Logger::log(LOG_INFO, "Cleaning zombie tasks: checking(1) %s", tasks[i].c_str());
 		string configDir = controlDir + "/" + tasks[i];
 		string configFile = configDir + "/" + "config";
 		struct stat statbuf;
@@ -790,7 +790,7 @@ void processMonitor::cleanZombieTasks() {
 	}
 	Lock lock(controlDir);
 	for (size_t i = 0; i < homes.size(); i++) {
-		syslog(LOG_INFO, "Cleaning zombie tasks: checking(2) %s", homes[i].c_str());
+		Logger::log(LOG_INFO, "Cleaning zombie tasks: checking(2) %s", homes[i].c_str());
 		string configFile = controlDir + "/" + homes[i] + "/" + "config";
 		string phome = homeDir + "/" + homes[i];
 		if ( Util::dirExists(phome) && ! Util::fileExists(configFile)) {

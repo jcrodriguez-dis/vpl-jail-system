@@ -31,7 +31,7 @@ vplregex Socket::regCookie("([^=]+)=([^;]+)(; )?");
  * @param line string to process
  */
 void Socket::parseRequestLine(const string &line){
-	syslog(LOG_DEBUG,"Request line :\"%s\"", line.c_str());
+	Logger::log(LOG_DEBUG,"Request line :\"%s\"", line.c_str());
 	method = "";
 	URL = "";
 	version = "";
@@ -43,11 +43,11 @@ void Socket::parseRequestLine(const string &line){
 		throw HttpException(badRequestCode, "Erroneous request line", line);
 	}
 	method = match[1];
-	syslog(LOG_DEBUG,"method :\"%s\"", method.c_str());
+	Logger::log(LOG_DEBUG,"method :\"%s\"", method.c_str());
 	URL = match[2];
-	syslog(LOG_DEBUG,"URL :\"%s\"", URL.c_str());
+	Logger::log(LOG_DEBUG,"URL :\"%s\"", URL.c_str());
 	version = match[3];
-	syslog(LOG_DEBUG,"version :\"%s\"",version.c_str());
+	Logger::log(LOG_DEBUG,"version :\"%s\"",version.c_str());
 
 	nomatch = ! regURL.search(URL, match);
 	if (nomatch) {
@@ -71,7 +71,7 @@ string Socket::getHeader(string name){
  */
 void Socket::parseCookies(const string &value){
 	string rawcookies = value;
-	syslog(LOG_INFO,"Cookie :\"%s\"", rawcookies.c_str());
+	Logger::log(LOG_INFO,"Cookie :\"%s\"", rawcookies.c_str());
 	vplregmatch match(3);
 	size_t nmatchs = 0;
 	while (regCookie.search(rawcookies, match)) {
@@ -80,7 +80,7 @@ void Socket::parseCookies(const string &value){
 		rawcookies = rawcookies.substr(match[0].length());
 	}
 	if (cookies.size() != nmatchs) {
-		syslog(LOG_DEBUG, "Bad cookiees (repeated): %s", value.c_str());
+		Logger::log(LOG_DEBUG, "Bad cookiees (repeated): %s", value.c_str());
 		throw HttpException(badRequestCode, "Erroneous cookie (repeated)", value);
 	}
 }
@@ -92,11 +92,11 @@ void Socket::parseCookies(const string &value){
  * @param line header to process
  */
 void Socket::parseHeader(const string &line){
-	syslog(LOG_INFO,"Header :\"%s\"", line.c_str());
+	Logger::log(LOG_INFO,"Header :\"%s\"", line.c_str());
 	vplregmatch match(3);
 	bool nomatch = !regHeader.search(line, match);
 	if (nomatch) {
-		syslog(LOG_DEBUG, "No match header: %s", line.c_str());
+		Logger::log(LOG_DEBUG, "No match header: %s", line.c_str());
 		throw HttpException(badRequestCode, "Erroneous header", line);
 	}
 	string field = Util::toUppercase(match[1]);
@@ -115,7 +115,7 @@ void Socket::parseHeader(const string &line){
 void Socket::processHeaders(const string &input){
 	string line;
 	size_t offset = 0;
-	syslog(LOG_DEBUG,"processHeaders: %s",input.c_str());
+	Logger::log(LOG_DEBUG,"processHeaders: %s",input.c_str());
 	do {
 		line = Util::getLine(input, offset);
 	} while(line.size() == 0 && offset < input.size());
@@ -129,11 +129,11 @@ Socket::Socket(int socket){
 	struct sockaddr_in jail_client;
 	socklen_t snlen = sizeof(jail_client);
 	if(getpeername(socket, (struct sockaddr*)&jail_client, &snlen)){
-		syslog(LOG_ERR, "getpeername fail %m");
+		Logger::log(LOG_ERR, "getpeername fail %m");
 	}else{
 		this->clientip = jail_client.sin_addr.s_addr;
 		unsigned char *CIP = (unsigned char *)&(this->clientip);
-		syslog(LOG_INFO, "Client: %d.%d.%d.%d", (int)CIP[0], (int)CIP[1], (int)CIP[2], (int)CIP[3]);
+		Logger::log(LOG_INFO, "Client: %d.%d.%d.%d", (int)CIP[0], (int)CIP[1], (int)CIP[2], (int)CIP[3]);
 	}
 	this->maxDataSize = Configuration::getConfiguration()->getRequestMaxSize();
 	this->socket = socket;
@@ -177,7 +177,7 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 		string ret = readBuffer;
 		readBuffer = "";
 		if (ret.size()) {
-			syslog(LOG_INFO,"Received %lu", (long unsigned int) ret.size());
+			Logger::log(LOG_INFO,"Received %lu", (long unsigned int) ret.size());
 		}
 		return ret;
 	}
@@ -185,7 +185,7 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 		sizeToReceive = JAIL_HEADERS_SIZE_LIMIT;
 	}
 	if (sizeToReceive > 0) {
-		syslog(LOG_INFO,"Receiving until %d bytes", sizeToReceive);
+		Logger::log(LOG_INFO,"Receiving until %d bytes", sizeToReceive);
 	}
 	//If already read, return data
 	if( sizeToReceive > 0 && (int) readBuffer.size() >= sizeToReceive
@@ -206,14 +206,14 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 	while (true) {
 		int res = poll(devices,1,wait);
 		if(res == -1) {
-			syslog(LOG_INFO,"poll fail reading %m");
+			Logger::log(LOG_INFO,"poll fail reading %m");
 			throw HttpException(internalServerErrorCode
 					,"Error poll reading data"); //Error
 		}
 		time_t currentTime = time(NULL);
 		if (currentTime > timeLimit || currentTime > fullTimeLimit) {
 			if(sizeToReceive == 0){
-				syslog(LOG_DEBUG,"Socket read timeout, closed connection?");
+				Logger::log(LOG_DEBUG,"Socket read timeout, closed connection?");
 				return "";
 			}else {
 				throw HttpException(requestTimeoutCode, "Socket read timeout");
@@ -221,20 +221,20 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 		}
 		if (res == 0 && sizeToReceive == 0) break; //Nothing to read
 		if (res == 0) continue; //Nothing to do
-		syslog(LOG_DEBUG,"poll return: %d", res);
+		Logger::log(LOG_DEBUG,"poll return: %d", res);
 		if (devices[0].revents & POLLIN) { //Read from net
 			int sizeRead = netRead(buf, MAX);
 			if(sizeRead > 0) {
 				string sread(buf, sizeRead);
 				if( (int) sread.size() != sizeRead) {
-					syslog(LOG_ERR,"read net decode error");
+					Logger::log(LOG_ERR,"read net decode error");
 				}
 				readBuffer += sread;
 				if (header.empty()) {
 					size_t pos;
 					if ((pos = readBuffer.find("\r\n\r\n")) != string::npos) {
 						header = readBuffer.substr(0, pos + 4);
-						syslog(LOG_INFO, "Received header %lu",(long unsigned int)pos+4);
+						Logger::log(LOG_INFO, "Received header %lu",(long unsigned int)pos+4);
 						processHeaders(header);
 						readBuffer.erase(0,pos+4);
 						return ""; //End of process
@@ -248,14 +248,14 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 			} else if (sizeRead < 0) {
 				throw HttpException(badRequestCode, "Error reading data");
 			} else {
-				syslog(LOG_INFO, "sizeRead==0");
+				Logger::log(LOG_INFO, "sizeRead==0");
 				closed = true;
 				break;
 			}
 		}
 		if (devices[0].revents & POLLHUP) { //socket close
 			closed = true;
-			syslog(LOG_INFO, "POLLHUP");
+			Logger::log(LOG_INFO, "POLLHUP");
 			break;
 		}
 		if (devices[0].revents & bad) {
@@ -265,7 +265,7 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 	string ret = readBuffer;
 	readBuffer = "";
 	if (ret.size()) {
-		syslog(LOG_INFO, "Received %lu", (long unsigned int) ret.size());
+		Logger::log(LOG_INFO, "Received %lu", (long unsigned int) ret.size());
 	}
 	return ret;
 }
@@ -275,7 +275,7 @@ void Socket::send(const string &data, bool async){
 	writeBuffer += data;
 	size_t size=writeBuffer.size();
 	const unsigned char *s=(const unsigned char *)writeBuffer.data();
-	syslog(LOG_INFO,"Sending %lu to fd %u",(long unsigned int)size,socket);
+	Logger::log(LOG_INFO,"Sending %lu to fd %u",(long unsigned int)size,socket);
 	size_t offset=0;
 	struct pollfd devices[1];
 	devices[0].fd=socket;
@@ -294,7 +294,7 @@ void Socket::send(const string &data, bool async){
 		if(res==0) continue; //Nothing to do
 		time_t currentTime=time(NULL);
 		if(currentTime>timeLimit || currentTime>fullTimeLimit){
-			syslog(LOG_ERR,"Socket write timeout");
+			Logger::log(LOG_ERR,"Socket write timeout");
 			throw requestTimeoutCode;
 		}
 		if(devices[0].revents & POLLOUT){ //Write to net
@@ -316,18 +316,18 @@ void Socket::send(const string &data, bool async){
 		}
 		if(devices[0].revents & POLLHUP){ //socket close
 			closed=true;
-			syslog(LOG_INFO,"POLLHUP");
+			Logger::log(LOG_INFO,"POLLHUP");
 			break;
 		}
 		if(devices[0].revents & bad) {
-			syslog(LOG_ERR,"Error writing http data %m");
+			Logger::log(LOG_ERR,"Error writing http data %m");
 			throw HttpException(internalServerErrorCode
 					,"Socket write data error");
 		}
 		if(offset>=size) break;
 	}
 	writeBuffer.erase(0,offset);
-	syslog(LOG_INFO,"Send %lu",(long unsigned int)offset);
+	Logger::log(LOG_INFO,"Send %lu",(long unsigned int)offset);
 }
 
 bool Socket::wait(const int msec){

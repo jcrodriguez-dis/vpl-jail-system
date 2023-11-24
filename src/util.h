@@ -24,6 +24,7 @@
 #include <signal.h>
 #include <string.h>
 #include <string>
+#include "log.h"
 #include "vplregex.h"
 #include "jail_limits.h"
 #include "httpException.h"
@@ -54,8 +55,8 @@ struct ExecutionLimits {
 	long long maxfilesize;
 	long long maxmemory;
 	int maxprocesses;
-	void syslog(const char *s){
-		::syslog(LOG_DEBUG,"%s: maxtime: %d seg, maxfilesize: %lld Kb, maxmemory %lld Kb, maxprocesses: %d",
+	void log(const char *s){
+		Logger::log(LOG_DEBUG, "%s: maxtime: %d seg, maxfilesize: %lld Kb, maxmemory %lld Kb, maxprocesses: %d",
 				s, maxtime, maxfilesize/1024, maxmemory/1024, maxprocesses);
 	}
 };
@@ -366,47 +367,46 @@ public:
 	 * @return environment var value or ""
 	 * @param env string var name
 	 */
-	static string getEnv(const string env){
-		const char *res=getenv(env.c_str());
-		if(res==NULL) return "";
+	static string getEnv(const string env) {
+		const char *res = getenv(env.c_str());
+		if (res == NULL) return "";
 		return res;
 	}
 
 	static bool correctFileName(const string &fn){
 		static vplregex reg("[[:cntrl:]]|[!-,]|[:-@]|[{-~]|\\\\|\\[|\\]|[\\/\\^`]|^ | $|^\\-|\\.\\.");
-		if(fn.size() < 1) return false;
-		if(fn.size() > JAIL_FILENAME_SIZE_LIMIT) return false;
+		if (fn.size() < 1) return false;
+		if (fn.size() > JAIL_FILENAME_SIZE_LIMIT) return false;
 		vplregmatch found(1);
 		bool incorrect = reg.search(fn, found);
 		if (incorrect) {
 			string incorrect = found[0];
-			syslog(LOG_DEBUG,"incorrectFile '%s' found '%s'"
+			Logger::log(LOG_DEBUG,"incorrectFile '%s' found '%s'"
 					,fn.c_str(), incorrect.c_str());
 		}
 		return ! incorrect;
 	}
 
 	static bool correctPath(const string &path){ //No trailing /
-		if(path.size()==0) return false;
-		if(path.size() > JAIL_PATH_SIZE_LIMIT) return false;
-		size_t pos=0;
+		if (path.size() == 0) return false;
+		if (path.size() > JAIL_PATH_SIZE_LIMIT) return false;
+		size_t pos = 0;
 		size_t found;
 		string fn;
-		if(path[0] == '/') pos=1; //skip absolute path
-		while((found=path.find('/',pos)) != string::npos){
+		if (path[0] == '/') pos = 1; //skip absolute path
+		while((found = path.find('/', pos)) != string::npos){
 			fn = path.substr(pos, found - pos);
-			if(!correctFileName(fn))
-				return false;
+			if (!correctFileName(fn)) return false;
 			pos = found + 1;
 		}
-		fn=path.substr(pos);
+		fn = path.substr(pos);
 		return correctFileName(fn);
 	}
 
 	static string getDir(const string &filePath){
-		size_t pos=0,found;
-		if((pos=found=filePath.rfind('/')) != string::npos){
-			return filePath.substr(0,pos);
+		size_t pos;
+		if ((pos = filePath.rfind('/')) != string::npos) {
+			return filePath.substr(0, pos);
 		}
 		return "";
 	}
@@ -415,30 +415,30 @@ public:
 		string curDir;
 		while((pos = path.find('/',pos)) != string::npos){
 			curDir=path.substr(0,pos++);
-			syslog(LOG_DEBUG,"dir to check or create '%s' user %d",curDir.c_str(),user);
+			Logger::log(LOG_DEBUG,"dir to check or create '%s' user %d",curDir.c_str(),user);
 			if(! dirExists(curDir) ){
 				if(mkdir(curDir.c_str(),0700)){
-					syslog(LOG_DEBUG,"Can't create dir '%s'",curDir.c_str());
+					Logger::log(LOG_DEBUG,"Can't create dir '%s'",curDir.c_str());
 					return false;
 				}
-				syslog(LOG_DEBUG,"Change owner to %d",user);
+				Logger::log(LOG_DEBUG,"Change owner to %d",user);
 				if(lchown(curDir.c_str(),user,user)){
-					syslog(LOG_DEBUG,"Can't lchown dir '%s'",curDir.c_str());
+					Logger::log(LOG_DEBUG,"Can't lchown dir '%s'",curDir.c_str());
 					return false;
 				}
 
 			}
 		}
-		syslog(LOG_DEBUG,"dir to check or create '%s'",path.c_str());
+		Logger::log(LOG_DEBUG,"dir to check or create '%s'",path.c_str());
 		if(! dirExists(path) ){
-			syslog(LOG_DEBUG,"Create '%s'",path.c_str());
+			Logger::log(LOG_DEBUG,"Create '%s'",path.c_str());
 			if(mkdir(path.c_str(),0700)){
-				syslog(LOG_DEBUG,"Can't create dir '%s' %m",path.c_str());
+				Logger::log(LOG_DEBUG,"Can't create dir '%s' %m",path.c_str());
 				return false;
 			}
-			syslog(LOG_DEBUG,"Change owner to %d",user);
+			Logger::log(LOG_DEBUG,"Change owner to %d",user);
 			if(lchown(path.c_str(),user,user)){
-				syslog(LOG_DEBUG,"Can't lchown dir '%s' %m",path.c_str());
+				Logger::log(LOG_DEBUG,"Can't lchown dir '%s' %m",path.c_str());
 				return false;
 			}
 		}
@@ -452,7 +452,7 @@ public:
 		FILE *fd=fopen(name.c_str(),"wb");
 		if (fd == NULL) {
 			string dir = getDir(name);
-			syslog(LOG_DEBUG,"path '%s' dir '%s'",name.c_str(), dir.c_str());
+			Logger::log(LOG_DEBUG,"path '%s' dir '%s'",name.c_str(), dir.c_str());
 			if (dir.size())
 				createDir(dir,user,pos);
 			fd = fopen(name.c_str(),"wb");
@@ -467,10 +467,10 @@ public:
 		}
 		fclose(fd);
 		if (lchown(name.c_str(),user,user))
-			syslog(LOG_ERR, "Can't change file owner %m");
+			Logger::log(LOG_ERR, "Can't change file owner %m");
 		bool isScript = name.size() > 4 && name.substr(name.size() - 3) == ".sh";
 		if (chmod(name.c_str(), isScript ? 0700 : 0600))
-			syslog(LOG_ERR, "Can't change file perm %m");
+			Logger::log(LOG_ERR, "Can't change file perm %m");
 	}
 
 	/**
@@ -500,9 +500,9 @@ public:
 	 */
 	static void deleteFile(string name){
 		if(Util::fileExists(name)){
-			syslog(LOG_DEBUG,"Delete \"%s\"",name.c_str());
+			Logger::log(LOG_DEBUG,"Delete \"%s\"",name.c_str());
 			if(unlink(name.c_str())){
-				syslog(LOG_ERR,"Can't unlink \"%s\": %m",name.c_str());
+				Logger::log(LOG_ERR,"Can't unlink \"%s\": %m",name.c_str());
 			}
 		}
 	}
@@ -526,7 +526,7 @@ public:
 		dirent *ent;
 		DIR *dirfd = opendir(dir.c_str());
 		if(dirfd==NULL){
-			syslog(LOG_ERR, "Can't open dir \"%s\": %m", dir.c_str());
+			Logger::log(LOG_ERR, "Can't open dir \"%s\": %m", dir.c_str());
 			return 0;
 		}
 		while( ( ent = readdir(dirfd) ) != NULL){
@@ -544,9 +544,9 @@ public:
 					remove = filestat.st_uid == owner || filestat.st_gid == owner;
 				}
 				if ( remove ) {
-					syslog(LOG_DEBUG,"Delete \"%s\"", fullname.c_str());
+					Logger::log(LOG_DEBUG,"Delete \"%s\"", fullname.c_str());
 					if( unlink(fullname.c_str()) ){
-						syslog(LOG_ERR,"Can't unlink \"%s\": %m",fullname.c_str());
+						Logger::log(LOG_ERR,"Can't unlink \"%s\": %m",fullname.c_str());
 					} else {
 						nunlinks++;
 					}
@@ -555,9 +555,9 @@ public:
 		}
 		closedir(dirfd);
 		if (force) {
-			syslog(LOG_DEBUG,"rmdir \"%s\"",dir.c_str());
+			Logger::log(LOG_DEBUG,"rmdir \"%s\"",dir.c_str());
 			if ( rmdir(dir.c_str()) ) {
-				syslog(LOG_ERR,"Can't rmdir \"%s\": %m",dir.c_str());
+				Logger::log(LOG_ERR,"Can't rmdir \"%s\": %m",dir.c_str());
 			} else {
 				nunlinks++;
 			}
@@ -570,12 +570,12 @@ public:
 	static void fdblock(int fd, bool set=true){
 		int flags;
 		if( (flags = fcntl(fd, F_GETFL, 0)) < 0){
-			syslog(LOG_ERR,"fcntl F_GETFL: %m");
+			Logger::log(LOG_ERR,"fcntl F_GETFL: %m");
 		}
 		if(set && (flags | O_NONBLOCK)==flags) flags ^=O_NONBLOCK;
 		else flags |=O_NONBLOCK;
 		if(fcntl(fd, F_SETFL, flags)<0){
-			syslog(LOG_ERR,"fcntl F_SETFL: %m");
+			Logger::log(LOG_ERR,"fcntl F_SETFL: %m");
 		}
 	}
 

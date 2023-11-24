@@ -20,7 +20,7 @@ using namespace std;
 #include "jail.h"
 #include "util.h"
 
-class Daemon{
+class Daemon {
 	Configuration *configuration;
 	static Daemon* singlenton;
 	int port,sport;
@@ -53,9 +53,9 @@ class Daemon{
 		time_t start;
 	};
 	map<pid_t,Child> children;
-	static bool finishRequest;
-	static void SIGTERMHandler(int n){
-		finishRequest=true;
+	static bool finishRequested;
+	static void SIGTERMHandler(int n) {
+		Daemon::finishRequested = true;
 	}
 
 	/**
@@ -65,7 +65,7 @@ class Daemon{
 		struct stat info;
 
 		string detc=configuration->getJailPath()+"/etc";
-		if(lstat(detc.c_str(),&info))
+		if(lstat(detc.c_str(), &info))
 			throw "jail /etc not checkable";
 		if(info.st_uid !=0 || info.st_gid !=0)
 			throw "jail /etc not owned by root";
@@ -138,7 +138,7 @@ class Daemon{
 	}
 	void processChildEnd(pid_t pid, ExitStatus es){
 		if(children.find(pid) == children.end())
-			syslog(LOG_ERR,"Child end, but pid not found");
+			Logger::log(LOG_ERR,"Child end, but pid not found");
 		Child c=children[pid];
 		children.erase(pid);
 		countRequest(c.IP,es);
@@ -151,7 +151,7 @@ class Daemon{
 			pid_t wret=waitpid(-1, &status, WNOHANG);
 			if(wret == 0) return; //All Children running o no child
 			if(wret == -1){
-				syslog(LOG_ERR,"Server waitpid error");
+				Logger::log(LOG_ERR,"Server waitpid error");
 				return;
 			}
 			statistics.requests++;
@@ -181,9 +181,9 @@ class Daemon{
 	void launch(int listen, bool sec){
 		struct sockaddr_in client;
 		socklen_t slen = sizeof(client);
-		actualSocket = ::accept(listen, (struct sockaddr *)&client, &slen);
-		if (actualSocket < 0) {
-			syslog(LOG_ERR,"accept() Error:%d  %m", actualSocket);
+		this->actualSocket = ::accept(listen, (struct sockaddr *)&client, &slen);
+		if (this->actualSocket < 0) {
+			Logger::log(LOG_ERR,"accept() Error:%d  %m", this->actualSocket);
 			return;
 		}
 		string IP;
@@ -192,28 +192,28 @@ class Daemon{
 		if(d != NULL)
 			IP=d;
 		if (isBanned(IP)) {
-			close(actualSocket);
+			close(this->actualSocket);
 			statistics.rejected++;
 			countRequest(IP,internalError);
-			syslog(LOG_ERR,"%s: Request rejected: IP banned", IP.c_str());
+			Logger::log(LOG_ERR,"%s: Request rejected: IP banned", IP.c_str());
 			return;
 		}
-		fcntl(actualSocket, FD_CLOEXEC); //Close socket on execve
+		fcntl(this->actualSocket, FD_CLOEXEC); //Close socket on execve
 		pid_t pid = fork();
 		if (pid == 0) { //new process
 			Socket *socket = NULL;
-			close(listenSocket);
+			close(this->listenSocket);
 			if(sec)
-				socket= new SSLSocket(actualSocket);
+				socket= new SSLSocket(this->actualSocket);
 			else
-				socket= new Socket(actualSocket);
+				socket= new Socket(this->actualSocket);
 			Jail jail(IP);
 			jail.process(socket);
 			delete socket;
 			usleep(10000);//Wait for father process child
 			_exit(EXIT_SUCCESS);
 		}
-		close(actualSocket);
+		close(this->actualSocket);
 		Child c;
 		c.IP=IP;
 		c.start=time(NULL);
@@ -237,7 +237,7 @@ class Daemon{
 	}
 	int initSocket(int port, const char *type, int timeout=10) {
 		if (port <= 0) {
-			syslog(LOG_INFO,"No %s used", type);
+			Logger::log(LOG_INFO,"No %s used", type);
 			return -1;
 		}
 		struct sockaddr_in local;
@@ -253,7 +253,7 @@ class Daemon{
 		#ifdef SO_REUSEPORT
 		int on=1;
 		if (setsockopt(socketfd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
-			syslog(LOG_ERR,"setsockopt(SO_REUSEPORT) %s failed: %m", type);
+			Logger::log(LOG_ERR,"setsockopt(SO_REUSEPORT) %s failed: %m", type);
 		}
 		#endif
 		local.sin_port = htons(port);
@@ -262,14 +262,14 @@ class Daemon{
 			bindResult = bind(socketfd, (struct sockaddr *) &local, sizeof(local));
 			if (bindResult == -1) {
 				sleep(1);
-				syslog(LOG_DEBUG,"bind() to %s retry %d: %m", type, i);
+				Logger::log(LOG_DEBUG,"bind() to %s retry %d: %m", type, i);
 			}
 		}
 		if ( bindResult == -1)
 			throw string("bind() to ") + type + " error: " + strerror(errno);
 		if (listen(socketfd, 100) == -1) // queue size = 100
 			throw "listen() error";
-		syslog(LOG_INFO,"Listening at %s %s:%d", type, inet_ntoa(local.sin_addr), port);
+		Logger::log(LOG_INFO,"Listening at %s %s:%d", type, inet_ntoa(local.sin_addr), port);
 		return socketfd;
 	}
 
@@ -287,14 +287,14 @@ class Daemon{
 			isSecureSocket[this->nSockets] = false;
 			this->nSockets++;
 		}
-		if (this->sport >= 0) {
+		if (this->secureListenSocket >= 0) {
 			sockets[this->nSockets].fd = this->secureListenSocket;
 			sockets[this->nSockets].events = POLLIN;
 			isSecureSocket[this->nSockets] = true;
 			this->nSockets++;
 		}
 		if ( this->nSockets == 0) {
-			syslog(LOG_CRIT,"No PORT or SECURE_PORT defined");
+			Logger::log(LOG_EMERG, "No PORT or SECURE_PORT defined");
 			_exit(EXIT_FAILURE);
 		}
 		actualSocket = -1;
@@ -320,17 +320,17 @@ public:
 	void demonize(){
 		pid_t child_pid = fork();
 		if(child_pid < 0) {
-			syslog(LOG_EMERG,"demonize() => fork() fail (child_pid < 0)");
+			Logger::log(LOG_EMERG,"demonize() => fork() fail (child_pid < 0)");
 			exit(EXIT_FAILURE);
 		}
 		if(child_pid > 0) _exit(EXIT_SUCCESS); //gradparent exit
 		if(setsid() < 0) {
-			syslog(LOG_EMERG,"demonize() => (setsid() < 0)");
+			Logger::log(LOG_EMERG,"demonize() => (setsid() < 0)");
 			exit(EXIT_FAILURE);
 		}
 		pid_t grandchild_pid = fork();
 		if(grandchild_pid < 0) {
-			syslog(LOG_EMERG,"demonize() => fork() fail (grandchild_pid < 0)");
+			Logger::log(LOG_EMERG,"demonize() => fork() fail (grandchild_pid < 0)");
 			exit(EXIT_FAILURE);
 		}
 		if(grandchild_pid > 0) _exit(EXIT_SUCCESS); //parent exit
@@ -339,10 +339,8 @@ public:
 		fclose(fd);
 	}
 
-	void online(){
-		if(setsid() < 0) {
-			throw "online() => (setsid() < 0)";
-		}
+	void foreground(){
+		setsid(); // NOTE: fail in Docker.
 		FILE *fd=fopen("/run/vpl-jail-server.pid", "w");
 		fprintf(fd, "%d", (int)getpid());
 		fclose(fd);
@@ -371,7 +369,7 @@ public:
 		if ( loops >= checkPoint ) {
 			loops = 0;
 			try {
-				SSLBase::getSSLBase()->updateCertificatesIfNeeded();
+				SSLBase::getSSLBase()->createUpdateContext();
 			} catch(...) {
 			}
 			int pid = fork();
@@ -380,7 +378,7 @@ public:
 					processMonitor::cleanZombieTasks();
 				} catch(...) {
 				}
-				_exit(0);
+				_exit(EXIT_SUCCESS);
 			}
 			Child c;
 			c.IP = "127.0.0.1";
@@ -389,8 +387,8 @@ public:
 		}
 	}
 	//Main loop: receive requests/dispatch and control child
-	void loop(){ //FIXME implement e adequate exit
-		while(!finishRequest){
+	void loop() {
+		while(!finishRequested) {
 			accept(); //Accept one request waiting JAIL_ACCEPT_WAIT msec
 			harvest(); //Process all dead childrens
 			periodicTasks();

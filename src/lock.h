@@ -47,7 +47,7 @@ public:
 			time_t lastModification = Util::timeOfFileModification(filePath);
 			if (lastModification &&  (lastModification + 2 < time(NULL))) {
 				unlink(filePath.c_str());
-				syslog(LOG_DEBUG,"locking timeout %s",filePath.c_str());
+				Logger::log(LOG_DEBUG,"locking timeout %s",filePath.c_str());
 			}
 			usleep(5000);
 			ntry++;

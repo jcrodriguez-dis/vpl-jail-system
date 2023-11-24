@@ -26,11 +26,11 @@ string webSocket::getHandshakeAnswer(){
 	string rec_pro=socket->getHeader("Sec-WebSocket-Protocol");
 	string protocols;
 	if(rec_pro.find("binary") != string::npos){
-		//syslog(LOG_DEBUG,"Protocol binary");
+		//Logger::log(LOG_DEBUG,"Protocol binary");
 		protocols = "Sec-WebSocket-Protocol: binary\r\n";
 		base64 = false;
 	}else if(rec_pro.find("base64") != string::npos){
-		//syslog(LOG_DEBUG,"Protocol base64");
+		//Logger::log(LOG_DEBUG,"Protocol base64");
 		base64 = true;
 		protocols = "Sec-WebSocket-Protocol: base64\r\n";
 	}else{
@@ -38,12 +38,12 @@ string webSocket::getHandshakeAnswer(){
 	}
 	unsigned char sha1key[21];
 	sha1key[20]=0;
-	//syslog(LOG_DEBUG,"Websocket key: %s",key.c_str());
+	//Logger::log(LOG_DEBUG,"Websocket key: %s",key.c_str());
 	SHA1((const unsigned char*)key.data(),key.size(),sha1key);
-	//syslog(LOG_DEBUG,"Websocket SHA1 key: %s",sha1key);
+	//Logger::log(LOG_DEBUG,"Websocket SHA1 key: %s",sha1key);
 
 	string responseKey=Base64::encode(string((char *)sha1key,20));
-	//syslog(LOG_DEBUG,"responseKey : %s",responseKey.c_str());
+	//Logger::log(LOG_DEBUG,"responseKey : %s",responseKey.c_str());
 	string ret="HTTP/1.1 101 Switching Protocols\r\n"
 			"Connection: Upgrade\r\n"
 			"Upgrade: websocket\r\n"
@@ -94,7 +94,7 @@ string webSocket::decodeFrame(string &data, FrameType &ft, bool &fin){
 	int control_size, mask_size;
 	long long payload_size;
 	int fSize = frameSize(data, control_size, mask_size, payload_size);
-	//syslog(LOG_DEBUG,"Decoding frame %d=%d+%d+%d",fSize,control_size,mask_size,payload_size);
+	//Logger::log(LOG_DEBUG,"Decoding frame %d=%d+%d+%d",fSize,control_size,mask_size,payload_size);
 	if(fSize == -1 || (int) data.size() < fSize){
 		ft = ERROR_FRAME;
 		return "Frame size too large";
@@ -112,7 +112,7 @@ string webSocket::decodeFrame(string &data, FrameType &ft, bool &fin){
 	if ((FrameType) (rawdata[0] & 0x0f) != CONTINUATION_FRAME) {
 		ft = (FrameType) (rawdata[0] & 0x0f);
 	}
-	//syslog(LOG_DEBUG,"Frame type %d",(int)ft);
+	//Logger::log(LOG_DEBUG,"Frame type %d",(int)ft);
 	string ret(payload_size, '\0');
 	unsigned char *rawret = (unsigned char *)ret.c_str();
 	const unsigned char *mask = (const unsigned char *)rawdata + control_size;
@@ -123,7 +123,7 @@ string webSocket::decodeFrame(string &data, FrameType &ft, bool &fin){
 	if (base64 && ft == TEXT_FRAME) {
 		ft = BINARY_FRAME;
 		string ret64 = Base64::decode( ret );
-		//syslog(LOG_DEBUG,"Base64::decode %s",ret64.c_str());
+		//Logger::log(LOG_DEBUG,"Base64::decode %s",ret64.c_str());
 		return ret64;
 	}
 	return ret;
@@ -134,7 +134,7 @@ string webSocket::encodeFrame(const string &rdata, FrameType ft){
 	string data = rdata;
 	if (base64 && ft == BINARY_FRAME) {
 		data = Base64::encode(data);
-		//syslog(LOG_DEBUG,"Base64::encode %s",data.c_str());
+		//Logger::log(LOG_DEBUG,"Base64::encode %s",data.c_str());
 		ft = TEXT_FRAME;
 	}
 	long long int payload_size = data.size();
@@ -176,10 +176,10 @@ string webSocket::receive(){
 	static string previous_data;
 	receiveBuffer += socket->receive();
 	if (isFrameComplete(receiveBuffer)) {
-		//syslog(LOG_INFO,"Websocket receive frame \"%s\"",receiveBuffer.c_str());
+		//Logger::log(LOG_INFO,"Websocket receive frame \"%s\"",receiveBuffer.c_str());
 		bool fin;
 		string data = decodeFrame(receiveBuffer, lFrameType, fin);
-		//syslog(LOG_INFO,"Websocket receive type %d data \"%s\"",ft,data.c_str());
+		//Logger::log(LOG_INFO,"Websocket receive type %d data \"%s\"",ft,data.c_str());
 		switch (lFrameType) {
 			case TEXT_FRAME:
 			case BINARY_FRAME:
@@ -221,9 +221,9 @@ string webSocket::receive(){
 }
 
 void webSocket::send(const string &s, FrameType ft){
-	//syslog(LOG_INFO,"Websocket framing type %d data \"%s\"",ft,s.c_str());
+	//Logger::log(LOG_INFO,"Websocket framing type %d data \"%s\"",ft,s.c_str());
 	string frame = encodeFrame(s, ft);
-	//syslog(LOG_INFO,"Frame send \"%s\"",frame.c_str());
+	//Logger::log(LOG_INFO,"Frame send \"%s\"",frame.c_str());
 	socket->send(frame);
 }
 void webSocket::close(string t){
