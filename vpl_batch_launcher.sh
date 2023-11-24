@@ -1,13 +1,19 @@
 #!/bin/bash
 {
-	export LC_ALL=$VPL_LANG 1>/dev/null 2>.vpl_set_locale_error
-	#if current lang not available use en_US.utf8
-	if [ -s .vpl_set_locale_error ] ; then
-		rm .vpl_set_locale_error
-		export LC_ALL=en_US.utf8
-	fi
+	. vpl_environment.sh
+	for NEWLANG in $VPL_LANG en_US.UTF-8 C.utf8 POSIX C
+	do
+		export LC_ALL=$NEWLANG 2> .vpl_set_locale_error
+		if [ -s .vpl_set_locale_error ] ; then
+			rm .vpl_set_locale_error
+			continue
+		else
+			break
+		fi
+	done
+	rm .vpl_set_locale_error
 	export TERM=dumb
-	stty raw iutf8 nl
+	stty raw -echo iutf8 nl
 } &>/dev/null
 ./vpl_execution
 exit
