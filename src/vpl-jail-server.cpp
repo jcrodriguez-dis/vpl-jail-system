@@ -7,4 +7,4 @@
 #include "vpl-jail-server.h"
 
 Daemon* Daemon::singlenton = NULL;
-bool Daemon::finishRequest = false;
+bool Daemon::finishRequested = false;
