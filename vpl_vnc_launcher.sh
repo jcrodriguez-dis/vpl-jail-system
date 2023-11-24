@@ -1,12 +1,17 @@
 #!/bin/bash
 {
 	. vpl_environment.sh
-	export LC_ALL=$VPL_LANG 2> .vpl_set_locale_error
-	#if current lang not available use en_US.utf8
-	if [ -s .vpl_set_locale_error ] ; then
-		export LC_ALL=en_US.utf8
-		rm .vpl_set_locale_error
-	fi
+	for NEWLANG in $VPL_LANG en_US.UTF-8 C.utf8 POSIX C
+	do
+		export LC_ALL=$NEWLANG 2> .vpl_set_locale_error
+		if [ -s .vpl_set_locale_error ] ; then
+			rm .vpl_set_locale_error
+			continue
+		else
+			break
+		fi
+	done
+	rm .vpl_set_locale_error
 	mkdir .vnc
 	VNCACCELDIR=/etc/vncaccel
 	if [ -d "$VNCACCELDIR" ] ; then
