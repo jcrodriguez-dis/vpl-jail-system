@@ -54,8 +54,8 @@ class ConfigurationTest: public BaseTest {
 		assert(config->getSSLCertFile() == "/etc/vpl/cert.pem");
 		assert(config->getSSLKeyFile() == "/etc/vpl/key.pem");
 		assert(config->getUseCGroup() == false);
-		assert(config->getRequestMaxSize() == Util::memSizeToBytesi("128 mb"));
-		assert(config->getResultMaxSize() == Util::memSizeToBytesi("32 Kb"));
+		assert(config->getRequestMaxSize() == Util::memSizeToBytesi("128 Mb"));
+		assert(config->getResultMaxSize() == Util::memSizeToBytesi("1 Mb"));
 	}
 
 	void testConfigurationFull() {
