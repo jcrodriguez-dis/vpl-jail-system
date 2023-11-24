@@ -125,6 +125,48 @@ class VPLregexTest: public BaseTest {
 			assert(found[1] == "127.11.52.24");
 			assert(found[2] == "34441");
 		}
+		{
+			vplregex webSocketPath("^\\/([^\\/]+)\\/(.+)$");
+			vplregmatch found(3);
+			string text = "/58495843242/4535034850953";
+			assert(webSocketPath.search(text, found));
+			assert(found[0] == text);
+			assert(found[1] == "58495843242");
+			assert(found[2] == "4535034850953");
+			text = "/hola_jjjk  / sdlfjlsdfjlsaf  lf ";
+			assert(webSocketPath.search(text, found));
+			assert(found[0] == text);
+			assert(found[1] == "hola_jjjk  ");
+			assert(found[2] == " sdlfjlsdfjlsaf  lf ");
+			text = "";
+			assert(! webSocketPath.search(text, found));
+			text = "/";
+			assert(! webSocketPath.search(text, found));
+			text = "/";
+			assert(! webSocketPath.search(text, found));
+			text = "/";
+			assert(! webSocketPath.search(text, found));
+		}
+		{
+			vplregex challenge("^\\/\\.well-known\\/acme-challenge\\/([^\\/]*)$");
+			vplregmatch found(2);
+			string text = "/.well-known/acme-challenge/algo";
+			assert(challenge.search(text, found));
+			assert(found[0] == text);
+			assert(found[1] == "algo");
+			text = "/.well-known/acme-challenge/algo kj klkjhk k hk";
+			assert(challenge.search(text, found));
+			assert(found[0] == text);
+			assert(found[1] == "algo kj klkjhk k hk");
+			text = "";
+			assert(! challenge.search(text, found));
+			text = "/hjg/gfg/gg";
+			assert(! challenge.search(text, found));
+			text = "/.well-known/acme-challenge/algokjk/lkjhkkhk";
+			assert(! challenge.search(text, found));
+			text = "/.well-known/acme-challenge/algokjk/../lkjhkkhk/";
+			assert(! challenge.search(text, found));
+		}
 	}
 public:
 	string name() {
