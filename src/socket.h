@@ -27,60 +27,50 @@ class SSLBase{
 	SSL_CTX *context;
 	time_t timePrivateKeyFileModification;
 	time_t timeCertificateFileModification;
-	SSLBase(){
-		this->context = NULL;
-		this->timePrivateKeyFileModification = 0;
-		this->timeCertificateFileModification = 0;
-		SSL_library_init();
-		OpenSSL_add_all_algorithms();
-		SSL_load_error_strings();
-		this->createContext();
-	}
 
-	void createContext() {
+	void newContext(const string certFile, const string keyFile) {
 		Configuration* configuration = Configuration::getConfiguration();
 		const string cipherList = configuration->getSSLCipherList();
 		const string cipherSuites = configuration->getSSLCipherSuites();
-		const string certFile = configuration->getSSLCertFile();
-		const string keyFile = configuration->getSSLKeyFile();
+
 		#ifdef HAVE_TLS_SERVER_METHOD
 		const SSL_METHOD *method = TLS_server_method();
 		if (method == NULL) {
-			syslog(LOG_EMERG,"TLS_server_method() fail: %s",getError());
+			Logger::log(LOG_EMERG,"TLS_server_method() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
 		#else
 		const SSL_METHOD *method = SSLv23_server_method();
 		if (method == NULL) {
-			syslog(LOG_EMERG,"SSLv23_server_method() fail: %s",getError());
+			Logger::log(LOG_EMERG,"SSLv23_server_method() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
 		#endif
 		bool fail = false;
 		SSL_CTX *newContext;
 		if ((newContext = SSL_CTX_new((SSL_METHOD *)method)) == NULL) { //Conversion for backward compatibility
-			syslog(LOG_EMERG,"SSL_CTX_new() fail: %s", getError());
+			Logger::log(LOG_EMERG,"SSL_CTX_new() fail: %s", getError());
 			fail = true;
 		} else if (SSL_CTX_use_certificate_chain_file(newContext, certFile.c_str()) != 1) {
-			syslog(LOG_EMERG,"SSL_CTX_use_certificate_chain_file() fail: %s", getError());
+			Logger::log(LOG_EMERG,"SSL_CTX_use_certificate_chain_file() fail: %s", getError());
 			fail = true;
 		} else if (SSL_CTX_use_PrivateKey_file(newContext, keyFile.c_str(), SSL_FILETYPE_PEM) != 1) {
-			syslog(LOG_EMERG,"SSL_CTX_use_PrivateKey_file() fail: %s", getError());
+			Logger::log(LOG_EMERG,"SSL_CTX_use_PrivateKey_file() fail: %s", getError());
 			fail = true;
 		} else if ( !SSL_CTX_check_private_key(newContext) ) {
-			syslog(LOG_EMERG,"SSL_CTX_check_private_key() fail: %s", getError());
+			Logger::log(LOG_EMERG,"SSL_CTX_check_private_key() fail: %s", getError());
 			fail = true;
 		} else if ( cipherList.size() && SSL_CTX_set_cipher_list(newContext, cipherList.c_str()) == 0) {
-			syslog(LOG_EMERG,"SSL_CTX_set_cipher_list() fail: %s", getError());
+			Logger::log(LOG_EMERG,"SSL_CTX_set_cipher_list() fail: %s", getError());
 			fail = true;
 		} else if ( cipherSuites.size() ) {
 			#ifdef HAVE_SSL_CTX_SET_CIPHERSUITES
 				if (SSL_CTX_set_ciphersuites(newContext, cipherSuites.c_str()) == 0) {
-					syslog(LOG_EMERG,"SSL_CTX_set_ciphersuites() fail: %s", getError());
+					Logger::log(LOG_EMERG,"SSL_CTX_set_ciphersuites() fail: %s", getError());
 					fail = true;
 				}
 			#else
-				syslog(LOG_EMERG,"SSL_CTX_set_ciphersuites() not available but parameter SSL_CIPHER_SUITES set");
+				Logger::log(LOG_EMERG,"SSL_CTX_set_ciphersuites() not available but parameter SSL_CIPHER_SUITES set");
 				fail = true;
 			#endif
 		}
@@ -88,6 +78,9 @@ class SSLBase{
 			if (this->context == NULL) {
 				_exit(EXIT_FAILURE);
 			} else {
+				if (newContext != NULL) {
+					SSL_CTX_free(newContext);
+				}
 				return;
 			}
 		}
@@ -97,14 +90,49 @@ class SSLBase{
 		this->timeCertificateFileModification = Util::timeOfFileModification(certFile);
 		if (this->context != NULL) {
 			SSL_CTX_free(this->context);
+			Logger::log(LOG_WARNING,"SSL certificate and private key files renew and reloaded.");
+		} else {
+			Logger::log(LOG_INFO,"SSL certificate and private key files loaded.");
 		}
 		this->context = newContext;
 	}
+
+	SSLBase(){
+		this->context = NULL;
+		this->timePrivateKeyFileModification = 0;
+		this->timeCertificateFileModification = 0;
+		SSL_library_init();
+		OpenSSL_add_all_algorithms();
+		SSL_load_error_strings();
+		this->createUpdateContext();
+	}
+
+
+
 public:
 	static SSLBase* getSSLBase(){
 		if(singlenton == NULL) singlenton= new SSLBase();
 		return singlenton;
 	}
+
+	void createUpdateContext() {
+		Configuration* configuration = Configuration::getConfiguration();
+		if (configuration->getSecurePort() <= 0) {
+			return;
+		}
+		const string certFile = configuration->getSSLCertFile();
+		const string keyFile = configuration->getSSLKeyFile();
+		if ( !Util::fileExists(certFile) || !Util::fileExists(keyFile)) {
+			Logger::log(LOG_ERR,"SSL unavailable due certificate or private key file not found.");
+			return;
+		}
+		if ( this->timePrivateKeyFileModification == Util::timeOfFileModification(keyFile) &&
+			 this->timeCertificateFileModification == Util::timeOfFileModification(certFile) ) {
+			return;
+		}
+		this->newContext(certFile, keyFile);
+	}
+
 	static const char *getError(){
 		int error_n=ERR_get_error();
 		const char* error_string="No detail";
@@ -118,15 +146,6 @@ public:
 	}
 	SSL_CTX *getContext(){
 		return context; 
-	}
-	void updateCertificatesIfNeeded() {
-		Configuration* configuration = Configuration::getConfiguration();
-		const string certFile = configuration->getSSLCertFile();
-		const string keyFile = configuration->getSSLKeyFile();
-		if ( this->timePrivateKeyFileModification != Util::timeOfFileModification(keyFile) ||
-		     this->timeCertificateFileModification != Util::timeOfFileModification(certFile) ) {
-			createContext();
-		}
 	}
 };
 
@@ -222,7 +241,7 @@ public:
 					scode = "SSL_ERROR_SYSCALL ";
 				}
 				if(ret == 0){
-					syslog(LOG_INFO,"SSL socket closed unexpected ret==0: %s %s",
+					Logger::log(LOG_INFO,"SSL socket closed unexpected ret==0: %s %s",
 						message.c_str(), scode);
 					return true;
 				}
@@ -273,6 +292,11 @@ class SSLSocket: public Socket{
 	}
 public:
 	SSLSocket(int s): Socket(s){
+		SSL_CTX *context = SSLBase::getSSLBase()->getContext();
+		if (context == NULL) {
+			Logger::log(LOG_ERR, "No SSL context available: certificate o private key file access error?");
+			_exit(EXIT_FAILURE);
+		}
 		ssl = SSL_new(SSLBase::getSSLBase()->getContext());
 		Util::fdblock(s,false);
 		SSL_set_fd(ssl, s);
