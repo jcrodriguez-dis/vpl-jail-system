@@ -1,6 +1,12 @@
 import time
 import asyncio
-import websockets
+try:
+    import websockets
+except ModuleNotFoundError:
+    print("⚠️  Warning: Test not executed.")
+    print("      Python websockets module not installed and it is needed in this test.")
+    exit(0)
+
 async def checkEcho(conn, value):
     # print ('Sending ', value)
     await conn.send(value)
