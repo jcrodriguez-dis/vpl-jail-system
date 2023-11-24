@@ -36,6 +36,7 @@ private:
 	string SSLCipherSuites;
 	string SSLCertFile;
 	string SSLKeyFile;
+	string cerbotWebrootPath;
 	bool useCgroup;
 	int requestMaxSize;
 	int resultMaxSize;
@@ -66,10 +67,11 @@ public:
 	int getSecurePort() const { return sport;}
 	int getLogLevel() const { return logLevel;}
 	int getFail2Ban() const { return fail2ban;}
-	const string &  getSSLCipherList() const { return SSLCipherList;}
-	const string &  getSSLCipherSuites() const { return SSLCipherSuites;}
-	const string &  getSSLCertFile() const { return SSLCertFile;}
-	const string &  getSSLKeyFile() const { return SSLKeyFile;}
+	const string & getSSLCipherList() const { return SSLCipherList;}
+	const string & getSSLCipherSuites() const { return SSLCipherSuites;}
+	const string & getSSLCertFile() const { return SSLCertFile;}
+	const string & getSSLKeyFile() const { return SSLKeyFile;}
+	const string & getCerbotWebrootPath() const { return cerbotWebrootPath; }
 	int getHSTSMaxAge() const { return HSTSMaxAge;};
 	bool getUseCGroup() const { return useCgroup;};
 	int getRequestMaxSize() const { return requestMaxSize;};

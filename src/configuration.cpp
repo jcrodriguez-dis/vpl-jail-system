@@ -27,7 +27,7 @@ string Configuration::generateCleanPATH(string path, string dirtyPATH){
 			}
 			clean += dir;
 		} else {
-			syslog(LOG_INFO, "Path removed: %s", dir.c_str());
+			Logger::log(LOG_INFO, "Path removed: %s", dir.c_str());
 		}
 		if(found == string::npos) return clean;
 		pos=found+1;
@@ -82,7 +82,8 @@ void Configuration::readConfigFile(){
 	configDefault["SSL_KEY_FILE"] = "/etc/vpl/key.pem";
 	configDefault["USE_CGROUP"] = "false";
 	configDefault["REQUEST_MAX_SIZE"] = "128 Mb";
-	configDefault["RESULT_MAX_SIZE"] = "32 Kb";
+	configDefault["RESULT_MAX_SIZE"] = "1 Mb";
+	configDefault["CERBOT_WEBROOT_PATH"] = "";
 	ConfigData data = ConfigurationFile::readConfiguration(configPath, configDefault);
 	readEnvironmentConfigVars(data);
 	minPrisoner = atoi(data["MIN_PRISONER_UGID"].c_str());
@@ -110,7 +111,7 @@ void Configuration::readConfigFile(){
 	istringstream iss(data["TASK_ONLY_FROM"]);
 	for (string ipnet; iss >> ipnet; ) {
 		taskOnlyFrom.push_back(ipnet);
-		syslog(LOG_INFO,"TASK_ONLY_FROM found IP/net %s", ipnet.c_str());
+		Logger::log(LOG_INFO,"TASK_ONLY_FROM found IP/net %s", ipnet.c_str());
 	}
 	interface = data["INTERFACE"];
 	port = atoi(data["PORT"].c_str());
@@ -130,6 +131,7 @@ void Configuration::readConfigFile(){
 	useCgroup = Util::toUppercase(data["USE_CGROUP"]) == "TRUE";
 	requestMaxSize = Util::memSizeToBytesi(data["REQUEST_MAX_SIZE"]);
 	resultMaxSize = Util::memSizeToBytesi(data["RESULT_MAX_SIZE"]);
+	cerbotWebrootPath = data["CERBOT_WEBROOT_PATH"];
 }
 
 Configuration::Configuration() {
