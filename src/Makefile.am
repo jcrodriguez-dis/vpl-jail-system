@@ -8,7 +8,8 @@ processMonitor.cpp processMonitor.h\
 socket.cpp socket.h\
 websocket.cpp websocket.h\
 util.cpp util.h requestmessage.h rpc.h xmlrpc.h xml.h xml.cpp jsonrpc.h json.h json.cpp jail_limits.h lock.h\
-cgroup.cpp cgroup.h vplregex.h
+cgroup.cpp cgroup.h vplregex.h\
+log.cpp log.h
 
 # set the include path found by configure
 #INCLUDES= $(all_includes)

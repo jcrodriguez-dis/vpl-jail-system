@@ -2,9 +2,9 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([vpl jail system], [3.0.1], jcrodriguez@dis.ulpgc.es)
+AC_INIT([vpl jail system], [4.0.0], jcrodriguez@dis.ulpgc.es)
 AC_CONFIG_SRCDIR([config.h.in])
-AC_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
 AC_PROG_CXX
@@ -36,7 +36,7 @@ AC_TYPE_UINT64_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT8_T
 CPPFLAGS="-Wall"
-AM_INIT_AUTOMAKE([subdir-objects])
+AM_INIT_AUTOMAKE
 
 # Checks for library functions.
 AC_FUNC_CHOWN

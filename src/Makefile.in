@@ -103,7 +103,8 @@ am_vpl_jail_server_OBJECTS = main.$(OBJEXT) vpl-jail-server.$(OBJEXT) \
 	jail.$(OBJEXT) httpServer.$(OBJEXT) redirector.$(OBJEXT) \
 	configurationFile.$(OBJEXT) configuration.$(OBJEXT) \
 	processMonitor.$(OBJEXT) socket.$(OBJEXT) websocket.$(OBJEXT) \
-	util.$(OBJEXT) xml.$(OBJEXT) json.$(OBJEXT) cgroup.$(OBJEXT)
+	util.$(OBJEXT) xml.$(OBJEXT) json.$(OBJEXT) cgroup.$(OBJEXT) \
+	log.$(OBJEXT)
 vpl_jail_server_OBJECTS = $(am_vpl_jail_server_OBJECTS)
 vpl_jail_server_LDADD = $(LDADD)
 AM_V_P = $(am__v_P_@AM_V@)
@@ -124,7 +125,7 @@ am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/cgroup.Po \
 	./$(DEPDIR)/configuration.Po ./$(DEPDIR)/configurationFile.Po \
 	./$(DEPDIR)/httpServer.Po ./$(DEPDIR)/jail.Po \
-	./$(DEPDIR)/json.Po ./$(DEPDIR)/main.Po \
+	./$(DEPDIR)/json.Po ./$(DEPDIR)/log.Po ./$(DEPDIR)/main.Po \
 	./$(DEPDIR)/processMonitor.Po ./$(DEPDIR)/redirector.Po \
 	./$(DEPDIR)/socket.Po ./$(DEPDIR)/util.Po \
 	./$(DEPDIR)/vpl-jail-server.Po ./$(DEPDIR)/websocket.Po \
@@ -284,7 +285,8 @@ processMonitor.cpp processMonitor.h\
 socket.cpp socket.h\
 websocket.cpp websocket.h\
 util.cpp util.h requestmessage.h rpc.h xmlrpc.h xml.h xml.cpp jsonrpc.h json.h json.cpp jail_limits.h lock.h\
-cgroup.cpp cgroup.h vplregex.h
+cgroup.cpp cgroup.h vplregex.h\
+log.cpp log.h
 
 
 # set the include path found by configure
@@ -385,6 +387,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httpServer.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/jail.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/json.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/log.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/processMonitor.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/redirector.Po@am__quote@ # am--include-marker
@@ -401,17 +404,15 @@ $(am__depfiles_remade):
 am--depfiles: $(am__depfiles_remade)
 
 .cpp.o:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
-@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ $<
 
 .cpp.obj:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
-@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
-@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
@@ -549,6 +550,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/httpServer.Po
 	-rm -f ./$(DEPDIR)/jail.Po
 	-rm -f ./$(DEPDIR)/json.Po
+	-rm -f ./$(DEPDIR)/log.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/processMonitor.Po
 	-rm -f ./$(DEPDIR)/redirector.Po
@@ -608,6 +610,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/httpServer.Po
 	-rm -f ./$(DEPDIR)/jail.Po
 	-rm -f ./$(DEPDIR)/json.Po
+	-rm -f ./$(DEPDIR)/log.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/processMonitor.Po
 	-rm -f ./$(DEPDIR)/redirector.Po

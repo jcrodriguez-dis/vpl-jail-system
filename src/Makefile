@@ -103,7 +103,8 @@ am_vpl_jail_server_OBJECTS = main.$(OBJEXT) vpl-jail-server.$(OBJEXT) \
 	jail.$(OBJEXT) httpServer.$(OBJEXT) redirector.$(OBJEXT) \
 	configurationFile.$(OBJEXT) configuration.$(OBJEXT) \
 	processMonitor.$(OBJEXT) socket.$(OBJEXT) websocket.$(OBJEXT) \
-	util.$(OBJEXT) xml.$(OBJEXT) json.$(OBJEXT) cgroup.$(OBJEXT)
+	util.$(OBJEXT) xml.$(OBJEXT) json.$(OBJEXT) cgroup.$(OBJEXT) \
+	log.$(OBJEXT)
 vpl_jail_server_OBJECTS = $(am_vpl_jail_server_OBJECTS)
 vpl_jail_server_LDADD = $(LDADD)
 AM_V_P = $(am__v_P_$(V))
@@ -124,7 +125,7 @@ am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/cgroup.Po \
 	./$(DEPDIR)/configuration.Po ./$(DEPDIR)/configurationFile.Po \
 	./$(DEPDIR)/httpServer.Po ./$(DEPDIR)/jail.Po \
-	./$(DEPDIR)/json.Po ./$(DEPDIR)/main.Po \
+	./$(DEPDIR)/json.Po ./$(DEPDIR)/log.Po ./$(DEPDIR)/main.Po \
 	./$(DEPDIR)/processMonitor.Po ./$(DEPDIR)/redirector.Po \
 	./$(DEPDIR)/socket.Po ./$(DEPDIR)/util.Po \
 	./$(DEPDIR)/vpl-jail-server.Po ./$(DEPDIR)/websocket.Po \
@@ -183,13 +184,13 @@ ETAGS = etags
 CTAGS = ctags
 am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/missing aclocal-1.16
+ACLOCAL = ${SHELL} /home/juanca/vpl-xmlrpc-jail/missing aclocal-1.16
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 1
-AUTOCONF = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/missing autoconf
-AUTOHEADER = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/missing autoheader
-AUTOMAKE = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/missing automake-1.16
-AWK = mawk
+AUTOCONF = ${SHELL} /home/juanca/vpl-xmlrpc-jail/missing autoconf
+AUTOHEADER = ${SHELL} /home/juanca/vpl-xmlrpc-jail/missing autoheader
+AUTOMAKE = ${SHELL} /home/juanca/vpl-xmlrpc-jail/missing automake-1.16
+AWK = gawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
@@ -204,9 +205,9 @@ DEPDIR = .deps
 ECHO_C = 
 ECHO_N = -n
 ECHO_T = 
-EGREP = /bin/grep -E
+EGREP = /usr/bin/grep -E
 EXEEXT = 
-GREP = /bin/grep
+GREP = /usr/bin/grep
 INSTALL = /usr/bin/install -c
 INSTALL_DATA = ${INSTALL} -m 644
 INSTALL_PROGRAM = ${INSTALL}
@@ -216,25 +217,25 @@ LDFLAGS =
 LIBOBJS = 
 LIBS = -lssl -lcrypto -lutil 
 LTLIBOBJS = 
-MAKEINFO = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/missing makeinfo
-MKDIR_P = /bin/mkdir -p
+MAKEINFO = ${SHELL} /home/juanca/vpl-xmlrpc-jail/missing makeinfo
+MKDIR_P = /usr/bin/mkdir -p
 OBJEXT = o
 PACKAGE = vpl-jail-system
 PACKAGE_BUGREPORT = jcrodriguez@dis.ulpgc.es
 PACKAGE_NAME = vpl jail system
-PACKAGE_STRING = vpl jail system 3.0.1
+PACKAGE_STRING = vpl jail system 4.0.0
 PACKAGE_TARNAME = vpl-jail-system
 PACKAGE_URL = 
-PACKAGE_VERSION = 3.0.1
+PACKAGE_VERSION = 4.0.0
 PATH_SEPARATOR = :
 SET_MAKE = 
 SHELL = /bin/bash
 STRIP = 
-VERSION = 3.0.1
-abs_builddir = /home/juanca/git/vpl-xmlrpc-jail/src
-abs_srcdir = /home/juanca/git/vpl-xmlrpc-jail/src
-abs_top_builddir = /home/juanca/git/vpl-xmlrpc-jail
-abs_top_srcdir = /home/juanca/git/vpl-xmlrpc-jail
+VERSION = 4.0.0
+abs_builddir = /home/juanca/vpl-xmlrpc-jail/src
+abs_srcdir = /home/juanca/vpl-xmlrpc-jail/src
+abs_top_builddir = /home/juanca/vpl-xmlrpc-jail
+abs_top_srcdir = /home/juanca/vpl-xmlrpc-jail
 ac_ct_CC = gcc
 ac_ct_CXX = g++
 am__include = include
@@ -254,7 +255,7 @@ host_alias =
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/juanca/git/vpl-xmlrpc-jail/install-sh
+install_sh = ${SHELL} /home/juanca/vpl-xmlrpc-jail/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -284,7 +285,8 @@ processMonitor.cpp processMonitor.h\
 socket.cpp socket.h\
 websocket.cpp websocket.h\
 util.cpp util.h requestmessage.h rpc.h xmlrpc.h xml.h xml.cpp jsonrpc.h json.h json.cpp jail_limits.h lock.h\
-cgroup.cpp cgroup.h vplregex.h
+cgroup.cpp cgroup.h vplregex.h\
+log.cpp log.h
 
 
 # set the include path found by configure
@@ -385,6 +387,7 @@ include ./$(DEPDIR)/configurationFile.Po # am--include-marker
 include ./$(DEPDIR)/httpServer.Po # am--include-marker
 include ./$(DEPDIR)/jail.Po # am--include-marker
 include ./$(DEPDIR)/json.Po # am--include-marker
+include ./$(DEPDIR)/log.Po # am--include-marker
 include ./$(DEPDIR)/main.Po # am--include-marker
 include ./$(DEPDIR)/processMonitor.Po # am--include-marker
 include ./$(DEPDIR)/redirector.Po # am--include-marker
@@ -401,17 +404,15 @@ $(am__depfiles_remade):
 am--depfiles: $(am__depfiles_remade)
 
 .cpp.o:
-	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
-	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
-	$(am__mv) $$depbase.Tpo $$depbase.Po
+	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 #	$(AM_V_CXX)source='$<' object='$@' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) \
 #	$(AM_V_CXX_no)$(CXXCOMPILE) -c -o $@ $<
 
 .cpp.obj:
-	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
-	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
-	$(am__mv) $$depbase.Tpo $$depbase.Po
+	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 #	$(AM_V_CXX)source='$<' object='$@' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) \
 #	$(AM_V_CXX_no)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
@@ -549,6 +550,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/httpServer.Po
 	-rm -f ./$(DEPDIR)/jail.Po
 	-rm -f ./$(DEPDIR)/json.Po
+	-rm -f ./$(DEPDIR)/log.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/processMonitor.Po
 	-rm -f ./$(DEPDIR)/redirector.Po
@@ -608,6 +610,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/httpServer.Po
 	-rm -f ./$(DEPDIR)/jail.Po
 	-rm -f ./$(DEPDIR)/json.Po
+	-rm -f ./$(DEPDIR)/log.Po
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/processMonitor.Po
 	-rm -f ./$(DEPDIR)/redirector.Po
