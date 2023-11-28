@@ -1,6 +1,7 @@
-ARG VPL_BASE_DISTRO
-ARG VPL_INSTALL_LEVEL
-FROM ${VPL_BASE_DISTRO:-debian}
+ARG VPL_BASE_DISTRO=debian
+
+FROM ${VPL_BASE_DISTRO}
+
 USER root:root
 
 COPY . /vpl-jail-system
@@ -8,7 +9,9 @@ WORKDIR /vpl-jail-system
 
 # Select the compilers/interpreters to install
 #      options: minimum < basic < standard < full
-RUN /vpl-jail-system/install-vpl-sh noninteractive ${VPL_INSTALL_LEVEL:-basic}
+RUN /vpl-jail-system/install-bash-sh
+ARG VPL_INSTALL_LEVEL=basic
+RUN /vpl-jail-system/install-vpl-sh noninteractive ${VPL_INSTALL_LEVEL}
 
 # Using HTTP only
 # ENV VPL_JAIL_SECURE_PORT=0
