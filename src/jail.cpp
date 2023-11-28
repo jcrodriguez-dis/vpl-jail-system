@@ -801,7 +801,7 @@ void Jail::transferExecution(processMonitor &pm, string fileName){
 	string PATH = "PATH=" + configuration->getCleanPATH();
 	env[nenv++] = (char *)PATH.c_str();
 	env[nenv++] = (char *)"TERM=dumb";
-	string UID = "UID="+uid;
+	string UID = "UID=" + uid;
 	env[nenv++]=(char *)UID.c_str();
 	string USER = "USER=p" + uid;
 	env[nenv++] = (char *)USER.c_str();
@@ -852,7 +852,7 @@ void Jail::setLimits(processMonitor &pm){
 /**
  * run program controlling timeout and redirection
  */
-string Jail::run(processMonitor &pm, string name, int othermaxtime){
+string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaunch){
 	int maxtime;
 	pm.getLimits().log("run");
 	if (othermaxtime) {
@@ -914,7 +914,7 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime){
 			}else{
 				redirector.addMessage("\r\nJail: program terminated but unknown reason.");
 			}
-			newpid=-1;
+			newpid = -1;
 			break;
 		} else if(wret > 0){//waitpid error wret != newpid
 			redirector.addMessage("\r\nJail waitpid error: ret>0.\n");
@@ -927,41 +927,44 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime){
 		if (wret == 0){ //Process running
 			time_t now=time(NULL);
 			if(lastTime != now){
-				int elapsedTime=now-startTime;
+				int elapsedTime = now - startTime;
 				lastTime = now;
-				if(elapsedTime>JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()){
-					if(stopSignal!=SIGKILL)
+				if(elapsedTime > JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()){
+					if(stopSignal != SIGKILL)
 						redirector.addMessage("\r\nJail: browser connection error.\n");
 					Logger::log(LOG_INFO,"Not monitored");
-					kill(newpid,stopSignal);
-					stopSignal=SIGKILL; //Second try
-					noMonitor=true;
-				}else if(elapsedTime > maxtime){
+					kill(newpid, stopSignal);
+					stopSignal = SIGKILL; //Second try
+					noMonitor = true;
+				} else if(elapsedTime > maxtime){
 					redirector.addMessage("\r\nJail: execution time limit reached.\n");
 					Logger::log(LOG_INFO,"Execution time limit (%d) reached"
 							,maxtime);
-					kill(newpid,stopSignal);
-					stopSignal=SIGKILL; //Second try
-				}
-				else if(pm.isOutOfMemory()){
-					string ml= pm.getMemoryLimit();
-					if(stopSignal!=SIGKILL)
-						redirector.addMessage("\r\nJail: out of memory ("+ml+")\n");
-					Logger::log(LOG_INFO,"Out of memory (%s)",ml.c_str());
-					kill(newpid,stopSignal);
-					stopSignal=SIGKILL; //Second try
+					kill(newpid, stopSignal);
+					stopSignal = SIGKILL; //Second try
+				} else if(VNCLaunch && redirector.getOutputSize() > 0){
+					redirector.advance();
+					break;
+				}else if(pm.isOutOfMemory()){
+					string ml = pm.getMemoryLimit();
+					if(stopSignal != SIGKILL)
+						redirector.addMessage("\r\nJail: out of memory (" + ml + ")\n");
+					Logger::log(LOG_INFO,"Out of memory (%s)", ml.c_str());
+					kill(newpid, stopSignal);
+					stopSignal = SIGKILL; //Second try
 				}
 			}
 		}
 	}
 	//wait until 5sg for redirector to read and send program output
-	for(int i=0;redirector.isActive() && i<50; i++){
+	int max_iter = VNCLaunch ? 5 : 50;
+	for(int i=0; redirector.isActive() && i < max_iter; i++){
 		redirector.advance();
 		usleep(100000); // 1/10 seg
 	}
-	string output=redirector.getOutput();
+	string output = redirector.getOutput();
 	Logger::log(LOG_DEBUG,"Complete program output: %s", output.c_str());
-	if(noMonitor){
+	if(noMonitor && !VNCLaunch){
 		pm.cleanTask();
 	}
 	return output;
@@ -1053,12 +1056,12 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
  * run program in VNCserver controlling timeout and redirection
  */
 void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
-	ExecutionLimits executionLimits=pm.getLimits();
-	signal(SIGTERM,SIG_IGN);
-	signal(SIGKILL,SIG_IGN);
-	string output=run(pm,name,10); //FIXME use constant
-	Logger::log(LOG_DEBUG,"%s",output.c_str());
-	int VNCServerPort=Util::atoi(output);
+	ExecutionLimits executionLimits = pm.getLimits();
+	signal(SIGTERM, SIG_IGN);
+	signal(SIGKILL, SIG_IGN);
+	string output = run(pm, name, 10, true);
+	Logger::log(LOG_DEBUG,"VNC launch %s", output.c_str());
+	int VNCServerPort = Util::atoi(output);
 	RedirectorVNC redirector(&ws, VNCServerPort);
 	Logger::log(LOG_INFO, "Redirector start vncserver control");
 	time_t startTime=time(NULL);

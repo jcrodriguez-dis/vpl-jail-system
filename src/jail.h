@@ -65,7 +65,7 @@ public:
 	void writeFile(processMonitor &pm,string name, const string &data);
 	string readFile(processMonitor &pm,string name);
 	void deleteFile(processMonitor &pm,string name);
-	string run(processMonitor &pm,string name, int othermaxtime=0);
+	string run(processMonitor &pm,string name, int othermaxtime=0, bool VNCLaunch=false);
 	void runTerminal(processMonitor &pm, webSocket &s, string name);
 	void runVNC(processMonitor &pm, webSocket &s, string name);
 	void runPassthrough(processMonitor &pm, Socket *s);
