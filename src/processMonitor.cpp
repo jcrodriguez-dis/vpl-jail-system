@@ -10,7 +10,7 @@ using namespace std;
 #include <sys/types.h>
 #include <unistd.h>
 #include <signal.h>
-#include <wait.h>
+#include <sys/wait.h>
 #include "lock.h"
 #include "processMonitor.h"
 #include "vpl-jail-server.h"
@@ -380,7 +380,7 @@ void processMonitor::deleteFile(string name) {
 bool processMonitor::installScript(string to, string from) {
 	if (Util::fileExists("/usr/sbin/vpl/" + from)) {
 		string scriptCode = Util::readFile("/usr/sbin/vpl/" + from);
-		Logger::log(LOG_DEBUG, "Installing %s in %s", to.c_str(), from.c_str());
+		Logger::log(LOG_DEBUG, "Installing %s in %s", from.c_str(), to.c_str());
 		writeFile(to, scriptCode);
 		return true;
 	}
@@ -635,6 +635,7 @@ void processMonitor::cleanTask() {
 	Lock lock(controlPath);
 
 	Util::removeDir(getProcessControlPath(), getPrisonerID(), true);
+	Util::removeDir(configuration->getJailPath() + "/tmp", getPrisonerID(), false);
 	removeTicketFile(adminticket);
 	removeTicketFile(monitorticket);
 	removeTicketFile(executionticket);
