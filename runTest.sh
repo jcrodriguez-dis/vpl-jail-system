@@ -4,8 +4,8 @@
 # license:      GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.txt
 # Description:  Script to run tests for vpl-jail-system
 
-CHECK_MARK="\u2713";
-X_MARK="\u274C";
+CHECK_MARK="✅"
+X_MARK="❌"
 function writeHeading {
 	echo -e "\e[33m RUNNING \e[0m \e[34m$1\e[0m"
 }
@@ -98,7 +98,12 @@ function Unit_tests() {
 	if test -f program-test ; then
 		rm -R cgroup.test 2> /dev/null
 		cp -a cgroup cgroup.test
-		valgrind ./program-test
+		if [ -x "$(command -v valgrind)" ] ; then
+			valgrind ./program-test
+		else
+			writeInfo "   " "Please, install valgrind for better checks"
+			./program-test
+		fi
 		result=$?
 		rm -R cgroup.test 2> /dev/null
 		rm program-test
