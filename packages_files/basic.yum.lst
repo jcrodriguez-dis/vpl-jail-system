@@ -1,0 +1,20 @@
+# Basic packages for VPL jail system on Linux using YUM (fedora, etc.)
+"General purpose debugger (GNU)" gdb
+"DDD graphical front end debugger (GNU)" ddd
+"Java (OpenJDK)" java-17-openjdk java-11-openjdk java-1.8.0-openjdk-devel java-1.7.0-openjdk-devel
+"JavaFX" openjfx
+"Junit framework" junit
+"PHP interpreter" php-cli
+"Python3" python3
+"Python3 Tkinter" python3-tkinter
+"Python3 NumPy" python3-numpy
+"Python3 pandas" python3-pandas
+"Python3 Matplotlib" python3-matplotlib
+"Python3 pudb" python3-pudb
+"Python3 pycodestyle" python3-pycodestyle
+"Python3 NetworkX" python3-networkx
+"Python3 mypy" python3-mypy
+"Python3 flake8" python3-flake8
+"Python3 pydocstyle" python3-pydocstyle
+"Pythom Thonny" thonny
+"SQL interpreter" sqlite

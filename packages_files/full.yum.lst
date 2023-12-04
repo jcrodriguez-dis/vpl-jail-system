@@ -1,0 +1,18 @@
+# Full additional packages for VPL jail system on Linux using YUM (fedora, etc.)
+"Clisp" clisp
+"Clojure" clojure clojure1.6 clojure1.4
+"Cobol" gnucobol
+"CoffeeScript" coffee-script
+"D compiler (GNU)" gcc-gdc
+"Erlang" erlang
+"Go programming language compiler" golang
+"Haxe programming language" haxe
+"JQuery JavaScript Lib" js-jquery
+"JQuery-UI JavaScript Lib" js-jquery-ui
+"Julia" julia
+"Lua compiler" lua lua5.1
+"R statistical computation and graphics system (GNU)" R
+"MIPS R2000/R3000 emulator" spim
+"Verilog compiler" iverilog
+"VHDL compiler" ghdl freehdl
+"Web browser" firefox

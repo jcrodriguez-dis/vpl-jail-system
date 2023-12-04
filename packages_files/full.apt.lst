@@ -1,0 +1,22 @@
+# Full additional packages for VPL jail system on Linux using APT (Debian, Ubuntu, etc.)
+"Clisp" clisp
+"Clojure" clojure clojure1.6 clojure1.4
+"Cobol" open-cobol
+"CoffeeScript" coffeescript
+"D compiler (GNU)" gdc
+"Erlang" erlang
+"Go programming language compiler" golang
+"Haxe programming language" haxe
+"JQuery JavaScript Lib" libjs-jquery
+"JQuery-UI JavaScript Lib" libjs-jquery-ui
+"Julia" julia
+"Lua compiler" lua lua5.4 lua5.3 lua5.2  lua5.1
+"R statistical computation and graphics system (GNU)" r-base
+"MIPS R2000/R3000 emulator" spim
+"MiniZinc constraint modeling language" minizinc
+"XQuery interpreter" galax
+"Verilog compiler" iverilog
+"VHDL compiler" ghdl freehdl
+"libtool required for VHDL" libtool-bin
+"Groovy programming language" groovy
+"Web browser" firefox firefox-esr

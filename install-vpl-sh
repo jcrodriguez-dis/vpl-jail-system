@@ -17,7 +17,7 @@ VPL_CONFIG_DIR=/etc/vpl
 function vpl_detect_package_manager() {
 	if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
 		echo "This script need to be run as user root and is run as user $USER uid $UID euid $EUID"
-		exit 1;
+		exit 1
 	fi
 	# Detect package manager (YUM/APT)
 	if [ "$(command -v yum)" != "" ] ; then
@@ -30,7 +30,7 @@ function vpl_detect_package_manager() {
 			yum list $1 &> /dev/null
 			return $?
 		}
-		PMTYPE="1"
+		PMTYPE="yum"
 	elif [ "$(command -v apt-get)" != "" ] ; then
 		echo "Using APT package manager"
 		echo "Updating distribution software DB"
@@ -43,7 +43,11 @@ function vpl_detect_package_manager() {
 			apt-cache pkgnames $1 | grep -q -x -F $1
 			return $?
 		}
-		PMTYPE="2"
+		PMTYPE="apt"
+		if [ "$(command -v add-apt-repository)" != "" ] ; then
+			add-apt-repository universe &> /dev/null
+		fi
+
 	elif [ "$(command -v apk)" != "" ] ; then
 		echo "Using APK package manager"
 		echo "Updating distribution software DB"
@@ -57,7 +61,7 @@ function vpl_detect_package_manager() {
 			apk add $1 &> /dev/null
 			return $?
 		}
-		PMTYPE="3"
+		PMTYPE="apk"
 	else
 		echo "Sorry, I can't detect the package manager of the system"
 		echo "Acepted package managers APT an YUM."
@@ -103,7 +107,7 @@ function vpl_detect_service_manager(){
 				if [ "$(command -v chkconfig)" != "" ] ; then
 					chkconfig --add vpl-jail-system  >> "$LOGFILE"
 				else
-					echo "ERROR installing the service. Not found update-rc.d or chkconfig"
+					echo "WARNING: Service not installed due update-rc.d neider chkconfig found."
 				fi
 			fi
 		}
@@ -433,7 +437,11 @@ function vpl_install_update_daemon() {
 		mkdir -p $VPL_CONFIG_DIR
 	fi
 	mkdir -p $VPL_PROGRAMS_DIR
-	#Copy daemon 
+	#Copy daemon
+	if [ ! -x "src/vpl-jail-server" ] ; then
+		echo "Error compiling vpl-jail-server. See logs for more details"
+		exit 1
+	fi
 	cp src/vpl-jail-server $VPL_PROGRAMS_DIR
 	[ -n "$NEED_RESTART" ] && vpl_start_service >> "$LOGFILE"
 }
@@ -456,7 +464,7 @@ function vpl_install_update_extra_files() {
 	else
 		cp vpl-jail-system.conf $VPL_CONFIGFILE
 		echo "Default configuration file installed"
-		if [ "$PMTYPE" == "1"  ] ; then
+		if [ "$PMTYPE" = "yum"  ] ; then
 			echo "" >> $VPL_CONFIGFILE
 			echo "ENVPATH=/usr/bin:/bin" >> $VPL_CONFIGFILE
 			echo "Configuration file changed for CentOS. Added ENVPATH"
@@ -465,75 +473,45 @@ function vpl_install_update_extra_files() {
 	chmod 600 $VPL_CONFIGFILE
 
 	# Copy launch scripts
-	cp vpl_*.sh $VPL_PROGRAMS_DIR
-	chmod +x $VPL_PROGRAMS_DIR/*.sh
 	echo "Installing launch scripts"
+	cp launchers/*.sh $VPL_PROGRAMS_DIR
+	chmod +x $VPL_PROGRAMS_DIR/*.sh
 
 	# Create default control dir
 	mkdir -p /var/vpl-jail-system
 	chmod 0600 /var/vpl-jail-system
 }
 
+function vpl_install_packages_file() {
+	[ ! -s "$1" ] && (echo "Package file '$1' not found" ; return)
+	echo "Installing from $1"
+	local line
+	local name
+	local packages
+	while read -r line
+	do
+		echo "$line" | grep -q "^ *#"
+		[ $? = 0 ] && continue
+		echo "$line" | grep -q "^ *npm "
+		if [ $? = 0 ] ; then
+			name=$(echo $line | sed -e "s/^ *npm \+\"\([^\"]\+\)\".*/\1/")
+			packages=$(echo $line | sed -e "s/.*\"[^\"]\+\"\(.*\)/\1/")
+			[ -n "$packages" ] && vpl_install_npm "$name" $packages
+		else
+			name=$(echo $line | sed -e "s/.*\"\([^\"]\+\)\".*/\1/")
+			packages=$(echo $line | sed -e "s/.*\"[^\"]\+\"\(.*\)/\1/")
+			[ -n "$packages" ] && vpl_install_package "$name" $packages
+		fi
+	done < "$1"
+}
+
 function vpl_install_minimum() {
 	echo ""
 	echo "Minimum required packages"
-	if [ "$PMTYPE" == "1" ] ; then
-		vpl_install_package "LSB core" redhat-lsb-core
-		vpl_install_package "make" make
-		vpl_install_package "C compiler" gcc
-		vpl_install_package "C++ compiler" gcc-c++
-		vpl_install_package "SSL library" openssl		
-		vpl_install_package "SSL library" openssl-devel	
-		vpl_install_package "Firewall" iptables
-		vpl_install_package "Window manager" openbox metacity
-		vpl_install_package "xterm" xterm
-		vpl_install_package "xset" xset
-		vpl_install_package "VNC server" tigervnc-server
-	elif [ "$PMTYPE" == "2" ] ; then
-		if [ "$(command -v add-apt-repository)" != "" ] ; then
-			add-apt-repository universe &> /dev/null
-		fi
-		vpl_install_package "apt-utils" apt-utils
-		vpl_install_package "make" make
-		vpl_install_package "automake tools" automake
-		vpl_install_package "LSB" lsb lsb-core lsb-compat
-		vpl_install_package "C++ compiler" g++
-		vpl_install_package "SSL library" openssl
-		vpl_install_package "SSL library" libssl-dev
-		vpl_install_package "Firewall" iptables
-		vpl_install_package "X system" xorg
-		vpl_install_package "dbus-x11" dbus-x11
-		vpl_install_package "VNC server" tightvncserver
-		vpl_install_package "Fonts" xfonts-75dpi
-		vpl_install_package "Fonts" xfonts-100dpi
-		vpl_install_package "Window manager" openbox metacity
-		vpl_install_package "Configuration DB system" gconf2
-		vpl_install_package "xterm" xterm
-		if [ "$(command -v gconftool-2)" != "" ] ; then
-			gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
-		fi
-		vpl_install_package "wget" wget
-		vpl_install_package "curl" curl
-		vpl_install_package "net-tools" net-tools
-		vpl_install_package "bc" bc
-	elif [ "$PMTYPE" == "3" ] ; then
-		vpl_install_package "make" make
-		vpl_install_package "automake tools" automake
-		vpl_install_package "LSB" lsb-release-minimal
-		vpl_install_package "C++ compiler" g++
-		vpl_install_package "SSL library" openssl
-		vpl_install_package "SSL library" openssl-dev
-		vpl_install_package "Firewall" iptables
-		vpl_install_package "X system" xorg-server
-		vpl_install_package "dbus-x11" dbus-x11
-		vpl_install_package "VNC server" tigervnc
-		vpl_install_package "Python XDG" py3-xdg
-		vpl_install_package "Window manager" openbox
-		vpl_install_package "xterm" xterm
-		vpl_install_package "wget" wget
-		vpl_install_package "curl" curl
-		vpl_install_package "net-tools" net-tools
-		vpl_install_package "bc" bc
+	local PACKAGE_LIST_FILE="packages_files/minimum.$PMTYPE.lst"
+	[ -s $PACKAGE_LIST_FILE ] && vpl_install_packages_file $PACKAGE_LIST_FILE
+	if [ "$(command -v gconftool-2)" != "" ] ; then
+		gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
 	fi
 	echo
 }
@@ -541,76 +519,16 @@ function vpl_install_minimum() {
 function vpl_install_basic() {
 	echo ""
 	echo "Basic aditional packages"
-	if [ "$PMTYPE" = "1" ] ; then
-		vpl_install_package "General purpose debugger (GNU)" gdb
-		vpl_install_package "DDD graphical front end debugger (GNU)" ddd
-		vpl_install_package "Java (OpenJDK)" java-1.8.0-openjdk-devel java-1.7.0-openjdk-devel
-		vpl_install_package "Junit framework" junit
-		vpl_install_package "PHP interpreter" php-cli
-		vpl_install_package "Python3" python3
-		vpl_install_package "Python3 Tkinter" python3-tkinter
-		vpl_install_package "Python3 NumPy" python3-numpy
-		vpl_install_package "Python3 pandas" python3-pandas
-		vpl_install_package "Python3 Matplotlib" python3-matplotlib
-		vpl_install_package "Python3 pudb" python3-pudb
-		vpl_install_package "Python3 pycodestyle" python3-pycodestyle
-		vpl_install_package "Python3 NetworkX" python3-networkx
-		vpl_install_package "Python3 mypy" python3-mypy
-		vpl_install_package "Python3 flake8" python3-flake8
-		vpl_install_package "Python3 pydocstyle" python3-pydocstyle
-		vpl_install_package "Pythom Thonny" thonny
-
-		vpl_install_package "SQL interpreter" sqlite
+	local PACKAGE_LIST_FILE="packages_files/basic.$PMTYPE.lst"
+	[ -s $PACKAGE_LIST_FILE ] && vpl_install_packages_file $PACKAGE_LIST_FILE
+	if [ "$PMTYPE" = "yum" ] ; then
 		echo "IMPORTANT: Please, set properly the ENVPATH in the config file /etc/vpl/vpl-jail-system.conf" 
 		echo "           e.g. \"ENVPATH=/usr/bin:/bin:/usr/sbin\" and restart the service"
-	elif [ "$PMTYPE" = "2" ] ; then
-		vpl_install_package "C compiler (GNU)" gcc
-		vpl_install_package "General purpose debugger (GNU)" gdb
-		vpl_install_package "DDD graphical front end debugger (GNU)" ddd
-		vpl_install_package "Java runtime" default-jre openjdk-11-jre openjdk-8-jre openjdk-7-jre
-		vpl_install_package "Java jdk" default-jdk openjdk-11-jdk openjdk-8-jdk openjdk-7-jdk
+	elif [ "$PMTYPE" = "apt" ] ; then
 		if [ "$(command -v update-alternatives)" != "" -a "$LISTPACKAGES" == "" ] ; then
 			update-alternatives --auto java
 			update-alternatives --auto javac
 		fi
-		vpl_install_package "JavaFX" openjfx
-		vpl_install_package "Java Checkstyle" checkstyle
-		vpl_install_package "Junit framework" junit4 junit
-		vpl_install_package "PHP interpreter" php-cli
-		vpl_install_package "PHP readline" php-readline
-		vpl_install_package "Sqlite for PHP" php-sqlite3
-		vpl_install_package "Python3" python3
-		vpl_install_package "Python3 Tk" python3-tk
-		vpl_install_package "Python3 NumPy" python3-numpy
-		vpl_install_package "Python3 pandas" python3-pandas
-		vpl_install_package "Python3 Matplotlib" python3-matplotlib
-		vpl_install_package "Python3 pudb" python3-pudb
-		vpl_install_package "Python3 pycodestyle" python3-pycodestyle
-		vpl_install_package "Python3 NetworkX" python3-networkx
-		vpl_install_package "Python mypy" mypy
-		vpl_install_package "Python pycodestyle" pycodestyle
-		vpl_install_package "Python pydocstyle" pydocstyle
-		vpl_install_package "Pythom Thonny" thonny
-		vpl_install_package "SQL interpreter" sqlite3
-	elif [ "$PMTYPE" = "3" ] ; then
-		vpl_install_package "C compiler (GNU)" gcc
-		vpl_install_package "General purpose debugger (GNU)" gdb
-		vpl_install_package "Java" openjdk21 openjdk20 openjdk19 openjdk17 openjdk11 openjdk8
-		vpl_install_package "Junit framework" junit4 junit
-		vpl_install_package "PHP interpreter" php83 php82 php81 php8
-		vpl_install_package "Sqlite for PHP" php83-sqlite3 php82-sqlite3 php81-sqlite3 php8-sqlite3
-		vpl_install_package "Python3" python3
-		vpl_install_package "Python3 Tk" python3-tkinter
-		vpl_install_package "Python3 NumPy" py3-numpy
-		vpl_install_package "Python3 pandas" py3-pandas
-		vpl_install_package "Python3 Matplotlib" py3-matplotlib
-		vpl_install_package "Python3 pycodestyle" py3-pycodestyle
-		vpl_install_package "Python3 NetworkX" py3-networkx
-		vpl_install_package "Python3 mypy" py3-mypy
-		vpl_install_package "Python3 pycodestyle" py3-pycodestyle
-		vpl_install_package "Python3 pydocstyle" py3-pydocstyle
-		vpl_install_package "Pythom Thonny" thonny
-		vpl_install_package "SQL interpreter" sqlite
 	fi
 	echo
 }
@@ -618,94 +536,16 @@ function vpl_install_basic() {
 function vpl_install_standard() {
 	echo ""
 	echo "Standard aditional packages"
-	if [ "$PMTYPE" = "1" ] ; then
-		vpl_install_package "Ada compiler (GNU)" gcc-gnat
-		vpl_install_package "Assembler" nasm
-		vpl_install_package "C# development framework (mono)" mono-complete
-		vpl_install_package "Fortran compiler (GNU)" gcc-gfortran
-		vpl_install_package "Haskell" haskell-platform
-		vpl_install_package "JavaScript (Nodejs)" nodejs
-		vpl_install_npm "TypeScript" typescript
-		vpl_install_npm "Sass" sass
-		vpl_install_package "Octave (GNU)" octave
-		vpl_install_package "Pascal compiler" fpc
-		vpl_install_package "Perl interpreter" perl
-		vpl_install_package "Prolog" pl
-		vpl_install_package "Ruby interpreter" ruby
-		vpl_install_package "Rust compiler" rust
-		vpl_install_package "Scala programming language" scala
-		vpl_install_package "Scheme interpreter" racket
-		vpl_install_package "TCL interpreter" tcl
-		vpl_install_package "Valgrind tool" valgrind
-	elif [ "$PMTYPE" = "2" ] ; then
-		vpl_install_package "Ada compiler (GNU)" gnat
-		vpl_install_package "Assembler" nasm
-		vpl_install_package "C# development framework (mono)" mono-complete
-		vpl_install_package "Fortran compiler (GNU)" gfortran
-		vpl_install_package "Haskell" hgc hugs
-		vpl_install_package "JavaScript (Nodejs)" nodejs
-		vpl_install_package "JavaScript (Nodejs-legacy)" nodejs-legacy
-		vpl_install_npm "TypeScript" typescript
-		vpl_install_npm "Sass" sass
-		vpl_install_package "Octave (GNU)" octave
-		vpl_install_package "Pascal compiler" fp-compiler
-		vpl_install_package "Perl interpreter" perl
-		vpl_install_package "Prolog" swi-prolog
-		vpl_install_package "Ruby interpreter" ruby
-		vpl_install_package "Rust compiler" rustc
-		vpl_install_package "Scala programming language" scala
-		vpl_install_package "Scheme interpreter" plt-scheme racket
-		vpl_install_package "TCL interpreter" tcl
-		vpl_install_package "Valgrind tool" valgrind
-	fi
+	local PACKAGE_LIST_FILE="packages_files/standard.$PMTYPE.lst"
+	[ -s $PACKAGE_LIST_FILE ] && vpl_install_packages_file $PACKAGE_LIST_FILE
 	echo
 }
 
 function vpl_install_full() {
 	echo ""
-	if [ "$PMTYPE" == "1" ] ; then
-		echo "Full aditional packages"
-		vpl_install_package "Clisp" clisp
-		vpl_install_package "Clojure" clojure clojure1.6 clojure1.4
-		vpl_install_package "Cobol" gnucobol
-		vpl_install_package "CoffeeScript" coffee-script
-		vpl_install_package "D compiler (GNU)" gcc-gdc
-		vpl_install_package "Erlang" erlang
-		vpl_install_package "Go programming language compiler" golang
-		vpl_install_package "Haxe programming language" haxe
-		vpl_install_package "JQuery JavaScript Lib" js-jquery
-		vpl_install_package "JQuery-UI JavaScript Lib" js-jquery-ui
-		vpl_install_package "Julia" julia
-		vpl_install_package "Lua compiler" lua lua5.1
-		vpl_install_package "R statistical computation and graphics system (GNU)" R
-		vpl_install_package "MIPS R2000/R3000 emulator" spim
-		vpl_install_package "Verilog compiler" iverilog
-		vpl_install_package "VHDL compiler" ghdl freehdl
-		vpl_install_package "Web browser" firefox
-	elif [ "$PMTYPE" = "2" ] ; then
-		echo "Full aditional packages"
-		vpl_install_package "Clisp" clisp
-		vpl_install_package "Clojure" clojure clojure1.6 clojure1.4
-		vpl_install_package "Cobol" open-cobol
-		vpl_install_package "CoffeeScript" coffeescript
-		vpl_install_package "D compiler (GNU)" gdc
-		vpl_install_package "Erlang" erlang
-		vpl_install_package "Go programming language compiler" golang
-		vpl_install_package "Haxe programming language" haxe
-		vpl_install_package "JQuery JavaScript Lib" libjs-jquery
-		vpl_install_package "JQuery-UI JavaScript Lib" libjs-jquery-ui
-		vpl_install_package "Julia" julia
-		vpl_install_package "Lua compiler" lua lua5.4 lua5.3 lua5.2  lua5.1
-		vpl_install_package "R statistical computation and graphics system (GNU)" r-base
-		vpl_install_package "MIPS R2000/R3000 emulator" spim
-		vpl_install_package "MiniZinc constraint modeling language" minizinc
-		vpl_install_package "XQuery interpreter" galax
-		vpl_install_package "Verilog compiler" iverilog
-		vpl_install_package "VHDL compiler" ghdl freehdl
-		vpl_install_package "libtool required for VHDL" libtool-bin
-		vpl_install_package "Groovy programming language" groovy
-		vpl_install_package "Web browser" firefox firefox-esr
-	fi
+	echo "Full aditional packages"
+	local PACKAGE_LIST_FILE="packages_files/full.$PMTYPE.lst"
+	[ -s $PACKAGE_LIST_FILE ] && vpl_install_packages_file $PACKAGE_LIST_FILE
 	if [ "$LISTPACKAGES" != "" ] ; then
 		echo "  JGrasp (requires user intervention) "
 		echo "  Kotlin (requires user intervention) "

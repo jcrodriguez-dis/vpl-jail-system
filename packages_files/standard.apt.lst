@@ -1,0 +1,20 @@
+# Standard packages for VPL jail system on Linux using APT (Debian, Ubuntu, etc.)
+"Ada compiler (GNU)" gnat
+"Assembler" nasm
+"C# development framework (mono)" mono-complete
+"Fortran compiler (GNU)" gfortran
+"Haskell" hgc hugs
+"JavaScript (Nodejs)" nodejs
+"JavaScript (Nodejs-legacy)" nodejs-legacy
+npm "TypeScript" typescript
+npm "Sass" sass
+"Octave (GNU)" octave
+"Pascal compiler" fp-compiler
+"Perl interpreter" perl
+"Prolog" swi-prolog
+"Ruby interpreter" ruby
+"Rust compiler" rustc
+"Scala programming language" scala
+"Scheme interpreter" plt-scheme racket
+"TCL interpreter" tcl
+"Valgrind tool" valgrind

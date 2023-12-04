@@ -1,0 +1,17 @@
+# Standard packages for VPL jail system on Linux using APK (Alpine)
+"Ada compiler (GNU)" gcc-gnat
+"Assembler" nasm
+"C# development framework (mono)" mono-dev
+"Fortran compiler (GNU)" gfortran
+"JavaScript (Nodejs)" nodejs
+npm "TypeScript" typescript
+npm "Sass" sass
+"Octave (GNU)" octave
+"Pascal compiler" fpc
+"Perl interpreter" perl
+"Prolog" swi-prolog
+"Ruby interpreter" ruby
+"Rust compiler" rust
+"Scheme interpreter" racket
+"TCL interpreter" tcl
+"Valgrind tool" valgrind

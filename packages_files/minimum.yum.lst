@@ -1,0 +1,12 @@
+# Minimum packages for VPL jail system on Linux using YUM (fedora, etc.)
+"LSB core" redhat-lsb-core
+"make" make
+"C compiler" gcc
+"C++ compiler" gcc-c++
+"SSL library" openssl		
+"SSL library" openssl-devel	
+"Firewall" iptables
+"Window manager" fluxbox openbox metacity 
+"xterm" xterm
+"xset" xset
+"VNC server" tigervnc-server

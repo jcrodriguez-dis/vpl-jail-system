@@ -1,0 +1,19 @@
+# Standard packages for VPL jail system on Linux using YUM (fedora, etc.)
+"Ada compiler (GNU)" gcc-gnat
+"Assembler" nasm
+"C# development framework (mono)" mono-complete
+"Fortran compiler (GNU)" gcc-gfortran
+"Haskell" haskell-platform
+"JavaScript (Nodejs)" nodejs
+npm "TypeScript" typescript
+npm "Sass" sass
+"Octave (GNU)" octave
+"Pascal compiler" fpc
+"Perl interpreter" perl
+"Prolog" pl
+"Ruby interpreter" ruby
+"Rust compiler" rust
+"Scala programming language" scala
+"Scheme interpreter" racket
+"TCL interpreter" tcl
+"Valgrind tool" valgrind

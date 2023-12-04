@@ -1,0 +1,21 @@
+# Minimum packages for VPL jail system on Linux using APT (Debian, Ubuntu, etc.)
+"apt-utils" apt-utils
+"make" make
+"automake tools" automake
+"LSB" lsb lsb-core lsb-compat
+"C++ compiler" g++
+"SSL library" openssl
+"SSL library" libssl-dev
+"Firewall" iptables
+"X system" xorg
+"dbus-x11" dbus-x11
+"VNC server" tightvncserver
+"Fonts" xfonts-75dpi
+"Fonts" xfonts-100dpi
+"Window manager" fluxbox metacity openbox
+"Configuration DB system" gconf2
+"xterm" xterm
+"wget" wget
+"curl" curl
+"net-tools" net-tools
+"bc" bc

@@ -1,0 +1,20 @@
+# Basic packages for VPL jail system on Linux using APK (Alpine)
+"C compiler (GNU)" gcc
+"General purpose debugger (GNU)" gdb
+"Java" openjdk21 openjdk20 openjdk19 openjdk17 openjdk11 openjdk8
+"JavaFX" openjfx
+"Junit framework" junit4 junit
+"PHP interpreter" php83 php82 php81 php8
+"Sqlite for PHP" php83-sqlite3 php82-sqlite3 php81-sqlite3 php8-sqlite3
+"Python3" python3
+"Python3 Tk" python3-tkinter
+"Python3 NumPy" py3-numpy
+"Python3 pandas" py3-pandas
+"Python3 Matplotlib" py3-matplotlib
+"Python3 pycodestyle" py3-pycodestyle
+"Python3 NetworkX" py3-networkx
+"Python3 mypy" py3-mypy
+"Python3 pycodestyle" py3-pycodestyle
+"Python3 pydocstyle" py3-pydocstyle
+"Pythom Thonny" thonny
+"SQL interpreter" sqlite
