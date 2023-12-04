@@ -180,6 +180,16 @@ function runTests() {
     else
 	    local INSTALL_LEVELS=( minimum )
     fi
+    rm vpl-jail-system-*.tar.gz &> /dev/null
+    echo "Building distribution package"
+    make distchek &> /dev/null
+    [ $? != 0 ] && echo "Distribution build fails" ; exit 1
+    [ -f ./config.h ] && VERSION=$(grep -E "PACKAGE_VERSION" ./config.h | sed -e "s/[^\"]\+\"\([^\"]\+\).*/\1/")
+    PACKAGE="vpl-jail-system-$VERSION"
+    TARPACKAGE="$PACKAGE.tar.gz"
+    [ ! -s $TARPACKAGE ] && echo "Package file not founs" ; exit 1
+    tar xvf "$PACKAGE.tar.gz"
+    cd $PACKAGE
     for VPL_INSTALL_LEVEL in "${INSTALL_LEVELS[@]}"
     do
         for VPL_BASE_DISTRO in "${DISTROS[@]}"
@@ -196,6 +206,9 @@ function runTests() {
             writeInfo "Test took " "$(($ELT / 60)) minutes and $(($ELT % 60)) seconds"
         done
     done
+    cd ..
+    rm -R $PACKAGE
+    rm $TARPACKAGE
 }
 
 writeHeading "Testing install vpl-jail-system in Docker $1"
