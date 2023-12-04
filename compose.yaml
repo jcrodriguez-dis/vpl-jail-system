@@ -1,0 +1,18 @@
+services:
+  vpl-jail:
+    environment:
+      - VPL_BASE_DISTRO
+      - VPL_INSTALL_LEVEL
+      - CERTIFICATES_DIR
+      - VPL_JAIL_SSL_CERT_FILE
+      - VPL_JAIL_SSL_KEY_FILE
+    image: "jail-${VPL_BASE_DISTRO}-${VPL_INSTALL_LEVEL}"
+    privileged: true
+    build: .
+    volumes:
+      - certificates:${CERTIFICATES_DIR}:ro
+    ports:
+      - "8080:80"
+      - "8090:443"
+volumes:
+  certificates:
