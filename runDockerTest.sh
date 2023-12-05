@@ -40,6 +40,20 @@ function removeImageContainer() {
     docker volume rm "$3" & > /dev/null
 }
 
+function show_progress() {
+    local linea
+    local num_columns=$COLUMNS
+    [ -z "$num_columns" ] && num_columns=80
+    ((num_columns--))
+    local clean="printf \"\r%${num_columns}s\r\" "
+    while read -r linea ; do
+        linea=${linea:0:$num_columns}
+        $clean
+        printf "\r%s" "$linea"
+    done
+    $clean
+}
+
 function chekPortInUse() {
     local n=1
     while true ; do
@@ -76,7 +90,7 @@ function checkDockerInstall() {
     docker build \
         --build-arg VPL_BASE_DISTRO=$VPL_BASE_DISTRO \
         --build-arg VPL_INSTALL_LEVEL=$VPL_INSTALL_LEVEL \
-        --progress=plain -t $IMAGE_NAME . &> $ERRORS_LOG_FILE
+        --progress=plain -t $IMAGE_NAME . 2>&1 | tee $ERRORS_LOG_FILE | show_progress
     if [[ $? != 0 ]] ; then
         writeError "Build $IMAGE_NAME fail"
         return 1
@@ -105,7 +119,7 @@ function checkDockerInstall() {
     fi
     docker container ls | head -1
     docker container ls | grep $CONTAINER_NAME
-    writeCorrect "Container $CONTAINER_NAME on $IMAGE_NAME image runnng" $CHECK_MARK
+    writeCorrect "Container $CONTAINER_NAME on $IMAGE_NAME image running" $CHECK_MARK
 
     # Test container
     URL="http://localhost:$PLAIN_PORT/nada"
@@ -182,13 +196,14 @@ function runTests() {
     fi
     rm vpl-jail-system-*.tar.gz &> /dev/null
     echo "Building distribution package"
-    make distchek &> /dev/null
-    [ $? != 0 ] && echo "Distribution build fails" ; exit 1
+    make distcheck &> /dev/null
+    [ $? != 0 ] && (echo "Distribution build fails" ; exit 1)
     [ -f ./config.h ] && VERSION=$(grep -E "PACKAGE_VERSION" ./config.h | sed -e "s/[^\"]\+\"\([^\"]\+\).*/\1/")
     PACKAGE="vpl-jail-system-$VERSION"
     TARPACKAGE="$PACKAGE.tar.gz"
-    [ ! -s $TARPACKAGE ] && echo "Package file not founs" ; exit 1
-    tar xvf "$PACKAGE.tar.gz"
+    [ ! -s $TARPACKAGE ] && (echo "Package file not found" ; exit 1)
+    echo "Unpacking distribution $VERSION"
+    tar xvf "$PACKAGE.tar.gz" > /dev/null
     cd $PACKAGE
     for VPL_INSTALL_LEVEL in "${INSTALL_LEVELS[@]}"
     do
