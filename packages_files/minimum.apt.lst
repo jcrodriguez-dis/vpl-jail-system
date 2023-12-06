@@ -15,7 +15,5 @@
 "Window manager" fluxbox metacity openbox
 "Configuration DB system" gconf2
 "xterm" xterm
-"wget" wget
-"curl" curl
 "net-tools" net-tools
 "bc" bc

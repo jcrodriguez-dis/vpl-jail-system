@@ -14,7 +14,5 @@
 "Window manager" fluxbox metacity openbox
 "X resource manager" xrdb
 "xterm" xterm
-"wget" wget
-"curl" curl
 "net-tools" net-tools
 "bc" bc
