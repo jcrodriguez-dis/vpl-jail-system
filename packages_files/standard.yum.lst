@@ -9,7 +9,7 @@ npm "TypeScript" typescript
 npm "Sass" sass
 "Octave (GNU)" octave
 "Pascal compiler" fpc
-"Perl interpreter" perl
+"Perl interpreter" perl-Modern-Perl perl
 "Prolog" pl
 "Ruby interpreter" ruby
 "Rust compiler" rust
