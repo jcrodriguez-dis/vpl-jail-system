@@ -287,6 +287,7 @@ function vpl_install_jgrasp {
 	local VERSION="205_04"
 	local FILENAME="jgrasp205_04.zip"
 	local CDIR=""
+	vpl_install_package "wget" wget &> /dev/null
 	while true ; do
 		echo -n "Version number of JGrasp to install e.g. 2.0.5_04 (0 to exit)"
 		read VERSION
@@ -328,6 +329,7 @@ function vpl_install_kotlin {
 	local VERSION="1.4.21"
 	local FILENAME=""
 	local CDIR=""
+	vpl_install_package "wget" wget &> /dev/null
 	while true ; do
 		echo -n "Version number of Kotlin to install e.g. 1.4.21 (0 to exit)"
 		read VERSION
@@ -476,6 +478,9 @@ function vpl_install_update_extra_files() {
 	echo "Installing launch scripts"
 	cp launchers/*.sh $VPL_PROGRAMS_DIR
 	chmod +x $VPL_PROGRAMS_DIR/*.sh
+
+	# Update vpl-jail-system
+	cp vpl-jail-system.initd $VPL_PROGRAMS_DIR/vpl-jail-system
 
 	# Create default control dir
 	mkdir -p /var/vpl-jail-system
