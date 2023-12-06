@@ -62,9 +62,13 @@ class Daemon {
 	 * Check jail security (/etc, paswords files, /home, etc)
 	 */
 	void checkJail(){
+		string jailPath = configuration->getJailPath();
+		if (jailPath == "") { // Running in container
+			return;
+		}
 		struct stat info;
 
-		string detc=configuration->getJailPath()+"/etc";
+		string detc = jailPath + "/etc";
 		if(lstat(detc.c_str(), &info))
 			throw "jail /etc not checkable";
 		if(info.st_uid !=0 || info.st_gid !=0)
@@ -72,7 +76,7 @@ class Daemon {
 		if(info.st_mode & 022)
 			throw "Jail error: jail /etc with insecure permissions (group or others with write permission)";
 
-		string fpasswd=configuration->getJailPath()+"/etc/passwd";
+		string fpasswd = jailPath + "/etc/passwd";
 		if(lstat(fpasswd.c_str(),&info))
 			throw "Jail error: jail /etc/passwd not checkable";
 		if(info.st_uid !=0 || info.st_gid !=0)
@@ -80,7 +84,7 @@ class Daemon {
 		if(info.st_mode & 033)
 			throw "Jail error: jail /etc/passwd with insecure permissions (group or others with write permission)";
 
-		string fgroup=configuration->getJailPath()+"/etc/group";
+		string fgroup = jailPath + "/etc/group";
 		if(lstat(fgroup.c_str(),&info))
 			throw "Jail error: jail /etc/group not checkable";
 		if(info.st_uid !=0 || info.st_gid !=0)
@@ -88,7 +92,7 @@ class Daemon {
 		if(info.st_mode & 033)
 			throw "Jail error: jail /etc/group with insecure permissions (group or others with write permission)";
 
-		string fshadow=configuration->getJailPath()+"/etc/shadow";
+		string fshadow = jailPath + "/etc/shadow";
 		if(!lstat(fshadow.c_str(),&info)) {
 			if(info.st_uid !=0 || info.st_gid !=0)
 				throw "Jail error: jail /etc/shadow not owned by root";

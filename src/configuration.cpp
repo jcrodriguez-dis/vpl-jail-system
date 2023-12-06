@@ -9,7 +9,9 @@
 #include "configuration.h"
 #include "jail_limits.h"
 #include "util.h"
-Configuration *Configuration::singlenton=0;
+
+Configuration *Configuration::singlenton = 0;
+
 string Configuration::generateCleanPATH(string path, string dirtyPATH){
 	string dir;
 	size_t pos=0;
@@ -52,6 +54,8 @@ void Configuration::readEnvironmentConfigVars(ConfigData &data) {
 		string new_value = Util::getEnv("VPL_JAIL_" + parameter);
         if (new_value.length() > 0) {
 			data[parameter] = new_value;
+			Logger::log(LOG_INFO,"Using parameter from environment var VPL_JAIL_%s = %s",
+			            parameter.c_str(), new_value.c_str());
 		}
     }
 }
@@ -94,12 +98,15 @@ void Configuration::readConfigFile(){
 		throw "Incorrect MAX_PRISONER_UGID config value" + data["MAX_PRISONER_UGID"];
 	if(minPrisoner>maxPrisoner || minPrisoner<JAIL_MIN_PRISONER_UID || maxPrisoner>JAIL_MAX_PRISONER_UID)
 		throw "Incorrect config file, prisoner uid inconsistency";
+	
 	jailPath = data["JAILPATH"];
-	if(!Util::correctPath(jailPath))
-		throw "Incorrect Jail"+jailPath;
 	jailPath = jailPath[0] == '/' ? jailPath : "/" + jailPath; //Add absolute path
-	if(jailPath == "/")
-		throw "Jail path can NOT be set to /";
+	if (jailPath == "/") {
+		jailPath = "";
+		data["JAILPATH"] = jailPath;
+	}
+	if(jailPath != "" and ! Util::correctPath(jailPath))
+		throw "Incorrect Jail path " + jailPath;
 	controlPath = data["CONTROLPATH"];
 	controlPath = controlPath[0] == '/' ? controlPath : "/" + controlPath; //Add absolute path
 	if(!Util::correctPath(controlPath))

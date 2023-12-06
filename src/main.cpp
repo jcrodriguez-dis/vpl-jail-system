@@ -17,18 +17,32 @@ using namespace std;
  */
 int main(int const argc, const char ** const argv, char * const * const env) {
 	bool foreground = false;
+	bool inContaier = false;
 	for (int i = 1; i < argc; i++) {
 		if (string(argv[i]) == "foreground") {
 			foreground = true;
-			cout << "Service execution foreground (nondemonize)" << endl;
-			break;
+		}
+		if (string(argv[i]) == "in_container") {
+			inContaier = true;
 		}
 	}
+	cout << "Server running";
+	if (foreground) cout << " in foreground mode (non demonize)";
+	if (inContaier) cout << " inside a container (no chroot used)";
+	cout << endl;
 	Logger::setLogLevel(LOG_ERR, foreground);
 	Configuration *conf = Configuration::getConfiguration();
 	Logger::setLogLevel(conf->getLogLevel(), foreground);
 	if ( conf->getLogLevel() >= LOG_INFO) {
 		conf->readConfigFile(); // Reread configuration file to show values in log
+	}
+	if (conf->getJailPath() == "" && ! inContaier) {
+		Logger::log(LOG_CRIT, "Jail directory root \"/\" but not running in container");
+		exit(1);
+	}
+	if (conf->getJailPath() != "" && inContaier) {
+		Logger::log(LOG_CRIT, "Running in container but Jail directory not root \"/\"");
+		exit(1);
 	}
 	int exitStatus=static_cast<int>(internalError);
 	try{

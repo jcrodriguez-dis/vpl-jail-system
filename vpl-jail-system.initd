@@ -35,6 +35,8 @@
 #          |     |___ lock #Real dir by mount --bind
 
 LOGFILE=/var/log/vpl-jail-service.log
+touch $LOGFILE &> /dev/null
+chmod 600 $LOGFILE
 VPL_PROGRAMS_DIR=/usr/sbin/vpl
 VPL_CONFIG_DIR=/etc/vpl
 DAEMON=$VPL_PROGRAMS_DIR/vpl-jail-server
@@ -74,21 +76,21 @@ function read_config_var {
 	local FILE=$1
 	shift
 	while (( "$#" )); do
-		local RES=$(grep -i -e "^[ \\t]*$1[ \\t]*=" $FILE \
-	             | tail -n 1 \
-	             | sed -e "s/^[ \\t]*$1[ \\t]*=[ \\t]*\\(.*\\)\$/\\1/I")
-	    if [ "$RES" == "" ] ; then
-			local ENVCONFIGVAR="VPL_JAIL_$1"
-			if [ "${!ENVCONFIGVAR}" == "" ] ; then
-	    		echo "$1=$2 (using the default value)" >> $LOGFILE
-	    		export $1=$2
+		local ENVCONFIGVAR="VPL_JAIL_$1"
+		if [ -n "${!ENVCONFIGVAR}" ] ; then
+			echo "$1=${!ENVCONFIGVAR} (using value from env var $ENVCONFIGVAR)" >> $LOGFILE
+			export $1=${!ENVCONFIGVAR}
+		else
+			local RES=$(grep -i -e "^[ \\t]*$1[ \\t]*=" $FILE \
+					| tail -n 1 \
+					| sed -e "s/^[ \\t]*$1[ \\t]*=[ \\t]*\\(.*\\)\$/\\1/I")
+			if [ -n "$RES" ] ; then
+				echo "$1=$RES (using value from configuration file)" >> $LOGFILE
+				export $1=$RES
 			else
-	    		echo "$1=${!ENVCONFIGVAR} (using value from env var $ENVCONFIGVAR)" >> $LOGFILE
-	    		export $1=${!ENVCONFIGVAR}
+				echo "$1=$2 (using the default value)" >> $LOGFILE
+				export $1=$2
 			fi
-	    else
-	    	echo "$1=$RES" >> $LOGFILE
-	    	export $1=$RES
 	    fi
 		shift
 		shift
@@ -138,24 +140,46 @@ function post_stop {
 }
 
 function set_etc {
-	#passwd file
 	local PASSWORDFILE="$JAILPATH/etc/passwd"
-	local I
-	echo "root:*:0:0:root:/root:/bin/bash" > "$PASSWORDFILE"
-	for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
-		echo "p$I:*:$I:$I:prisoner $I:/home/p$I:/bin/bash" >> "$PASSWORDFILE"
-	done
-	chmod 644 "$PASSWORDFILE"
-	#group file
 	local GROUPFILE="$JAILPATH/etc/group"
-	echo "root:*:0:root" > "$GROUPFILE"
-	for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
-		echo "p$I:*:$I:p$I" >> "$GROUPFILE"
-	done
-	chmod 644 "$GROUPFILE"
 	local SHADOWFILE="$JAILPATH/etc/shadow"
-	chown root:root "$SHADOWFILE"
-	chmod 600 "$SHADOWFILE"
+	local I
+	if [ -z "$IN_CONTAINER" ] ; then
+		#passwd file
+		echo "root:*:0:0:root:/root:/bin/bash" > "$PASSWORDFILE"
+		for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
+			echo "p$I:*:$I:$I:prisoner $I:/home/p$I:/bin/bash" >> "$PASSWORDFILE"
+		done
+		chmod 644 "$PASSWORDFILE"
+		#group file
+		echo "root:*:0:root" > "$GROUPFILE"
+		for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
+			echo "p$I:*:$I:p$I" >> "$GROUPFILE"
+		done
+		chmod 644 "$GROUPFILE"
+		chown root:root "$SHADOWFILE"
+		chmod 600 "$SHADOWFILE"
+	else
+		#passwd file
+		local TMPFILE=/tmp/.nothing
+		grep -v "^p[0-9][0-9][0-9]+:" "$PASSWORDFILE" > $TMPFILE
+		for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
+			echo "p$I:*:$I:$I:prisoner $I:/home/p$I:/bin/bash" >> $TMPFILE
+		done
+		cp $TMPFILE "$PASSWORDFILE"
+		chown root:root "$PASSWORDFILE"
+		chmod 644 "$PASSWORDFILE"
+
+		#group file
+		grep -v "^p[0-9][0-9][0-9]+:" "$GROUPFILE" > $TMPFILE
+		for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
+			echo "p$I:*:$I:p$I" >> $TMPFILE
+		done
+		cp $TMPFILE "$GROUPFILE"
+		chown root:root "$GROUPFILE"
+		chmod 644 "$GROUPFILE"
+		rm $TMPFILE
+	fi
 }
 
 function set_tmpdir {
@@ -275,12 +299,12 @@ function unset_firewall {
 
 function read_config {
 	case "$1" in
-  		start)
-			local CONFIG_FILE="$VPL_CONFIG_DIR/vpl-jail-system.conf"
-			cp "$CONFIG_FILE" "$CONFIG_FILE.LAST"
-        ;;
   		stop)
         	local CONFIG_FILE="$VPL_CONFIG_DIR/vpl-jail-system.conf.LAST"
+        ;;
+		*)
+			local CONFIG_FILE="$VPL_CONFIG_DIR/vpl-jail-system.conf"
+			cp "$CONFIG_FILE" "$CONFIG_FILE.LAST"
         ;;
 	esac
 	if [ ! -f "$CONFIG_FILE" ] ; then
@@ -320,27 +344,28 @@ function set_controldir {
 	rm -Rf "$JAIL_WORK" &> /dev/null
 	rm -Rf "$CONTROLPATH" &> /dev/null
 	create_check_dir "$CONTROLPATH" 0700
-	if [ "${USETMPFS,,}" != "false" ] ; then 
-		mount -t tmpfs -o size=$HOMESIZE tmpfs "$CONTROLPATH"
-	else
-		if [ `expr index "%" "$HOMESIZE"` != "0" ] ; then
-			log_failure_msg $"Please use a fixed size for HOMESIZE. E.g. 2G, 1500M"
-			exit 2
+	if [ -z "$IN_CONTAINER" ] ; then
+		if [ "${USETMPFS,,}" != "false" ] ; then 
+			mount -t tmpfs -o size=$HOMESIZE tmpfs "$CONTROLPATH"
+		else
+			if [ `expr index "%" "$HOMESIZE"` != "0" ] ; then
+				log_failure_msg $"Please use a fixed size for HOMESIZE. E.g. 2G, 1500M"
+				exit 2
+			fi
+			local CONTROLFS="${CONTROLPATH}.fs"
+			if [ -f "$CONTROLFS" ] ; then
+				rm "$CONTROLFS"
+			fi
+			touch "$CONTROLFS"
+			chmod 0600 "$CONTROLFS" 
+			truncate --size $HOMESIZE "$CONTROLFS"
+			mkfs.ext3 "$CONTROLFS" &> /dev/null
+			mount "$CONTROLFS" "$CONTROLPATH"
 		fi
-		local CONTROLFS="${CONTROLPATH}.fs"
-		if [ -f "$CONTROLFS" ] ; then
-			rm "$CONTROLFS"
-		fi
-		touch "$CONTROLFS"
-		chmod 0600 "$CONTROLFS" 
-		truncate --size $HOMESIZE "$CONTROLFS"
-		mkfs.ext3 "$CONTROLFS" &> /dev/null
-		mount "$CONTROLFS" "$CONTROLPATH"
+		chmod 0700 "$CONTROLPATH"	
+		create_check_dir "$JAIL_LIVE" 0700
+		create_check_dir "$JAIL_WORK" 0700
 	fi
-	chmod 0700 "$CONTROLPATH"
-	
-	create_check_dir "$JAIL_LIVE" 0700
-	create_check_dir "$JAIL_WORK" 0700
 }
 
 function unset_controldir {
@@ -365,38 +390,47 @@ function start_vpl {
 		pre_start
 		check_selinux_vpl
 		read_config start
-		local JAIL_LIVE="$CONTROLPATH/jail_live"
-		local JAIL_WORK="$CONTROLPATH/jail_work"
 		set_controldir
-		create_check_dir "$JAILPATH" 0755
 		if [ "$CERBOT_WEBROOT_PATH" != "" ] ; then
 			create_check_dir "$CERBOT_WEBROOT_PATH" 0700
 		fi
-		mount -t overlay overlay -olowerdir=/,upperdir=$JAIL_LIVE,workdir=$JAIL_WORK${NOSUID} "$JAILPATH"
-		chmod 0755 "$JAILPATH"
-		if [ "$?" != "0" ] ; then
-			log_failure_msg $"Error mounting jail dir"
-			exit 4
+		if [ -z "$IN_CONTAINER" ] ; then
+			create_check_dir "$JAILPATH" 0755
+			local JAIL_LIVE="$CONTROLPATH/jail_live"
+			local JAIL_WORK="$CONTROLPATH/jail_work"
+			mount -t overlay overlay -olowerdir=/,upperdir=$JAIL_LIVE,workdir=$JAIL_WORK${NOSUID} "$JAILPATH"
+			chmod 0755 "$JAILPATH"
+			if [ "$?" != "0" ] ; then
+				log_failure_msg $"Error mounting jail dir"
+				exit 4
+			fi
+			rm -Rf "$JAILPATH/home" &> /dev/null
+			rm -Rf "$JAILPATH/jail" &> /dev/null
+			rm -Rf "$JAILPATH/etc/vpl" &> /dev/null
+			rm -Rf "$JAILPATH/$CONTROLPATH" &> /dev/null
+			create_check_dir "$JAILPATH/home" 0711
+			set_other /proc
+			set_other /dev
+			set_tmpdir /dev/shm $SHMSIZE 1777
+			set_other /dev/pts
+			set_other /run
+			set_other /run/lock
+			set_snap
 		fi
 		set_etc
-		rm -Rf "$JAILPATH/home" &> /dev/null
-		rm -Rf "$JAILPATH/jail" &> /dev/null
-		rm -Rf "$JAILPATH/etc/vpl" &> /dev/null
-		rm -Rf "$JAILPATH/$CONTROLPATH" &> /dev/null
-		create_check_dir "$JAILPATH/home" 0711
-		set_other /proc
-		set_other /dev
-		set_tmpdir /dev/shm $SHMSIZE 1777
-		set_other /dev/pts
-		set_other /run
-		set_other /run/lock
-		set_snap
 	} 2>> $LOGFILE
 	if [ "$1" == "foreground" ] ; then
 		trap "signal_stop_vpl" SIGTERM
 		echo
-		echo "Starting in foreground mode (nondaemon mode)"
-		$DAEMON foreground $2 $3
+
+		if [ -n "$IN_CONTAINER" ] ; then
+			echo "Starting in container in foreground mode (nondaemon mode)"
+			$DAEMON in_container foreground $2 $3
+		else
+			echo "Starting in foreground mode (nondaemon mode)"
+			$DAEMON foreground $2 $3
+		fi
+
 	else
 		start_daemon $DAEMON $1 $2
 		sleep 1
@@ -420,35 +454,59 @@ function stop_vpl {
 			kill -9 $(cat $PIDFILE) &> /dev/null
 			rm $PIDFILE
 		fi
-		if [ -d "$JAILPATH" ] ; then
-			if [ "$(stat -c "%d:%i" /)" == "$(stat -c "%d:%i" $JAILPATH)" ] ; then
-				log_failure_msg $"vpl-jail-system error jail path is the root directory"
-				exit 5
-			fi
-		fi
-		unset_snap
-		unset_other /run/lock
-		unset_other /run
-		unset_other /dev/pts
-		unset_tmpdir /dev/shm
-		unset_other /dev
-		unset_other /proc
-		if [ -d "$JAILPATH" ] ; then
-			local I
-			for (( I=1 ; $I < 2 ; I+=1 )) ; do
-				vpl_umount "$JAILPATH" &> /dev/null
-				if [ "$?" == "0" ] ;  then
-					break
+		if [ -z "$IN_CONTAINER" ] ; then
+			if [ -d "$JAILPATH" ] ; then
+				if [ "$(stat -c "%d:%i" /)" == "$(stat -c "%d:%i" $JAILPATH)" ] ; then
+					log_failure_msg $"vpl-jail-system error jail path is the root directory"
+					exit 5
 				fi
-				echo -n "."
-				sleep 1
-			done
-			vpl_umount "$JAILPATH"
+			fi
+
+			unset_snap
+			unset_other /run/lock
+			unset_other /run
+			unset_other /dev/pts
+			unset_tmpdir /dev/shm
+			unset_other /dev
+			unset_other /proc
+			if [ -d "$JAILPATH" ] ; then
+				local I
+				for (( I=1 ; $I < 2 ; I+=1 )) ; do
+					vpl_umount "$JAILPATH" &> /dev/null
+					if [ "$?" == "0" ] ;  then
+						break
+					fi
+					echo -n "."
+					sleep 1
+				done
+				vpl_umount "$JAILPATH"
+			fi
 		fi
 		unset_controldir
 		unset_firewall
 		post_stop
 	} 2>> $LOGFILE
+}
+
+function chek_running_in_container() {
+	# Set IN_CONTAINER to yes if running in container and JAIL_PATH = /
+	local USING_OVERLAY
+	if [ -x "$(command -v mount)" ] ; then
+		mount | grep -q "^overlay on / type overlay"
+		USING_OVERLAY=$?
+	elif [ -x "$(command -v stat)" ] ; then
+		stat -f -c "%T" / | grep -q "^overlay"
+		USING_OVERLAY=$?
+	elif [ -f "/etc/mtab" ] ; then
+		grep -q "^overlay on / type overlay" /etc/mtab
+		USING_OVERLAY=$?
+	else
+		return
+	fi
+	[[ $USING_OVERLAY != 0 && $JAILPATH == "/" ]] && (echo "Error: trying to use "/" as jail mount and not in container"; exit 1)
+	IN_CONTAINER=
+	[[ $USING_OVERLAY = 0 && $JAILPATH == "/" ]] && IN_CONTAINER=yes
+	[ -n "$IN_CONTAINER" ] && echo "Detected running in container"
 }
 
 function signal_stop_vpl() {
@@ -457,6 +515,8 @@ function signal_stop_vpl() {
 }
 
 echo "===== vpl-jail-system ======" >> $LOGFILE
+read_config init
+chek_running_in_container
 date >> $LOGFILE
 case "$1" in
 	start)

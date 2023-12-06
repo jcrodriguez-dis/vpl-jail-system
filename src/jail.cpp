@@ -766,6 +766,10 @@ void Jail::process(Socket *socket){
  */
 void Jail::goJail(){
 	string jailPath=configuration->getJailPath();
+	if (jailPath == "") {
+		Logger::log(LOG_INFO,"No chrooted, running in container");
+		return;
+	}
 	if(chdir(jailPath.c_str()) != 0)
 		throw HttpException(internalServerErrorCode, "I can't chdir to jail", jailPath);
 	if(chroot(jailPath.c_str()) != 0)
