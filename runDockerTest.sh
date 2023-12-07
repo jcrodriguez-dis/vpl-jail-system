@@ -59,7 +59,7 @@ function chekPortInUse() {
     while true ; do
         docker ps --filter publish=$1 | grep $1 &> /dev/null
         if [ "$?" == "0" ] ; then
-            if [ n -gt 10 ] ; then
+            if [ $n -gt 10 ] ; then
                 echo
                 writeError "The following container is using a port need for the tests" " Please stop it"
                 docker ps --filter publish=$1
