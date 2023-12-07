@@ -5,23 +5,35 @@
 # Description:  Script to install VPL-Jail-System
 
 echo "Runing with parms: $@"
+
+# Fixes UID if needed
+if [ -z "$UID" ] ; then
+	UID=$(id -u)
+	EUID=$(id -u -r)
+fi
+# Checks running as root
+if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
+	echo "This script need to be run as user root and is run as user $USER uid $UID euid $EUID"
+	exit 1
+fi
+
 LOGFILE=/var/log/vpl_installation.log
 VPL_PROGRAMS_DIR=/usr/sbin/vpl
 VPL_CONFIG_DIR=/etc/vpl
 
 {
+	touch "$LOGFILE"
+	chmod 600 "$LOGFILE"
 	date > "$LOGFILE"
 	exec &> >(tee "$LOGFILE")
 } &> /dev/null
 
 function vpl_detect_package_manager() {
-	if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
-		echo "This script need to be run as user root and is run as user $USER uid $UID euid $EUID"
-		exit 1
-	fi
 	# Detect package manager (YUM/APT)
 	if [ "$(command -v yum)" != "" ] ; then
 		echo "Using YUM package manager" 
+		yum -y -q check-update
+		yum -y -q upgrade
 		function vpl_install_base {
 			yum -y install $1 >> "$LOGFILE"
 			return $?
@@ -35,6 +47,7 @@ function vpl_detect_package_manager() {
 		echo "Using APT package manager"
 		echo "Updating distribution software DB"
 		apt-get update >> "$LOGFILE"
+		apt-get -q -y upgrade >> "$LOGFILE"
 		function vpl_install_base {
 			apt-get -q -y --allow-unauthenticated install $1 >> "$LOGFILE"
 			return $?
@@ -51,8 +64,8 @@ function vpl_detect_package_manager() {
 	elif [ "$(command -v apk)" != "" ] ; then
 		echo "Using APK package manager"
 		echo "Updating distribution software DB"
-		apk update >> "$LOGFILE"
-		apk upgrade >> "$LOGFILE"
+		apk --no-interactive update >> "$LOGFILE"
+		apk --no-interactive upgrade >> "$LOGFILE"
 		function vpl_install_base {
 			apk add $1 >> "$LOGFILE"
 			return $?
@@ -399,27 +412,25 @@ function vpl_show_help() {
     echo "VPL-Jail-System Installer"
     echo ""
     echo "This script is used to install the VPL-Jail-System."
-    echo "Note that you can install manually all the software you want to use."
+    echo "Note: you can install manually all the development software you want to use."
     echo "Usage: ./install-vpl.sh [OPTIONS]"
     echo ""
     echo "OPTIONS:"
     echo "  help           Show this help message and exit."
-    echo "  update         Update the VPL-Jail-System daemon restarting the servise."
+    echo "  update         Update the VPL-Jail-System server software."
     echo "  start          Start the VPL-Jail-System service after installation."
     echo "  noninteractive Install without user interaction."
-    echo "  minimum        Install the minimum required software packages."
-    echo "  basic          Install basic additional packages."
-    echo "  standard       Install standard additional packages."
-    echo "  full           Install full additional packages."
-	echo "  list           Show the packages to install by option"
+    echo "  [inst_level]   Install programming languages development packages:"
+	echo "                 values [minimum | basic | standard | full]"
+	echo "  list           Show the packages to install by [inst_level]"
     echo ""
     echo "EXAMPLES:"
     echo "  ./install-vpl.sh update"
-	echo "         Update the VPL-Jail-System daemon."
+	echo "         Update the VPL-Jail-System server software."
     echo "  ./install-vpl.sh standard noninteractive start"
-	echo "         Install standard packages and start the service."
+	echo "         Install in non-interactive mode standard packages and start server."
     echo "  ./install-vpl.sh full"
-	echo "         Install all the packages."
+	echo "         Install all known dev packages in interactive mode."
 }
 
 function vpl_install_update_daemon() {
