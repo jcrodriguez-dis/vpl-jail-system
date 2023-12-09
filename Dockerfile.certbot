@@ -1,0 +1,7 @@
+FROM alpine
+
+USER root:root
+
+WORKDIR /
+RUN apk add certbot
+

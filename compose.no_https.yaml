@@ -1,0 +1,21 @@
+services:
+  vpl-jail:
+    environment:
+      - VPL_BASE_DISTRO
+      - VPL_INSTALL_LEVEL
+      - VPL_RUN_PRIVILEGED
+      - VPL_JAIL_JAILPATH
+      - VPL_JAIL_SECURE_PORT=0
+    image: "jail-${VPL_BASE_DISTRO}-${VPL_INSTALL_LEVEL}"
+    privileged: ${VPL_RUN_PRIVILEGED}
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile.no_https
+      args:
+        - VPL_BASE_DISTRO=${VPL_BASE_DISTRO}
+        - VPL_INSTALL_LEVEL=${VPL_INSTALL_LEVEL}
+        - VPL_JAIL_SECURE_PORT=${VPL_JAIL_SECURE_PORT}
+        - VPL_JAIL_JAILPATH=${VPL_JAIL_JAILPATH}
+    ports:
+      - "${VPL_EXPOSE_PORT}:80"

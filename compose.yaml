@@ -3,16 +3,32 @@ services:
     environment:
       - VPL_BASE_DISTRO
       - VPL_INSTALL_LEVEL
-      - CERTIFICATES_DIR
+      - VPL_RUN_PRIVILEGED
+      - VPL_JAIL_JAILPATH
+      - VPL_CERTIFICATES_DIR
       - VPL_JAIL_SSL_CERT_FILE
       - VPL_JAIL_SSL_KEY_FILE
+      - VPL_HOST_SSL_DIRECTORY
     image: "jail-${VPL_BASE_DISTRO}-${VPL_INSTALL_LEVEL}"
-    privileged: true
-    build: .
+    privileged: ${VPL_RUN_PRIVILEGED}
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VPL_BASE_DISTRO=${VPL_BASE_DISTRO}
+        - VPL_INSTALL_LEVEL=${VPL_INSTALL_LEVEL}
+        - VPL_JAIL_PORT=${VPL_JAIL_PORT}
+        - VPL_JAIL_SECURE_PORT=${VPL_JAIL_SECURE_PORT}
+        - VPL_JAIL_JAILPATH=${VPL_JAIL_JAILPATH}
+        - VPL_CERTIFICATES_DIR=${VPL_CERTIFICATES_DIR}
+        - VPL_JAIL_SSL_CERT_FILE=${VPL_JAIL_SSL_CERT_FILE}
+        - VPL_JAIL_SSL_KEY_FILE=${VPL_JAIL_SSL_KEY_FILE}
     volumes:
-      - certificates:${CERTIFICATES_DIR}:ro
+      - type: bind
+        source: ${VPL_HOST_SSL_DIRECTORY}
+        target: ${VPL_CERTIFICATES_DIR}
+        read_only: true
     ports:
-      - "8080:80"
-      - "8090:443"
-volumes:
-  certificates:
+      - "${VPL_EXPOSE_PORT}:${VPL_JAIL_PORT}"
+      - "${VPL_EXPOSE_SECURE_PORT}:${VPL_JAIL_SECURE_PORT}"
