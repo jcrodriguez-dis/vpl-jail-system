@@ -13,7 +13,7 @@ using namespace std;
 
 #ifndef TEST
 /**
- * main accept command line "foreground" to go nondemonize run.
+ * main accept command line "foreground" to go non-daemon run.
  */
 int main(int const argc, const char ** const argv, char * const * const env) {
 	bool foreground = false;
@@ -27,7 +27,7 @@ int main(int const argc, const char ** const argv, char * const * const env) {
 		}
 	}
 	cout << "Server running";
-	if (foreground) cout << " in foreground mode (non demonize)";
+	if (foreground) cout << " in foreground mode (non-daemon mode)";
 	if (inContaier) cout << " inside a container (no chroot used)";
 	cout << endl;
 	Logger::setLogLevel(LOG_ERR, foreground);
@@ -50,7 +50,7 @@ int main(int const argc, const char ** const argv, char * const * const env) {
 		if (foreground) {
 			runner->foreground();
 		} else {
-			runner->demonize();
+			runner->daemonize();
 		}
 		Logger::log(LOG_INFO, "Server started");
 		runner->loop();
