@@ -422,15 +422,14 @@ function start_vpl {
 	if [ "$1" == "foreground" ] ; then
 		trap "signal_stop_vpl" SIGTERM
 		echo
-
 		if [ -n "$IN_CONTAINER" ] ; then
 			echo "Starting in container in foreground mode (nondaemon mode)"
-			$DAEMON in_container foreground $2 $3
+			$DAEMON in_container foreground $2 $3 &
 		else
 			echo "Starting in foreground mode (nondaemon mode)"
-			$DAEMON foreground $2 $3
+			$DAEMON foreground $2 $3 &
 		fi
-
+		wait $!
 	else
 		start_daemon $DAEMON $1 $2
 		sleep 1
@@ -471,12 +470,11 @@ function stop_vpl {
 			unset_other /proc
 			if [ -d "$JAILPATH" ] ; then
 				local I
-				for (( I=1 ; $I < 2 ; I+=1 )) ; do
+				for (( I=1 ; $I < 4 ; I+=1 )) ; do
 					vpl_umount "$JAILPATH" &> /dev/null
 					if [ "$?" == "0" ] ;  then
 						break
 					fi
-					echo -n "."
 					sleep 1
 				done
 				vpl_umount "$JAILPATH"
