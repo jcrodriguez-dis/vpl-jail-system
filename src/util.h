@@ -217,10 +217,15 @@ public:
 	/**
 	 * Check if file exists
 	 */
-	static bool fileExists(const string &fileName){
+	static bool fileExists(const string &fileName, bool followLink=false){
 		struct stat info;
-		return lstat(fileName.c_str(),&info)==0
-				&& S_ISREG(info.st_mode);
+		if (followLink) {
+			return stat(fileName.c_str(),&info)==0
+					&& S_ISREG(info.st_mode);
+		} else {
+			return lstat(fileName.c_str(),&info)==0
+					&& S_ISREG(info.st_mode);
+		}
 	}
 
 	/**

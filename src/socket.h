@@ -122,8 +122,10 @@ public:
 		}
 		const string certFile = configuration->getSSLCertFile();
 		const string keyFile = configuration->getSSLKeyFile();
-		if ( !Util::fileExists(certFile) || !Util::fileExists(keyFile)) {
+		if ( !Util::fileExists(certFile, true) || !Util::fileExists(keyFile, true)) {
 			Logger::log(LOG_ERR,"SSL unavailable due certificate or private key file not found.");
+			Logger::log(LOG_ERR,"Certfile: '%s'", certFile.c_str());
+			Logger::log(LOG_ERR,"Keyfile: '%s'", keyFile.c_str());
 			return;
 		}
 		if ( this->timePrivateKeyFileModification == Util::timeOfFileModification(keyFile) &&
