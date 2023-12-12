@@ -1,20 +1,7 @@
 services:
   vpl-jail:
-    environment:
-      - VPL_BASE_DISTRO
-      - VPL_INSTALL_LEVEL
-      - VPL_RUN_PRIVILEGED
-      - VPL_JAIL_JAILPATH
-      - VPL_CERTIFICATES_DIR
-      - VPL_JAIL_SSL_CERT_FILE
-      - VPL_JAIL_SSL_KEY_FILE
-      - VPL_HOST_SSL_DIRECTORY
-      - VPL_JAIL_CERBOT_WEBROOT_PATH
-      - VPL_EMAIL_FOR_CERBOT
-      - VPL_SERVER_NAME
-
-    image: "jail-${VPL_BASE_DISTRO}-${VPL_INSTALL_LEVEL}"
-    privileged: ${VPL_RUN_PRIVILEGED}
+    image: "jail-${VPL_BASE_DISTRO:?error}-${VPL_INSTALL_LEVEL:?error}"
+    privileged: "${VPL_RUN_PRIVILEGED:?error}"
     restart: always
     build:
       context: .
@@ -25,9 +12,9 @@ services:
         - VPL_JAIL_PORT
         - VPL_JAIL_SECURE_PORT
         - VPL_JAIL_JAILPATH
-        - VPL_JAIL_CERBOT_WEBROOT_PATH
         - VPL_JAIL_SSL_CERT_FILE
         - VPL_JAIL_SSL_KEY_FILE
+        - VPL_JAIL_CERBOT_WEBROOT_PATH
         - VPL_SERVER_NAME
     volumes:
       - certbot_webroot:${VPL_JAIL_CERBOT_WEBROOT_PATH}:ro
@@ -36,14 +23,10 @@ services:
         target: ${VPL_CERTIFICATES_DIR}
         read_only: true
     ports:
-      - "${VPL_EXPOSE_PORT}:${VPL_JAIL_PORT}"
+      - "80:${VPL_JAIL_PORT:?error}"
       - "${VPL_EXPOSE_SECURE_PORT}:${VPL_JAIL_SECURE_PORT}"
   
   certbot_obtain_certificate:
-    environment:
-      - VPL_EMAIL_FOR_CERBOT
-      - VPL_SERVER_NAME
-      - VPL_HOST_SSL_DIRECTORY
     image: vpl_certbot
     build:
       context: .
@@ -67,7 +50,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.certbot
-    command: "/bin/sh -c 'trap exit TERM; echo \"Checking to renew certificates every 12h\"; while :; do certbot renew; sleep 12h & wait $!; done;'"
+    command: "/bin/sh -c 'trap exit TERM; echo \"Checking to renew certificates every 12h\"; while :; do certbot -q renew; sleep 12h & wait $!; done;'"
     depends_on:
       vpl-jail:
         condition: service_started

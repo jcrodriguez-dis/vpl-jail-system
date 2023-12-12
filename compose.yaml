@@ -1,29 +1,20 @@
 services:
   vpl-jail:
-    environment:
-      - VPL_BASE_DISTRO
-      - VPL_INSTALL_LEVEL
-      - VPL_RUN_PRIVILEGED
-      - VPL_JAIL_JAILPATH
-      - VPL_CERTIFICATES_DIR
-      - VPL_JAIL_SSL_CERT_FILE
-      - VPL_JAIL_SSL_KEY_FILE
-      - VPL_HOST_SSL_DIRECTORY
-    image: "jail-${VPL_BASE_DISTRO}-${VPL_INSTALL_LEVEL}"
-    privileged: ${VPL_RUN_PRIVILEGED}
+    image: "jail-${VPL_BASE_DISTRO:?error}-${VPL_INSTALL_LEVEL:?error}"
+    privileged: "${VPL_RUN_PRIVILEGED:?error}"
     restart: always
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        - VPL_BASE_DISTRO=${VPL_BASE_DISTRO}
-        - VPL_INSTALL_LEVEL=${VPL_INSTALL_LEVEL}
-        - VPL_JAIL_PORT=${VPL_JAIL_PORT}
-        - VPL_JAIL_SECURE_PORT=${VPL_JAIL_SECURE_PORT}
-        - VPL_JAIL_JAILPATH=${VPL_JAIL_JAILPATH}
-        - VPL_CERTIFICATES_DIR=${VPL_CERTIFICATES_DIR}
-        - VPL_JAIL_SSL_CERT_FILE=${VPL_JAIL_SSL_CERT_FILE}
-        - VPL_JAIL_SSL_KEY_FILE=${VPL_JAIL_SSL_KEY_FILE}
+        - VPL_BASE_DISTRO
+        - VPL_INSTALL_LEVEL
+        - VPL_JAIL_JAILPATH
+        - VPL_JAIL_PORT
+        - VPL_JAIL_SECURE_PORT
+        - VPL_CERTIFICATES_DIR
+        - VPL_JAIL_SSL_CERT_FILE
+        - VPL_JAIL_SSL_KEY_FILE
     volumes:
       - type: bind
         source: ${VPL_HOST_SSL_DIRECTORY}

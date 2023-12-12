@@ -10,15 +10,25 @@ WORKDIR /vpl-jail-system
 # Install bash on distros with no bash
 RUN /vpl-jail-system/install-bash-sh
 
-# Install levels: minimum < basic < standard < full
-ARG VPL_INSTALL_LEVEL=basic
+# Set default install levels: minimum < basic < standard < full
+ARG VPL_INSTALL_LEVEL=standard
+ARG VPL_JAIL_JAILPATH
+ARG VPL_JAIL_PORT
+ARG VPL_JAIL_SECURE_PORT
+ARG VPL_CERTIFICATES_DIR=/etc/vpl/ssl
+ARG VPL_JAIL_SSL_CERT_FILE="${VPL_CERTIFICATES_DIR}/fullchain.pem"
+ARG VPL_JAIL_SSL_KEY_FILE="${VPL_CERTIFICATES_DIR}/privkey.pem"
 
+ENV VPL_JAIL_JAILPATH=${VPL_JAIL_JAILPATH}
+ENV VPL_JAIL_PORT=${VPL_JAIL_PORT}
+ENV VPL_JAIL_SECURE_PORT=${VPL_JAIL_SECURE_PORT}
+ENV VPL_CERTIFICATES_DIR="${VPL_CERTIFICATES_DIR}""
+ENV VPL_JAIL_SSL_CERT_FILE="${VPL_JAIL_SSL_CERT_FILE}"
+ENV VPL_JAIL_SSL_KEY_FILE="${VPL_JAIL_SSL_KEY_FILE}"
+
+# Run VPL installer
 RUN /vpl-jail-system/install-vpl-sh noninteractive ${VPL_INSTALL_LEVEL}
 
-# Using HTTP and HTTPS
-ENV VPL_CERTIFICATES_DIR="/etc/vpl/ssl"
-ENV VPL_JAIL_SSL_CERT_FILE="${CERTIFICATES_DIR}/cert.pem"
-ENV VPL_JAIL_SSL_KEY_FILE="${CERTIFICATES_DIR}/key.pem"
 VOLUME [ "${VPL_CERTIFICATES_DIR}" ]
 EXPOSE 80 443
 

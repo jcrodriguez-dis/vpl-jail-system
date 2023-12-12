@@ -7,14 +7,21 @@ USER root:root
 COPY . /vpl-jail-system
 WORKDIR /vpl-jail-system
 
+# Install bash on distros with no bash
 RUN /vpl-jail-system/install-bash-sh
 
-# Install levels: minimum < basic < standard < full
-ARG VPL_INSTALL_LEVEL=basic
+# Set default install levels: minimum < basic < standard < full
+ARG VPL_INSTALL_LEVEL=standard
+ARG VPL_JAIL_JAILPATH
+ARG VPL_JAIL_PORT
+
+ENV VPL_JAIL_JAILPATH=${VPL_JAIL_JAILPATH}
+ENV VPL_JAIL_PORT=${VPL_JAIL_PORT}
+ENV VPL_JAIL_SECURE_PORT=0
+
 RUN /vpl-jail-system/install-vpl-sh noninteractive ${VPL_INSTALL_LEVEL}
 
 # Using HTTP only
-ENV VPL_JAIL_SECURE_PORT=0
 EXPOSE 80
 
 STOPSIGNAL SIGTERM
