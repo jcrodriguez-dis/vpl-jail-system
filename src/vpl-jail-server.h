@@ -70,7 +70,7 @@ class Daemon {
 
 		string detc = jailPath + "/etc";
 		if(lstat(detc.c_str(), &info))
-			throw "jail /etc not checkable";
+			throw "jail /etc not checkable (Running in container no privileged with JAILPATH != /?)";
 		if(info.st_uid !=0 || info.st_gid !=0)
 			throw "jail /etc not owned by root";
 		if(info.st_mode & 022)
