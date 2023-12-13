@@ -1,3 +1,4 @@
+name: "jail-${VPL_BASE_DISTRO:?error}-${VPL_INSTALL_LEVEL:?error}-no_https"
 services:
   vpl-jail:
     image: "jail-${VPL_BASE_DISTRO}-${VPL_INSTALL_LEVEL}"

@@ -1,3 +1,4 @@
+name: "jail-${VPL_BASE_DISTRO:?error}-${VPL_INSTALL_LEVEL:?error}+letsencrypt"
 services:
   vpl-jail:
     image: "jail-${VPL_BASE_DISTRO:?error}-${VPL_INSTALL_LEVEL:?error}"
