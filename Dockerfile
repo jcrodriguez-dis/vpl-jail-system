@@ -4,12 +4,6 @@ FROM ${VPL_BASE_DISTRO}
 
 USER root:root
 
-COPY . /vpl-jail-system
-WORKDIR /vpl-jail-system
-
-# Install bash on distros with no bash
-RUN /vpl-jail-system/install-bash-sh
-
 # Set default install levels: minimum < basic < standard < full
 ARG VPL_INSTALL_LEVEL=standard
 ARG VPL_JAIL_JAILPATH
@@ -26,8 +20,19 @@ ENV VPL_CERTIFICATES_DIR="${VPL_CERTIFICATES_DIR}"
 ENV VPL_JAIL_SSL_CERT_FILE="${VPL_JAIL_SSL_CERT_FILE}"
 ENV VPL_JAIL_SSL_KEY_FILE="${VPL_JAIL_SSL_KEY_FILE}"
 
+# Copy installer
+COPY . /vpl-jail-system
+WORKDIR /vpl-jail-system
+
+# Install bash on distros with no bash
+RUN /vpl-jail-system/install-bash-sh
+
 # Run VPL installer
 RUN /vpl-jail-system/install-vpl-sh noninteractive ${VPL_INSTALL_LEVEL}
+
+# Remove installer
+WORKDIR /
+RUN rm -R vpl-jail-system
 
 VOLUME [ "${VPL_CERTIFICATES_DIR}" ]
 EXPOSE 80 443
