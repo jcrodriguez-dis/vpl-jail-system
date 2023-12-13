@@ -166,15 +166,19 @@ OUTPUTFILE=$HOME/.std_output
 # Shows task output stdout & stderr if any content
 if [ -s $OUTPUTFILE ] ; then
     if [ -x "$(command -v xterm)" ] ; then
-        xterm -T "std output" -bg white -fg red -e more $OUTPUTFILE
+        xterm -T "std output" -bg white -fg red -e /bin/bash -c "more $OUTPUTFILE; sleep 3"
+    elif [ -x "$(command -v x-terminal-emulator)" ] ; then
+        x-terminal-emulator -e /bin/bash -c "more $OUTPUTFILE; sleep 3"
     else
-        if [ -x "$(command -v x-terminal-emulator)" ] ; then
-            x-terminal-emulator -e more .std_output
-        fi
+        sleep 5s
     fi
+else
+    sleep 5s
 fi
 
 # Kill X server
+ls $HOME/.vnc/*.pid &> /dev/null
+[ $? != 0 ] && exit
 PIDFILE=$(ls $HOME/.vnc/*.pid)
 if [ -x "$(command -v tightvncserver)" ] ; then
     FILENAME=${PIDFILE##*/}
@@ -182,12 +186,12 @@ if [ -x "$(command -v tightvncserver)" ] ; then
     [ -n "$TIGHTDIS" ] && tightvncserver -kill $TIGHTDIS
 fi
 
-if [ -s $PIDFILE ] ; then 
+if [ -f $PIDFILE ] ; then 
     kill -SIGTERM $(cat $PIDFILE)
     [ $? = 0 ] && sleep 2
     [ -s $PIDFILE ] && kill -SIGKILL $(cat $PIDFILE)
 fi
-
+exit
 END_OF_SCRIPT
     chmod 0755 $XSTARTUPFILE
     echo "$SECONDS: Created xstatup file"
