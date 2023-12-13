@@ -17,6 +17,8 @@ if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
 	exit 1
 fi
 
+umask 077
+
 LOGFILE=/var/log/vpl_installation.log
 VPL_PROGRAMS_DIR=/usr/sbin/vpl
 VPL_CONFIG_DIR=/etc/vpl

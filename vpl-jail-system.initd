@@ -34,6 +34,7 @@
 #          |___ run       #Real dir by mount --bind
 #          |     |___ lock #Real dir by mount --bind
 
+umask 077
 LOGFILE=/var/log/vpl-jail-service.log
 touch $LOGFILE &> /dev/null
 chmod 600 $LOGFILE
