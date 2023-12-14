@@ -80,6 +80,7 @@ function runTests() {
 }
 
 function Autotools_execution() {
+	[ -x "$(command -v autoreconf)" ] && autoreconf -i
 	aclocal
 	autoheader
 	autoconf

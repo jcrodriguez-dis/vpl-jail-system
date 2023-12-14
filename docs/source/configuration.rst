@@ -403,7 +403,7 @@ RESULT_MAX_SIZE
 
 The máximum size of data in the evaluation result.
 The value can be written in bytes, kilobytes, megabytes and gigabytes
-The default value is 32 Kb.
+The default value is 1 Mb.
 
 Example:
 
