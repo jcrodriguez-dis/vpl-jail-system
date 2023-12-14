@@ -335,7 +335,9 @@ dist_pkgdata_DATA = launchers/vncaccel.sh \
 	packages_files/standard.apk.lst packages_files/full.apk.lst \
 	vpl-jail-system.service vpl-jail-system.initd \
 	vpl-jail-system.conf install-vpl-sh install-bash-sh \
-	uninstall-sh Dockerfile
+	uninstall-sh Dockerfile Dockerfile.certbot Dockerfile.no_https \
+	Dockerfile.letsencrypt compose.yaml compose.no_https.yaml \
+	compose.letsencrypt.yaml .env
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
