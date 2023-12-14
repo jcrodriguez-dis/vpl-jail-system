@@ -88,7 +88,7 @@ function showMessageIfError() {
     return $1
 }
 
-function checkDockerRunImage() {
+function checkDockerRunContainer() {
     local CONTAINER_NAME=$1
     local PRIVILEGED=$2
     local RUNOPTION="-e VPL_JAIL_JAILPATH=/"
@@ -138,7 +138,7 @@ function checkDockerRunImage() {
     [[ $? != 0 ]] && return 6
 }
 
-function checkDockerInstall() { 
+function checkDockerBuild() { 
     export VPL_BASE_DISTRO=$1
     export VPL_INSTALL_LEVEL=$2
     export IMAGE_NAME=jail-$VPL_BASE_DISTRO-$VPL_INSTALL_LEVEL
@@ -159,8 +159,8 @@ function checkDockerInstall() {
     writeCorrect "Image $IMAGE_NAME created" $CHECK_MARK
 
     # Run container in privileged and non-privileged mode
-    checkDockerRunImage "$CONTAINER_NAME" "noprivileged"
-    checkDockerRunImage "$CONTAINER_NAME-privileged" "privileged"
+    checkDockerRunContainer "$CONTAINER_NAME" "noprivileged"
+    checkDockerRunContainer "$CONTAINER_NAME-privileged" "privileged"
 
     # Remove image
     if [ "$3" = "" ] ; then
@@ -204,7 +204,7 @@ function runTests() {
             SECONDS=0
             ((n=n+1))
             writeInfo "Test $n: " "Testing vpl-jail-system in $VPL_BASE_DISTRO install $VPL_INSTALL_LEVEL"
-            checkDockerInstall $VPL_BASE_DISTRO $VPL_INSTALL_LEVEL $1
+            checkDockerBuild $VPL_BASE_DISTRO $VPL_INSTALL_LEVEL $1
             [ "$?" != "0" ] && ((nfails++))
             ELT=$SECONDS
             writeInfo "Test took " "$(($ELT / 60)) minutes and $(($ELT % 60)) seconds"
@@ -220,5 +220,5 @@ function runTests() {
     rm $TARPACKAGE
 }
 
-writeHeading "Testing install vpl-jail-system in Docker $1"
+writeHeading "Testing vpl-jail-system running in Docker $1"
 runTests $1 $2
