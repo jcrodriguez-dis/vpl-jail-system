@@ -14,6 +14,7 @@
 #include <map>
 #include <vector>
 #include <syslog.h>
+#include <iomanip>
 
 #include "httpServer.h"
 #include "requestmessage.h"
@@ -209,29 +210,46 @@ public:
 		root = processRawData();
 	}
 
+	static string char_to_hex( unsigned int c ) {
+		std::stringstream stream;
+		stream << "\\u" << setfill('0') << setw(4) << hex << c;
+		return stream.str();
+	}
+
 	static string encodeJSONString(const string &data) {
 		string ret;
 		for(size_t i=0; i<data.size(); i++){
 			char c = data[i];
-			switch(c) {
-				case '\\':ret += "\\\\";
-				break;
-				case '"':ret += "\\\"";
-				break;
-				case '/':ret += "\\/";
-				break;
-				case '\b':ret += "\\b";
-				break;
-				case '\f':ret += "\\f";
-				break;
-				case '\n':ret += "\\n";
-				break;
-				case '\r':ret += "\\r";
-				break;
-				case '\t':ret += "\\t";
-				break;
-				default: ret += c;
-				break;
+			if (c < 0) {
+				ret += c;
+			} else {
+				switch(c) {
+					case '"':ret += "\\\"";
+					break;
+					case '\\':ret += "\\\\";
+					break;
+					case '/':ret += "\\/";
+					break;
+					case '\b':ret += "\\b";
+					break;
+					case '\f':ret += "\\f";
+					break;
+					case '\n':ret += "\\n";
+					break;
+					case '\r':ret += "\\r";
+					break;
+					case '\t':ret += "\\t";
+					break;
+					case 127: ret += char_to_hex(0x00ff & c);
+					break;
+					default:
+						if (c <= 31) {
+							ret += char_to_hex(0x00ff & c);
+						} else {
+							ret += c;
+						}
+					break;
+				}
 			}
 		}
 		return ret;

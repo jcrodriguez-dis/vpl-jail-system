@@ -27,7 +27,8 @@ class JSONRPCTest: public BaseTest {
 		converted = JSON::decodeJSONString(JSON::encodeJSONString(data), 0, 10000);
 		assert(data == converted);
 		data = "\\áéíóúÑñ";
-		converted = JSON::decodeJSONString(JSON::encodeJSONString(data), 0, 10000);
+		encoded = JSON::encodeJSONString(data);
+		converted = JSON::decodeJSONString(encoded, 0, 10000);
 		assert(data == converted);
 		encoded = "\\\\\\u00e1\\u00e9\\u00ed\\u00f3\\u00fa\\u00d1\\u00f1";
 		converted = JSON::decodeJSONString(encoded, 0, 10000);
@@ -38,7 +39,14 @@ class JSONRPCTest: public BaseTest {
 		encoded = "\\ud83d\\ude00\\ud83d\\ude07\\ud83d\\udc7a"
 		 		  "\\ud83e\\udd1c\\ud83d\\udd32\\ud83d\\udd22";
 		converted = JSON::decodeJSONString(encoded, 0, 10000);
+		// Check control codes conversion
 		assert(data == converted);
+		char c_data[33];
+		for (int i = 0; i < 31; i++) c_data[i] = (char) (i+1);
+		c_data[31] = 127;
+		c_data[32] = 0;
+		converted = JSON::decodeJSONString(JSON::encodeJSONString(c_data), 0, 10000);
+		assert(converted == c_data);
 	}
 
 	void testAvailable() {
