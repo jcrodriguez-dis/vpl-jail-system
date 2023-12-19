@@ -1,4 +1,4 @@
-# Minimum packages for VPL jail system on Linux using YUM (fedora, etc.)
+# Minimum packages for VPL jail system on Linux using DNF (fedora, etc.)
 "LSB core" redhat-lsb-core
 "make" make
 "C compiler" gcc

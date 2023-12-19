@@ -31,20 +31,20 @@ VPL_CONFIG_DIR=/etc/vpl
 } &> /dev/null
 
 function vpl_detect_package_manager() {
-	# Detect package manager (YUM/APT)
-	if [ "$(command -v yum)" != "" ] ; then
-		echo "Using YUM package manager" 
-		yum -y -q check-update
-		yum -y -q upgrade
+	# Detect package manager (DNF/APT/APK)
+	if [ "$(command -v dnf)" != "" ] ; then
+		echo "Using DNF package manager" 
+		dnf -y -q check-update
+		dnf -y -q upgrade
 		function vpl_install_base {
-			yum -y install $1 >> "$LOGFILE"
+			dnf -y install $1 >> "$LOGFILE"
 			return $?
 		}
 		function vpl_install_check {
-			yum list $1 &> /dev/null
+			dnf list $1 &> /dev/null
 			return $?
 		}
-		PMTYPE="yum"
+		PMTYPE="dnf"
 	elif [ "$(command -v apt-get)" != "" ] ; then
 		echo "Using APT package manager"
 		echo "Updating distribution software DB"
@@ -79,7 +79,7 @@ function vpl_detect_package_manager() {
 		PMTYPE="apk"
 	else
 		echo "Sorry, I can't detect the package manager of the system"
-		echo "Acepted package managers APT an YUM."
+		echo "Acepted package managers APT, DNF, or APK."
 		exit 1
 	fi
 }
@@ -479,10 +479,10 @@ function vpl_install_update_extra_files() {
 	else
 		cp vpl-jail-system.conf $VPL_CONFIGFILE
 		echo "Default configuration file installed"
-		if [ "$PMTYPE" = "yum"  ] ; then
+		if [ "$PMTYPE" = "dnf"  ] ; then
 			echo "" >> $VPL_CONFIGFILE
 			echo "ENVPATH=/usr/bin:/bin" >> $VPL_CONFIGFILE
-			echo "Configuration file changed for CentOS. Added ENVPATH"
+			echo "Configuration file changed. Added ENVPATH"
 		fi
 	fi
 	chmod 600 $VPL_CONFIGFILE
@@ -539,10 +539,7 @@ function vpl_install_basic() {
 	echo "Basic aditional packages"
 	local PACKAGE_LIST_FILE="packages_files/basic.$PMTYPE.lst"
 	[ -s $PACKAGE_LIST_FILE ] && vpl_install_packages_file $PACKAGE_LIST_FILE
-	if [ "$PMTYPE" = "yum" ] ; then
-		echo "IMPORTANT: Please, set properly the ENVPATH in the config file /etc/vpl/vpl-jail-system.conf" 
-		echo "           e.g. \"ENVPATH=/usr/bin:/bin:/usr/sbin\" and restart the service"
-	elif [ "$PMTYPE" = "apt" ] ; then
+	if [ "$PMTYPE" = "apt" ] ; then
 		if [ "$(command -v update-alternatives)" != "" -a "$LISTPACKAGES" == "" ] ; then
 			update-alternatives --auto java
 			update-alternatives --auto javac

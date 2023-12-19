@@ -1,4 +1,4 @@
-# Full additional packages for VPL jail system on Linux using YUM (fedora, etc.)
+# Full additional packages for VPL jail system on Linux using DNF (fedora, etc.)
 "Clisp" clisp
 "Clojure" clojure clojure1.6 clojure1.4
 "Cobol" gnucobol

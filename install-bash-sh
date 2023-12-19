@@ -24,9 +24,9 @@ LOGFILE=/var/log/vpl_installation.log
 touch $LOGFILE &> /dev/null
 chmod 600 $LOGFILE
 
-# Install bash after detecting package manager (YUM/APT/APK)
-if [ "$(command -v yum)" != "" ] ; then
-	yum -y install bash >> "$LOGFILE"
+# Install bash after detecting package manager (DNF/APT/APK)
+if [ "$(command -v dnf)" != "" ] ; then
+	dnf -y install bash >> "$LOGFILE"
 elif [ "$(command -v apt)" != "" ] ; then
 	apt-get -q -y install bash >> "$LOGFILE"
 elif [ "$(command -v apk)" != "" ] ; then
