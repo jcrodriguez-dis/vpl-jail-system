@@ -444,6 +444,7 @@ function vpl_install_update_daemon() {
 	if [ -d $VPL_CONFIG_DIR ] ; then
 		echo "Updating installation => $VPL_CONFIG_DIR"
 		if [ -n "$(ps | grep vpl-jail-server)" ] ; then
+			echo "Stop service"
 			vpl_stop_service >> "$LOGFILE"
 			local NEED_RESTART=yes
 		fi
@@ -458,13 +459,18 @@ function vpl_install_update_daemon() {
 		exit 1
 	fi
 	cp src/vpl-jail-server $VPL_PROGRAMS_DIR
-	[ -n "$NEED_RESTART" ] && vpl_start_service >> "$LOGFILE"
+	if [ "$?" != "0" ] ; then
+	 	echo "Error: The daemon update failed (old daemon still running?)"
+		echo "        Please, stop the service or daemon manually and retry update."
+		exit 1)
+	fi
+	[ -n "$NEED_RESTART" ] && (echo "Start service" ; vpl_start_service >> "$LOGFILE")
 }
 
 function vpl_install_update_extra_files() {
 	local VPL_CONFIGFILE=$VPL_CONFIG_DIR/vpl-jail-system.conf
 	if [ -f $VPL_CONFIGFILE ] ; then
-		A=""
+		local A=""
 		if [ "$NONINTERACTIVE" == "" ] ; then
 			echo "Replace current configuration file with a fresh one?"
 			echo -n "(y/n)"
