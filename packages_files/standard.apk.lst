@@ -1,7 +1,7 @@
 # Standard packages for VPL jail system on Linux using APK (Alpine)
 "Ada compiler (GNU)" gcc-gnat
 "Assembler" nasm
-"C# development framework (mono)" mono-dev
+"C#/F#/VisualBasic on DotNet or C# mono" dotnet9-sdk dotnet8-sdk dotnet7-sdk dotnet6-sdk mono-dev
 "Fortran compiler (GNU)" gfortran
 "JavaScript (Nodejs)" nodejs
 npm "TypeScript" typescript

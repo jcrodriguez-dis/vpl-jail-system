@@ -1,7 +1,7 @@
 # Standard packages for VPL jail system on Linux using APT (Debian, Ubuntu, etc.)
 "Ada compiler (GNU)" gnat
 "Assembler" nasm
-"C# development framework (mono)" mono-complete
+"C#/F#/VisualBasic on DotNet" dotnet-sdk-9.0 dotnet-sdk-8.0 dotnet-sdk-7.0 dotnet-sdk-6.0 mono-complete
 "Fortran compiler (GNU)" gfortran
 "Haskell" hgc hugs
 "JavaScript (Nodejs)" nodejs
