@@ -30,3 +30,6 @@ jobs:
 
       - name: Run WebSocket tests
         run: ./runTest.sh WebSocket_tests
+
+      - name: Run checks for scripts syntax
+        run: ./runTest.sh Check_scripts
