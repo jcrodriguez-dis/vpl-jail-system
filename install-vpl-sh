@@ -443,7 +443,7 @@ function vpl_install_update_daemon() {
 	make >> "$LOGFILE"
 	if [ -d $VPL_CONFIG_DIR ] ; then
 		echo "Updating installation => $VPL_CONFIG_DIR"
-		if [ -n "$(ps | grep vpl-jail-server)" ] ; then
+		if [ -n "$(ps -e | grep -q vpl-jail-server)" ] ; then
 			echo "Stop service"
 			vpl_stop_service >> "$LOGFILE"
 			local NEED_RESTART=yes
@@ -462,8 +462,9 @@ function vpl_install_update_daemon() {
 	if [ "$?" != "0" ] ; then
 	 	echo "Error: The daemon update failed (old daemon still running?)"
 		echo "        Please, stop the service or daemon manually and retry update."
-		exit 1)
+		exit 1
 	fi
+	echo "New daemon (vpl-jail-server) installed"
 	[ -n "$NEED_RESTART" ] && (echo "Start service" ; vpl_start_service >> "$LOGFILE")
 }
 
@@ -622,32 +623,14 @@ function vpl_check_SSL_certificate() {
 	fi
 }
 
-function vpl_commandline_arg() {
+function vpl_commandline_config_arg() {
 	case "$1" in
-		help)
-			vpl_show_help
-			exit 0
-			;;
-		update)
-			vpl_install_update_daemon
-			vpl_install_update_extra_files
-			[ -z "$NONINTERACTIVE" ] && vpl_info_using_service
-			exit 0
-			;;
 		start)
 			export START=yes
 			;;
  		noninteractive)
 			export NONINTERACTIVE=yes
 			export DEBIAN_FRONTEND=noninteractive
-			;;
-		list)
-			export LISTPACKAGES=yes
-			vpl_install_minimum
-			vpl_install_basic
-            vpl_install_standard
-            vpl_install_full
-			exit
 			;;
 		minimum)		
 			export MINIMUM=yes
@@ -668,12 +651,36 @@ function vpl_commandline_arg() {
 			export FULL=yes
 			;;
 		*)
+			[ -z "$ACTION_ARG" ] && ACTION_ARG=$1
+			;;
+	esac
+}
+
+function vpl_commandline_action_arg() {
+	case "$1" in
+		help)
+			vpl_show_help
+			;;
+		update)
+			vpl_install_update_daemon
+			vpl_install_update_extra_files
+			[ -z "$NONINTERACTIVE" ] && vpl_info_using_service
+			;;
+		list)
+			export LISTPACKAGES=yes
+			vpl_install_minimum
+			vpl_install_basic
+            vpl_install_standard
+            vpl_install_full
+			;;
+		*)
 			echo ""
 			echo " => Error: unknow parameter '$1'"
 			vpl_show_help
 			exit 1
 			;;
 	esac
+	exit 0
 }
 
 vpl_detect_package_manager
@@ -681,9 +688,12 @@ vpl_detect_service_manager
 
 echo "Installation log file => $LOGFILE"
 while [ $# -gt 0 ] ; do
-	vpl_commandline_arg "$1"
+	vpl_commandline_config_arg "$1"
 	shift
 done
+
+[ -n "$ACTION_ARG" ] && vpl_commandline_action_arg $ACTION_ARG
+
 if [ "$MINIMUM" == "" ] ; then
 	vpl_show_help
 	exit 1
