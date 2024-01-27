@@ -152,12 +152,11 @@ function Check_scripts() {
 	scripts="runDockerComposeTest.sh runDockerTest.sh runTest.sh"
 	scripts="$scripts uninstall-sh install-bash-sh install-vpl-sh vpl-jail-system.initd"
 	for script in $scripts ; do
-		echo -n " $script"
 		bash -n $script
 		[ "$?" != "0" ] && result=1
 	done
 	echo
-	return 0
+	return $result
 }
 
 if [ -f ./config.h ] ; then
