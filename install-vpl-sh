@@ -4,7 +4,7 @@
 # license:      GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl.txt
 # Description:  Script to install VPL-Jail-System
 
-echo "Runing with parms: $@"
+echo "Running with parameters: $@"
 
 # Fixes UID if needed
 if [ -z "$UID" ] ; then
@@ -13,7 +13,8 @@ if [ -z "$UID" ] ; then
 fi
 # Checks running as root
 if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
-	echo "This script need to be run as user root and is run as user $USER uid $UID euid $EUID"
+	echo "This script must be run as the root user."
+	echo "Currently, it is being run as user $USER with UID $UID and EUID $EUID."
 	exit 1
 fi
 
@@ -34,6 +35,7 @@ function vpl_detect_package_manager() {
 	# Detect package manager (DNF/APT/APK)
 	if [ "$(command -v dnf)" != "" ] ; then
 		echo "Using DNF package manager" 
+		echo "Upgrading installed software"
 		dnf -y -q check-update
 		dnf -y -q upgrade
 		function vpl_install_base {
@@ -47,7 +49,7 @@ function vpl_detect_package_manager() {
 		PMTYPE="dnf"
 	elif [ "$(command -v apt-get)" != "" ] ; then
 		echo "Using APT package manager"
-		echo "Updating distribution software DB"
+		echo "Upgrading installed software"
 		apt-get update >> "$LOGFILE"
 		apt-get -q -y upgrade >> "$LOGFILE"
 		function vpl_install_base {
@@ -65,7 +67,7 @@ function vpl_detect_package_manager() {
 
 	elif [ "$(command -v apk)" != "" ] ; then
 		echo "Using APK package manager"
-		echo "Updating distribution software DB"
+		echo "Updagrading installed software"
 		apk --no-interactive update >> "$LOGFILE"
 		apk --no-interactive upgrade >> "$LOGFILE"
 		function vpl_install_base {
@@ -78,8 +80,8 @@ function vpl_detect_package_manager() {
 		}
 		PMTYPE="apk"
 	else
-		echo "Sorry, I can't detect the package manager of the system"
-		echo "Acepted package managers APT, DNF, or APK."
+	    echo "Unable to detect the package manager."
+		echo "Please ensure your system uses one of the supported package managers: APT, DNF, or APK."
 		exit 1
 	fi
 }
@@ -103,8 +105,8 @@ function vpl_detect_service_manager(){
 		}
 		function vpl_info_using_service {
 			echo
-			echo "-------------------------------------------------------"
-			echo "Notice: you may use next command to control the service"
+			echo "------------------------------------------------------"
+			echo "Note: Use the following command to manage the service."
 			echo "systemctl [start|stop|status] vpl-jail-system"
 		}
 		SMANAGER="1"
@@ -122,7 +124,8 @@ function vpl_detect_service_manager(){
 				if [ "$(command -v chkconfig)" != "" ] ; then
 					chkconfig --add vpl-jail-system  >> "$LOGFILE"
 				else
-					echo "WARNING: Service not installed due update-rc.d neider chkconfig found."
+					echo "WARNING: The service was not installed because neither"
+					echo "update-rc.d nor chkconfig was found."
 				fi
 			fi
 		}
@@ -140,7 +143,7 @@ function vpl_detect_service_manager(){
 		}
 		SMANAGER="2"
 	else
-		echo "Unkown service manager"	 
+		echo "Unknown service manager"	 
 		function vpl_install_service {
 			cp vpl-jail-system.initd $VPL_PROGRAMS_DIR/vpl-jail-system
 			chmod +x $VPL_PROGRAMS_DIR/vpl-jail-system
@@ -597,10 +600,10 @@ function vpl_check_SSL_certificate() {
 			echo "VPL execution server needs SSL certificates to accept https:"
 			echo "and wss: requests."
 			echo "If you have certificates then copy the key and the certificate file"
-			echo "in pem format to $VPL_CONFIG_DIR/key.pem and $VPL_CONFIG_DIR/cert.pem"
-			echo "If you don't have certificate the intaller can install and configure"
-			echo "Let's Encryptn certbot in standalone mode for you."
-			echo "If yuo want to use certbot in webroot mode you must install and configure it manually."
+			echo "in pem format to $VPL_CONFIG_DIR/key.pem and $VPL_CONFIG_DIR/cert.pem ."
+			echo "If you do not have a certificate, the installer can automatically install"
+			echo "and configure the Let's Encrypt certbot in standalone mode for you."
+			echo "If you want to use certbot in webroot mode you must install and configure it manually (answer n)."
 			echo "Notice that this machine must be accesible from internet and has port 80 available."
 			echo -n "Install Let's Encrypt in standalone mode to get and renew free certificates?"
 			echo -n "(y/n)"
@@ -669,9 +672,9 @@ function vpl_commandline_action_arg() {
 		list)
 			export LISTPACKAGES=yes
 			vpl_install_minimum
-			vpl_install_basic
-            vpl_install_standard
-            vpl_install_full
+			[ "$BASIC" != "" ] && vpl_install_basic
+			[ "$STANDARD" != "" ] && vpl_install_standard
+			[ "$FULL" != "" ] && vpl_install_full
 			;;
 		*)
 			echo ""
