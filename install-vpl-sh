@@ -275,7 +275,7 @@ function vpl_install_letsencrypt {
 	vpl_install_package "Let's Encrypt" certbot
 	if [ "$(command -v certbot)" = "" ] ; then
 		echo "Error: certbot not installed."
-		echo "Please install cerbot manually"
+		echo "Please install certbot manually"
 		exit 0
 	fi
 	local DETECTEDFQDN=""
@@ -599,8 +599,8 @@ function vpl_check_SSL_certificate() {
 			echo "If you have certificates then copy the key and the certificate file"
 			echo "in pem format to $VPL_CONFIG_DIR/key.pem and $VPL_CONFIG_DIR/cert.pem"
 			echo "If you don't have certificate the intaller can install and configure"
-			echo "Let's Encryptn cerbot in standalone mode for you."
-			echo "If yuo want to use cerbot in webroot mode you must install and configure it manually."
+			echo "Let's Encryptn certbot in standalone mode for you."
+			echo "If yuo want to use certbot in webroot mode you must install and configure it manually."
 			echo "Notice that this machine must be accesible from internet and has port 80 available."
 			echo -n "Install Let's Encrypt in standalone mode to get and renew free certificates?"
 			echo -n "(y/n)"

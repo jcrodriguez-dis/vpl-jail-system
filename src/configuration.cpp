@@ -87,7 +87,7 @@ void Configuration::readConfigFile(){
 	configDefault["USE_CGROUP"] = "false";
 	configDefault["REQUEST_MAX_SIZE"] = "128 Mb";
 	configDefault["RESULT_MAX_SIZE"] = "1 Mb";
-	configDefault["CERBOT_WEBROOT_PATH"] = "";
+	configDefault["CERTBOT_WEBROOT_PATH"] = "";
 	ConfigData data = ConfigurationFile::readConfiguration(configPath, configDefault);
 	readEnvironmentConfigVars(data);
 	minPrisoner = atoi(data["MIN_PRISONER_UGID"].c_str());
@@ -138,7 +138,7 @@ void Configuration::readConfigFile(){
 	useCgroup = Util::toUppercase(data["USE_CGROUP"]) == "TRUE";
 	requestMaxSize = Util::memSizeToBytesi(data["REQUEST_MAX_SIZE"]);
 	resultMaxSize = Util::memSizeToBytesi(data["RESULT_MAX_SIZE"]);
-	cerbotWebrootPath = data["CERBOT_WEBROOT_PATH"];
+	certbotWebrootPath = data["CERTBOT_WEBROOT_PATH"];
 }
 
 Configuration::Configuration() {

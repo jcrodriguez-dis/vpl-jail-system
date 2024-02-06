@@ -15,10 +15,10 @@ services:
         - VPL_JAIL_JAILPATH
         - VPL_JAIL_SSL_CERT_FILE
         - VPL_JAIL_SSL_KEY_FILE
-        - VPL_JAIL_CERBOT_WEBROOT_PATH
+        - VPL_JAIL_CERTBOT_WEBROOT_PATH
         - VPL_SERVER_NAME
     volumes:
-      - certbot_webroot:${VPL_JAIL_CERBOT_WEBROOT_PATH}:ro
+      - certbot_webroot:${VPL_JAIL_CERTBOT_WEBROOT_PATH}:ro
       - type: bind
         source: ${VPL_HOST_SSL_DIRECTORY}
         target: ${VPL_CERTIFICATES_DIR}
@@ -32,7 +32,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.certbot
-    command: "/bin/sh -c 'certbot certonly -n --webroot --webroot-path /var/www -m ${VPL_EMAIL_FOR_CERBOT} --agree-tos -d ${VPL_SERVER_NAME}'"
+    command: "/bin/sh -c 'certbot certonly -n --webroot --webroot-path /var/www -m ${VPL_EMAIL_FOR_CERTBOT} --agree-tos -d ${VPL_SERVER_NAME}'"
     depends_on:
       vpl-jail:
         condition: service_started

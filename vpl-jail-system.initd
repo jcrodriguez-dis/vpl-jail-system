@@ -320,7 +320,7 @@ function read_config {
 		read_config_var "$CONFIG_FILE" FIREWALL 0
 		read_config_var "$CONFIG_FILE" ALLOWSUID false
 		read_config_var "$CONFIG_FILE" USETMPFS true
-		read_config_var "$CONFIG_FILE" CERBOT_WEBROOT_PATH
+		read_config_var "$CONFIG_FILE" CERTBOT_WEBROOT_PATH
 		if [ "${USETMPFS,,}" != "false" ] ; then
 			read_config_var "$CONFIG_FILE" HOMESIZE 30%			
 		else
@@ -392,8 +392,8 @@ function start_vpl {
 		check_selinux_vpl
 		read_config start
 		set_controldir
-		if [ "$CERBOT_WEBROOT_PATH" != "" ] ; then
-			create_check_dir "$CERBOT_WEBROOT_PATH" 0700
+		if [ "$CERTBOT_WEBROOT_PATH" != "" ] ; then
+			create_check_dir "$CERTBOT_WEBROOT_PATH" 0700
 		fi
 		if [ -z "$IN_CONTAINER" ] ; then
 			create_check_dir "$JAILPATH" 0755
