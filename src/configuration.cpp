@@ -12,18 +12,18 @@
 
 Configuration *Configuration::singlenton = 0;
 
-string Configuration::generateCleanPATH(string path, string dirtyPATH){
+string Configuration::generateCleanPATH(string path, string dirtyPATH) {
 	string dir;
 	size_t pos=0;
 	size_t found;
 	string clean;
-	while(true){
-		if((found=dirtyPATH.find(':', pos)) != string::npos){
+	while(true) {
+		if((found=dirtyPATH.find(':', pos)) != string::npos) {
 			dir = dirtyPATH.substr(pos,found-pos);
 		}else{
 			dir = dirtyPATH.substr(pos);
 		}
-		if(Util::dirExistsFollowingSymLink(path+dir)){
+		if(Util::dirExistsFollowingSymLink(path+dir)) {
 			if(clean.size()>0){
 				clean += ':';
 			}
@@ -37,7 +37,7 @@ string Configuration::generateCleanPATH(string path, string dirtyPATH){
 	return "";
 }
 
-void Configuration::checkConfigFile(string fileName, string men){
+void Configuration::checkConfigFile(string fileName, string men) {
 	const int ga_mask = 077;
 	struct stat info;
 	if(lstat(fileName.c_str(), &info))
@@ -49,46 +49,71 @@ void Configuration::checkConfigFile(string fileName, string men){
 }
 
 void Configuration::readEnvironmentConfigVars(ConfigData &data) {
-	for(ConfigData::iterator i=data.begin();i != data.end(); i++){
+	extern char **environ;
+	for(ConfigData::iterator i=data.begin(); i != data.end(); i++) {
 		string parameter=i->first;
 		string new_value = Util::getEnv("VPL_JAIL_" + parameter);
         if (new_value.length() > 0) {
 			data[parameter] = new_value;
-			Logger::log(LOG_INFO,"Using parameter from environment var VPL_JAIL_%s = %s",
+			Logger::log(LOG_INFO, "Using parameter from environment var VPL_JAIL_%s = %s",
 			            parameter.c_str(), new_value.c_str());
 		}
     }
+	for (char **environArray = environ; *environArray; environArray++) {
+		string name = *environArray;
+		name = Util::toUppercase(name);
+		if (name.find("VPL_JAIL_") == 0 && data.find(name) == data.end()) {
+			Logger::log(LOG_ERR,"Warning: Unknown environment var %s", *environArray);
+		}
+	}
 }
 
-void Configuration::readConfigFile(){
+void Configuration::readConfigFile() {
 	ConfigData configDefault;
 	// Values used if parameter not present in configuration file
-	configDefault["MAXTIME"] = "1200";
-	configDefault["MAXFILESIZE"] = "64 Mb";
-	configDefault["MAXMEMORY"] = "2000 Mb";
-	configDefault["MAXPROCESSES"] = "500";
-	configDefault["MIN_PRISONER_UGID"] = "10000";
-	configDefault["MAX_PRISONER_UGID"] = "20000";
-	configDefault["JAILPATH"] = "/jail";
-	configDefault["CONTROLPATH"] = "/var/vpl-jail-system";
-	configDefault["TASK_ONLY_FROM"] = "";
-	configDefault["INTERFACE"] = "";
 	configDefault["PORT"] = "80";
 	configDefault["SECURE_PORT"] = "443";
-	configDefault["URLPATH"] = "/";
-	configDefault["ENVPATH"] = Util::getEnv("PATH");
-	configDefault["LOGLEVEL"] = "0";
-	configDefault["FAIL2BAN"] = "0";
+	configDefault["INTERFACE"] = "";
 	configDefault["SSL_CIPHER_LIST"] = "";
 	configDefault["SSL_CIPHER_SUITES"] = "";
 	configDefault["HSTS_MAX_AGE"] = "";
 	configDefault["SSL_CERT_FILE"] = "/etc/vpl/cert.pem";
 	configDefault["SSL_KEY_FILE"] = "/etc/vpl/key.pem";
-	configDefault["USE_CGROUP"] = "false";
+	configDefault["CERTBOT_WEBROOT_PATH"] = "";
+
+	configDefault["URLPATH"] = "/";
+	configDefault["TASK_ONLY_FROM"] = "";
+	configDefault["ALLOWSUID"] = "false";
+	configDefault["FAIL2BAN"] = "0";
+	configDefault["FIREWALL"] = "0";
+	configDefault["LOGLEVEL"] = "0";
+	configDefault["JAILPATH"] = "/jail";
+	configDefault["CONTROLPATH"] = "/var/vpl-jail-system";
+	configDefault["USETMPFS"] = "";
+	configDefault["HOMESIZE"] = "";
+	configDefault["SHMSIZE"] = "";
+
+	configDefault["MAXTIME"] = "1200";
+	configDefault["MAXFILESIZE"] = "64 Mb";
+	configDefault["MAXMEMORY"] = "2000 Mb";
+	configDefault["MAXPROCESSES"] = "500";
 	configDefault["REQUEST_MAX_SIZE"] = "128 Mb";
 	configDefault["RESULT_MAX_SIZE"] = "1 Mb";
-	configDefault["CERTBOT_WEBROOT_PATH"] = "";
+
+	configDefault["MIN_PRISONER_UGID"] = "10000";
+	configDefault["MAX_PRISONER_UGID"] = "20000";
+	configDefault["ENVPATH"] = Util::getEnv("PATH");
+	configDefault["USE_CGROUP"] = "false";
+
 	ConfigData data = ConfigurationFile::readConfiguration(configPath, configDefault);
+	// Check unkown parameters
+	for(ConfigData::iterator i = data.begin(); i != data.end(); i++) {
+		string param = i->first;
+		param = Util::toUppercase(param);
+		if(configDefault.find(param) == data.end())
+			Logger::log(LOG_ERR,"Error: Unknown config param %s", param.c_str());
+	}
+
 	readEnvironmentConfigVars(data);
 	minPrisoner = atoi(data["MIN_PRISONER_UGID"].c_str());
 	if(minPrisoner < JAIL_MIN_PRISONER_UID)
@@ -118,7 +143,7 @@ void Configuration::readConfigFile(){
 	istringstream iss(data["TASK_ONLY_FROM"]);
 	for (string ipnet; iss >> ipnet; ) {
 		taskOnlyFrom.push_back(ipnet);
-		Logger::log(LOG_INFO,"TASK_ONLY_FROM found IP/net %s", ipnet.c_str());
+		Logger::log(LOG_INFO, "TASK_ONLY_FROM found IP/net %s", ipnet.c_str());
 	}
 	interface = data["INTERFACE"];
 	port = atoi(data["PORT"].c_str());

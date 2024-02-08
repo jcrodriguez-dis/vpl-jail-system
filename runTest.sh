@@ -100,17 +100,20 @@ function Unit_tests() {
 		rm -R cgroup.test 2> /dev/null
 		cp -a cgroup cgroup.test
 		if [ -x "$(command -v valgrind)" ] ; then
-			valgrind ./program-test
+			valgrind ./program-test 2> run.log
 		else
 			writeInfo "   " "Please, install valgrind for better checks"
-			./program-test
+			./program-test 2> run.log
 		fi
 		result=$?
 		rm -R cgroup.test 2> /dev/null
 		rm program-test
+		if [ "$result" != "0" -o "$SHOW_LOG" != "" ] ; then
+			cat run.log
+		fi
+		rm run.log
 		cd ..
 		if [ "$result" != "0" ] ; then
-			tail /var/log/syslog
 			return 1
 		else
 			return 111
