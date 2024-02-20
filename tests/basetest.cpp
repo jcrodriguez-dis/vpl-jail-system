@@ -5,8 +5,11 @@
  **/
 
 #include "basetest.h"
+#include "../src/log.h"
+
 vector<BaseTest*> BaseTest::tests;
 
 int main() {
+    Logger::setLogLevel(LOG_DEBUG, true);
     return BaseTest::launchAll();
 }
