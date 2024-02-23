@@ -39,11 +39,11 @@ function vpl_detect_package_manager() {
 		dnf -y -q check-update
 		dnf -y -q upgrade
 		function vpl_install_base {
-			dnf -y install $1 >> "$LOGFILE"
+			dnf -y -q install $1 >> "$LOGFILE"
 			return $?
 		}
 		function vpl_install_check {
-			dnf list $1 &> /dev/null
+			dnf -y -q list $1 &> /dev/null
 			return $?
 		}
 		PMTYPE="dnf"
@@ -62,7 +62,7 @@ function vpl_detect_package_manager() {
 		}
 		PMTYPE="apt"
 		if [ "$(command -v add-apt-repository)" != "" ] ; then
-			add-apt-repository universe &> /dev/null
+			add-apt-repository -y universe &> /dev/null
 		fi
 
 	elif [ "$(command -v apk)" != "" ] ; then
@@ -71,11 +71,11 @@ function vpl_detect_package_manager() {
 		apk --no-interactive update >> "$LOGFILE"
 		apk --no-interactive upgrade >> "$LOGFILE"
 		function vpl_install_base {
-			apk add $1 >> "$LOGFILE"
+			apk --no-interactive add $1 >> "$LOGFILE"
 			return $?
 		}
 		function vpl_install_check {
-			apk add $1 &> /dev/null
+			apk --no-interactive add $1 &> /dev/null
 			return $?
 		}
 		PMTYPE="apk"
