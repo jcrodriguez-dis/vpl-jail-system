@@ -57,16 +57,16 @@ int main(int const argc, const char ** const argv, char * const * const env) {
 		exitStatus = EXIT_SUCCESS;
 	}
 	catch(HttpException &exception) {
-		Logger::log(LOG_EMERG, "%s", exception.getLog().c_str());
+		Logger::log(LOG_WARNING, "%s", exception.getLog().c_str());
 		exitStatus=static_cast<int>(httpError);
 	}
 	catch(const string &me) {
 		exitStatus = EXIT_FAILURE;
-		Logger::log(LOG_EMERG, "%s", me.c_str());
+		Logger::log(LOG_WARNING, "%s", me.c_str());
 	}
 	catch(const char * const me) {
 		exitStatus = EXIT_FAILURE;
-		Logger::log(LOG_EMERG, "%s",me);
+		Logger::log(LOG_WARNING, "%s",me);
 	}
 	catch(std::exception &e) {
 		exitStatus = EXIT_FAILURE;

@@ -135,12 +135,12 @@ public:
 		this->newContext(certFile, keyFile);
 	}
 
-	static const char *getError(){
-		int error_n=ERR_get_error();
-		const char* error_string="No detail";
-		if(error_n !=0){
-			error_string = ERR_error_string(error_n,NULL);
-			if(error_string == NULL) {
+	static const char *getError() {
+		int error_n = ERR_get_error();
+		const char* error_string = "No detail";
+		if (error_n != 0) {
+			error_string = ERR_error_string(error_n, NULL);
+			if (error_string == NULL) {
 				error_string ="unregister error";
 			}
 		}
@@ -204,7 +204,7 @@ public:
 
 class SSLRetry{
 	struct pollfd devices[1];
-	time_t currentTime,timeLimit;
+	time_t currentTime, timeLimit;
 	string message;
 	const SSL *ssl;
 public:
@@ -258,7 +258,7 @@ public:
 					scode = "UNKNOW SSL_ERROR ";
 				}
 				throw HttpException(internalServerErrorCode,
-				      	message+scode+SSLBase::getError()); //Error
+				      	message + scode + SSLBase::getError()); //Error
 		}
 		ERR_clear_error();
 		time_t wait = (timeLimit - currentTime) * 1000;
@@ -268,7 +268,7 @@ public:
 		}
 		currentTime = time(NULL);
 		if (currentTime > timeLimit || res == 0) {
-			throw HttpException(requestTimeoutCode, message+": timeout");
+			throw HttpException(requestTimeoutCode, message + ": timeout");
 		}
 		return false;
 	}
