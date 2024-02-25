@@ -324,17 +324,17 @@ public:
 	void daemonize(){
 		pid_t child_pid = fork();
 		if(child_pid < 0) {
-			Logger::log(LOG_EMERG,"daemonize() => fork() fail (child_pid < 0)");
+			Logger::log(LOG_EMERG, "daemonize() => fork() fail (child_pid < 0)");
 			exit(EXIT_FAILURE);
 		}
 		if(child_pid > 0) _exit(EXIT_SUCCESS); //gradparent exit
 		if(setsid() < 0) {
-			Logger::log(LOG_EMERG,"daemonize() => (setsid() < 0)");
+			Logger::log(LOG_EMERG, "daemonize() => (setsid() < 0)");
 			exit(EXIT_FAILURE);
 		}
 		pid_t grandchild_pid = fork();
 		if(grandchild_pid < 0) {
-			Logger::log(LOG_EMERG,"daemonize() => fork() fail (grandchild_pid < 0)");
+			Logger::log(LOG_EMERG, "daemonize() => fork() fail (grandchild_pid < 0)");
 			exit(EXIT_FAILURE);
 		}
 		if(grandchild_pid > 0) _exit(EXIT_SUCCESS); //parent exit

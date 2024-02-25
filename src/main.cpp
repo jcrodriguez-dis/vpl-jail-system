@@ -37,11 +37,11 @@ int main(int const argc, const char ** const argv, char * const * const env) {
 		conf->readConfigFile(); // Reread configuration file to show values in log
 	}
 	if (conf->getJailPath() == "" && ! inContaier) {
-		Logger::log(LOG_CRIT, "Jail directory root \"/\" but not running in container");
+		Logger::log(LOG_EMERG, "Jail directory root \"/\" but not running in container");
 		exit(1);
 	}
 	if (conf->getJailPath() != "" && inContaier) {
-		Logger::log(LOG_CRIT, "Running in container but Jail directory not root \"/\"");
+		Logger::log(LOG_EMERG, "Running in container but Jail directory not root \"/\"");
 		exit(1);
 	}
 	int exitStatus=static_cast<int>(internalError);
@@ -52,7 +52,7 @@ int main(int const argc, const char ** const argv, char * const * const env) {
 		} else {
 			runner->daemonize();
 		}
-		Logger::log(LOG_INFO, "Server started");
+		Logger::log(LOG_INFO, "VPL Jail Server %s started", Util::version());
 		runner->loop();
 		exitStatus = EXIT_SUCCESS;
 	}

@@ -36,41 +36,41 @@ class SSLBase{
 		#ifdef HAVE_TLS_SERVER_METHOD
 		const SSL_METHOD *method = TLS_server_method();
 		if (method == NULL) {
-			Logger::log(LOG_EMERG,"TLS_server_method() fail: %s",getError());
+			Logger::log(LOG_ERR, "TLS_server_method() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
 		#else
 		const SSL_METHOD *method = SSLv23_server_method();
 		if (method == NULL) {
-			Logger::log(LOG_EMERG,"SSLv23_server_method() fail: %s",getError());
+			Logger::log(LOG_ERR, "SSLv23_server_method() fail: %s",getError());
 			_exit(EXIT_FAILURE);
 		}
 		#endif
 		bool fail = false;
 		SSL_CTX *newContext;
 		if ((newContext = SSL_CTX_new((SSL_METHOD *)method)) == NULL) { //Conversion for backward compatibility
-			Logger::log(LOG_EMERG,"SSL_CTX_new() fail: %s", getError());
+			Logger::log(LOG_ERR, "SSL_CTX_new() fail: %s", getError());
 			fail = true;
 		} else if (SSL_CTX_use_certificate_chain_file(newContext, certFile.c_str()) != 1) {
-			Logger::log(LOG_EMERG,"SSL_CTX_use_certificate_chain_file() fail: %s", getError());
+			Logger::log(LOG_ERR, "SSL_CTX_use_certificate_chain_file() fail: %s", getError());
 			fail = true;
 		} else if (SSL_CTX_use_PrivateKey_file(newContext, keyFile.c_str(), SSL_FILETYPE_PEM) != 1) {
-			Logger::log(LOG_EMERG,"SSL_CTX_use_PrivateKey_file() fail: %s", getError());
+			Logger::log(LOG_ERR, "SSL_CTX_use_PrivateKey_file() fail: %s", getError());
 			fail = true;
 		} else if ( !SSL_CTX_check_private_key(newContext) ) {
-			Logger::log(LOG_EMERG,"SSL_CTX_check_private_key() fail: %s", getError());
+			Logger::log(LOG_ERR, "SSL_CTX_check_private_key() fail: %s", getError());
 			fail = true;
 		} else if ( cipherList.size() && SSL_CTX_set_cipher_list(newContext, cipherList.c_str()) == 0) {
-			Logger::log(LOG_EMERG,"SSL_CTX_set_cipher_list() fail: %s", getError());
+			Logger::log(LOG_ERR, "SSL_CTX_set_cipher_list() fail: %s", getError());
 			fail = true;
 		} else if ( cipherSuites.size() ) {
 			#ifdef HAVE_SSL_CTX_SET_CIPHERSUITES
 				if (SSL_CTX_set_ciphersuites(newContext, cipherSuites.c_str()) == 0) {
-					Logger::log(LOG_EMERG,"SSL_CTX_set_ciphersuites() fail: %s", getError());
+					Logger::log(LOG_ERR, "SSL_CTX_set_ciphersuites() fail: %s", getError());
 					fail = true;
 				}
 			#else
-				Logger::log(LOG_EMERG,"SSL_CTX_set_ciphersuites() not available but parameter SSL_CIPHER_SUITES set");
+				Logger::log(LOG_ERR, "SSL_CTX_set_ciphersuites() not available but parameter SSL_CIPHER_SUITES set");
 				fail = true;
 			#endif
 		}
@@ -90,9 +90,9 @@ class SSLBase{
 		this->timeCertificateFileModification = Util::timeOfFileModification(certFile);
 		if (this->context != NULL) {
 			SSL_CTX_free(this->context);
-			Logger::log(LOG_WARNING,"SSL certificate and private key files renew and reloaded.");
+			Logger::log(LOG_NOTICE, "SSL certificate and private key files renew and reloaded.");
 		} else {
-			Logger::log(LOG_INFO,"SSL certificate and private key files loaded.");
+			Logger::log(LOG_INFO, "SSL certificate and private key files loaded.");
 		}
 		this->context = newContext;
 	}
@@ -140,7 +140,7 @@ public:
 		const char* error_string="No detail";
 		if(error_n !=0){
 			error_string = ERR_error_string(error_n,NULL);
-			if(error_string == NULL){
+			if(error_string == NULL) {
 				error_string ="unregister error";
 			}
 		}
