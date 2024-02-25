@@ -440,7 +440,7 @@ function vpl_show_help() {
 
 function vpl_install_update_daemon() {
 	echo "Preparing daemon compilation"
-	[ -x "$(command -v autoreconf)" ] && autoreconf -i
+	[ -x "$(command -v autoreconf)" ] && (autoreconf -i &> /dev/null)
 	./configure >> "$LOGFILE"
 	echo "Compiling daemon (vpl-jail-server)"
 	make >> "$LOGFILE"
