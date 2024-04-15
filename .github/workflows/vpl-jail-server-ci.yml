@@ -1,6 +1,6 @@
 name: VPL jail server CI (VPL Moodle Plugin)
 
-on: [push]
+on: [workflow_dispatch]
 
 jobs:
   test:
