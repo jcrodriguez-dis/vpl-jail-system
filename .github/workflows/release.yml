@@ -1,0 +1,69 @@
+name: VPL jail server Build and Release (VPL Moodle Plugin)
+
+on: [workflow_dispatch]
+
+jobs:
+    build:
+        runs-on: ubuntu-22.04
+        strategy:
+          fail-fast: false
+    
+        steps:
+          - name: Check out repository code
+            uses: actions/checkout@v4
+            with:
+              path: ~
+    
+          - name: Install Dependencies
+            run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool
+        
+          - name: Prepare the Build
+            run: |
+              autoreconf -i
+              aclocal
+              autoheader
+              autoconf
+              automake
+              ./configure
+    
+          - name: Build and Check
+            run: make distcheck
+
+          - name: Upload package
+            uses: actions/upload-artifact@v2
+            with:
+              name: packaged-file
+              path: *.gz
+    release:
+        needs: build
+        runs-on: ubuntu-22.04
+        strategy:
+          fail-fast: false
+        
+        steps:
+            - name: Download package
+              uses: actions/download-artifact@v2
+              with:
+                name: packaged-file
+                path: ~
+            - name: Create Release
+              uses: actions/create-release@v1
+              id: create_release
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                tag_name: "V${{ github.ref }}"
+                release_name: "VPL-JAIL-SYSTEM V${{ github.ref }}"
+                draft: true
+                prerelease: true
+                body: "VPL Jail System ${{ github.ref }} Release Notes"
+                files: packaged-file
+            - name: Upload Release Asset
+              uses: actions/upload-release-asset@v1
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                upload_url: ${{ steps.create_release.outputs.upload_url }}
+                asset_path: packaged-file
+                asset_name: packaged-file
+                asset_content_type: application/gzip 
