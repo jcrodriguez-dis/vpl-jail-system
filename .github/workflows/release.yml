@@ -33,7 +33,7 @@ jobs:
             uses: actions/upload-artifact@v2
             with:
               name: packaged-file
-              path: ~/*.gz
+              path: ./*.gz
     release:
         needs: build
         runs-on: ubuntu-22.04
@@ -45,7 +45,7 @@ jobs:
               uses: actions/download-artifact@v2
               with:
                 name: packaged-file
-                path: ~
+                path: .
             - name: Create Release
               uses: actions/create-release@v1
               id: create_release
