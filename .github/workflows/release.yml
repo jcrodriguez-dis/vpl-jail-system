@@ -3,6 +3,7 @@ name: VPL jail server Build and Release (VPL Moodle Plugin)
 on: [workflow_dispatch]
 
 jobs:
+  
     build:
         runs-on: ubuntu-22.04
         strategy:
@@ -41,6 +42,11 @@ jobs:
           fail-fast: false
         
         steps:
+            - name: Extract branch name
+              id: branch
+              run: echo "##[set-output name=name;]$(echo ${GITHUB_REF#refs/heads/})"
+              env:
+                GITHUB_REF: ${{ github.ref }}
             - name: Download package
               uses: actions/download-artifact@v2
               with:
@@ -52,11 +58,11 @@ jobs:
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                tag_name: "V${{ github.ref }}"
-                release_name: "VPL-JAIL-SYSTEM V${{ github.ref }}"
+                tag_name: "V${{ steps.branch.outputs.name }}"
+                release_name: "VPL-JAIL-SYSTEM V${{ steps.branch.outputs.name }}"
                 draft: true
                 prerelease: true
-                body: "VPL Jail System ${{ github.ref }} Release Notes"
+                body: "VPL Jail System ${{ steps.branch.outputs.name }} Draft Release"
                 #files: packaged-file
             - name: Upload Release Asset
               uses: actions/upload-release-asset@v1
@@ -64,6 +70,6 @@ jobs:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                 upload_url: ${{ steps.create_release.outputs.upload_url }}
-                asset_path: packaged-file
+                asset_path: ./*.gz
                 asset_name: packaged-file
                 asset_content_type: application/gzip 
