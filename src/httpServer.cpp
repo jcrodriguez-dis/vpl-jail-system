@@ -19,6 +19,7 @@
 #include <sstream>
 #include "util.h"
 #include "httpServer.h"
+#include "xml.h"
 
 
 
@@ -187,9 +188,9 @@ void HttpJailServer::sendCode(CodeNumber code, string text){
 	};
 	string html;
 	if (code != continueCode) {
-		html = "<html><head><title>" + codeText + "</title></head><body>";
-		html += "<h2>" + codeText + "</h2>";
-		html += "<h3>" + text + "</h3>";
+		html = "<html><head><title>" + XML::encodeXML(codeText) + "</title></head><body>";
+		html += "<h2>" + XML::encodeXML(codeText) + "</h2>";
+		html += "<h3>" + XML::encodeXML(text) + "</h3>";
 		html += "</body></html>";
 	}
 	send(cnumber, codeText, html);
