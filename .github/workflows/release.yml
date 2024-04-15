@@ -33,7 +33,7 @@ jobs:
             uses: actions/upload-artifact@v2
             with:
               name: packaged-file
-              path: *.gz
+              path: ~/*.gz
     release:
         needs: build
         runs-on: ubuntu-22.04
