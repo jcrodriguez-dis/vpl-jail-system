@@ -26,7 +26,7 @@ void ConfigurationFile::parseConfigLine(ConfigData &data,const string &line){
 			string value = line.substr(match[2].rm_so,match[2].rm_eo-match[2].rm_so);
 			param = Util::toUppercase(param);
 			Util::trimAndRemoveQuotes(value);
-			if (data.find(param) == data.end()) {
+			if (data.find(param) != data.end()) {
 				Logger::log(LOG_ERR,"Warning: Repeated config param %s=%s (Using last)", param.c_str(), value.c_str());
 			}
 			data[param] = value;
