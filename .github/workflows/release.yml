@@ -36,8 +36,10 @@ jobs:
                 package_name=$(ls *.gz | head -n1)
                 package_version=${package_name#vpl-jail-system-}
                 package_version=${package_version%.tar.gz}
+                tag_name="V${package_version}dev"
                 echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
                 echo "package_name=$package_name"  >> "$GITHUB_OUTPUT"
+                echo "tag_name=$tag_name"  >> "$GITHUB_OUTPUT"
 
           - name: Upload package
             uses: actions/upload-artifact@v4
@@ -46,9 +48,22 @@ jobs:
               name: build_package.gz
               path: ${{ steps.branch.outputs.package_name }}
               if-no-files-found: error
+
+          - name: Delete previous tag and release
+            run: |
+              tag_name=${{ steps.branch.outputs.tag_name }}
+              git tag -l | grep "^${tag_name}\$"
+              [ $? -ne 0 ] && exit 1
+              git tag -d $tag_name
+              git push origin --delete $tag_name
+            env:
+              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
         outputs:
           package_version: ${{ steps.branch.outputs.package_version }}
           package_name: ${{ steps.branch.outputs.package_name }}
+          tag_name: ${{ steps.branch.outputs.tag_name }}
+
     release:
         needs: build
         runs-on: ubuntu-22.04
@@ -57,24 +72,27 @@ jobs:
         env:
           package_version: ${{ needs.build.outputs.package_version }}
           package_name: ${{ needs.build.outputs.package_name }}
+          tag_name: ${{ needs.build.outputs.tag_name }}
+
         steps:
             - name: Download package
               uses: actions/download-artifact@v4
               with:
                 name: build_package.gz
                 path: ./assets
+
             - name: Create Release
               uses: actions/create-release@v1
               id: create_release
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                tag_name: "V${{ env.package_version }}dev"
-                release_name: "VPL-JAIL-SYSTEM V${{ env.package_version }} Dev"
+                tag_name: ${{ env.tag_name }}
+                release_name: "VPL-JAIL-SYSTEM ${{ env.tag_name }}"
                 draft: false
                 prerelease: true
                 body: |
-                  ## This is an automated build of VPL-JAIL-SYSTEM V${{ env.package_version }} Dev
+                  ## This is an automated build of VPL-JAIL-SYSTEM ${{ env.tag_name }}
 
                   This release was generated through our Continuous Integration (CI) process.
                   Please be aware that this build is not an official release.
@@ -85,6 +103,7 @@ jobs:
 
                   **Use this build with caution** and consider the potential risks before
                   deployment in a production environment.
+
             - name: Upload Release Asset
               uses: actions/upload-release-asset@v1
               env:
