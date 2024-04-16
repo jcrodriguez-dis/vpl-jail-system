@@ -16,7 +16,7 @@ jobs:
               path: ~
     
           - name: Install Dependencies
-            run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool git
+            run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool git grep
         
           - name: Prepare the Build
             run: |
