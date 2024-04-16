@@ -72,16 +72,17 @@ jobs:
                 draft: false
                 prerelease: true
                 body: |
-                  "This is an automated build of VPL-JAIL-SYSTEM V$${{ env.version }}
-                  generated through our Continuous Integration (CI) process.
+                  ## This is an automated build of VPL-JAIL-SYSTEM V$${{ env.version }}
+
+                  This release was generated through our Continuous Integration (CI) process.
                   Please be aware that this build is not an official release.
-                  It is intended primarily for testing and development purposes.
+                  **It is intended primarily for testing and development purposes**.
                   Users should employ this build with the understanding that it has
                   not undergone the same level of testing as our official releases
                   and may contain bugs or unfinished features.
 
-                  Use this build with caution and consider the potential risks before
-                  deployment in a production environment."
+                  **Use this build with caution** and consider the potential risks before
+                  deployment in a production environment.
             - name: Upload Release Asset
               uses: actions/upload-release-asset@v1
               env:
