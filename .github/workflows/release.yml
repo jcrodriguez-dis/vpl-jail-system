@@ -34,8 +34,8 @@ jobs:
             id: branch
             run: |
                 package_name=$(ls *.gz | head -n1)
-                package_version=${package_name#.tar.gz}
-                package_version=${package_version:16}
+                package_version=${package_name#vpl-jail-system-}
+                package_version=${package_version%.tar.gz}
                 echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
                 echo "package_name=$package_name"  >> "$GITHUB_OUTPUT"
 
