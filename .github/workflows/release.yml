@@ -56,6 +56,7 @@ jobs:
               [ $? -ne 0 ] && exit 0
               git tag -d $tag_name
               git push origin --delete $tag_name
+              exit 0
             env:
               GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
