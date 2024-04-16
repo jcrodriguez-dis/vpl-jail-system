@@ -370,7 +370,7 @@ void Jail::commandMonitor(string monitorticket, Socket *s){
 				}
 				break;
 			case retrieve:
-				Logger::log(LOG_DEBUG,"Monitor retrieve");
+				Logger::log(LOG_DEBUG, "Monitor retrieve");
 				startTime = now;
 				timeout = now + JAIL_HARVEST_TIMEOUT;
 				ws.send("retrieve:");
@@ -385,36 +385,41 @@ void Jail::commandMonitor(string monitorticket, Socket *s){
 		}
 		ws.wait(100); // 10 times a second
 		
-		string rec=ws.receive();
-		if (ws.isClosed())
+		string rec = ws.receive();
+		if (ws.isClosed()) {
+			if (state == retrieve && timeout >= time(NULL)) {
+				continue;
+			}
 			break;
+		}
+
 		if (rec.size() > 0) { //Receive client close ws
 			ws.close();
 			break;
 		}
+
 		//Check running timeout
 		if (state != starting && timeout < time(NULL)) {
 			ws.send("message:timeout");
-			pm.cleanTask();
 			usleep(3000000);
 			ws.send("close:");
 			ws.close();
 			ws.wait(500); //wait client response
 			ws.receive();
-			return;
+			break;
 		}
+
 		if (lastTime != now && pm.isOutOfMemory()) { //Every second check memory usage
 			string ml= pm.getMemoryLimit();
 			Logger::log(LOG_DEBUG,"Out of memory (%s)",ml.c_str());
 			ws.send("message:outofmemory:"+ml);
 			usleep(1500000);
-			pm.cleanTask();
 			usleep(1500000);
 			ws.send("close:");
 			ws.close();
 			ws.wait(500); //wait client response
 			ws.receive();
-			return;
+			break;
 		}
 		lastTime = now;
 	}
