@@ -34,18 +34,19 @@ jobs:
             id: branch
             run: |
                 package_name=$(ls *.gz | head -n1)
-                version=$(echo ${package_name#refs/heads/})
-                echo "version=$version" >> "$GITHUB_OUTPUT"
+                package_version=$(echo ${package_name#refs/heads/})
+                echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
                 echo "package_name=$package_name"  >> "$GITHUB_OUTPUT"
 
           - name: Upload package
-            uses: actions/upload-artifact@v2
+            uses: actions/upload-artifact@v4
             with:
+              overwrite: true
               name: ${{ steps.branch.outputs.package_name }}
               path: ${{ steps.branch.outputs.package_name }}
               if-no-files-found: error
         outputs:
-          version: ${{ steps.branch.outputs.version }}
+          package_version: ${{ steps.branch.outputs.package_version }}
           package_name: ${{ steps.branch.outputs.package_name }}
     release:
         needs: build
@@ -53,11 +54,11 @@ jobs:
         strategy:
           fail-fast: false
         env:
-          version: ${{ needs.build.outputs.version }}
+          package_version: ${{ needs.build.outputs.package_version }}
           package_name: ${{ needs.build.outputs.package_name }}
         steps:
             - name: Download package
-              uses: actions/download-artifact@v2
+              uses: actions/download-artifact@v4
               with:
                 name: ${{ env.package_name }}
                 path: ${{ env.package_name }}
@@ -67,12 +68,12 @@ jobs:
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                tag_name: "V${{ env.version }}dev"
-                release_name: "VPL-JAIL-SYSTEM V${{ env.version }} Development"
+                tag_name: "V${{ env.package_version }}dev"
+                release_name: "VPL-JAIL-SYSTEM V${{ env.package_version }} Dev"
                 draft: false
                 prerelease: true
                 body: |
-                  ## This is an automated build of VPL-JAIL-SYSTEM V$${{ env.version }}
+                  ## This is an automated build of VPL-JAIL-SYSTEM V$${{ env.package_version }} Dev
 
                   This release was generated through our Continuous Integration (CI) process.
                   Please be aware that this build is not an official release.
@@ -89,6 +90,6 @@ jobs:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                 upload_url: ${{ steps.create_release.outputs.upload_url }}
-                asset_path: ${{ env.package_name }}
+                asset_path: "/home/runner/work/vpl-jail-system/vpl-jail-system/${{ env.package_name }}"
                 asset_name: ${{ env.package_name }}
                 asset_content_type: application/gzip 
