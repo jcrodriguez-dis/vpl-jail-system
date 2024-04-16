@@ -44,14 +44,17 @@ jobs:
               name: ${{ steps.branch.outputs.package_name }}
               path: ${{ steps.branch.outputs.package_name }}
               if-no-files-found: error
+        outputs:
+          version: ${{ steps.branch.outputs.version }}
+          package_name: ${{ steps.branch.outputs.package_name }}
     release:
         needs: build
         runs-on: ubuntu-22.04
         strategy:
           fail-fast: false
         env:
-          version: ${{ needs.build.result.package_name }}
-          package_name: ${{ needs.build.result.version }}
+          version: ${{ needs.build.outputs.version }}
+          package_name: ${{ needs.build.outputs.package_name }}
         steps:
             - name: Download package
               uses: actions/download-artifact@v2
@@ -64,7 +67,7 @@ jobs:
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                tag_name: "V${{ env.version }}"
+                tag_name: "V${{ env.version }} Prerelease $(date '+%Y-%m-%d %H:%M:%S')"
                 release_name: "VPL-JAIL-SYSTEM V${{ env.version }}"
                 draft: false
                 prerelease: true
