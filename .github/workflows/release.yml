@@ -16,7 +16,7 @@ jobs:
               path: ~
     
           - name: Install Dependencies
-            run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool
+            run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool git
         
           - name: Prepare the Build
             run: |
@@ -48,11 +48,6 @@ jobs:
               name: build_package.gz
               path: ${{ steps.branch.outputs.package_name }}
               if-no-files-found: error
-
-          - name: Install git 
-            run: |
-              apt-get install -y git
-              git --version
 
           - name: Delete previous tag
             run: |            
