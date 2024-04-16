@@ -49,11 +49,11 @@ jobs:
               path: ${{ steps.branch.outputs.package_name }}
               if-no-files-found: error
 
-          - name: Delete previous tag and release
+          - name: Delete previous tag
             run: |
               tag_name=${{ steps.branch.outputs.tag_name }}
               git tag -l | grep "^${tag_name}\$"
-              [ $? -ne 0 ] && exit 1
+              [ $? -ne 0 ] && exit 0
               git tag -d $tag_name
               git push origin --delete $tag_name
             env:
