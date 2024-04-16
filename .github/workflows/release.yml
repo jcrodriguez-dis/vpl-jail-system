@@ -34,15 +34,16 @@ jobs:
             id: branch
             run: |
                 package_name=$(ls *.gz | head -n1)
-                echo "##[set-output name=version;]$(echo ${package_name#refs/heads/})"
-                echo "##[set-output name=package_name;]$package_name"
+                version=$(echo ${package_name#refs/heads/})
+                echo "version=$version" >> "$GITHUB_OUTPUT"
+                echo "package_name=$package_name"  >> "$GITHUB_OUTPUT"
 
           - name: Upload package
             uses: actions/upload-artifact@v2
             with:
               name: ${{ steps.branch.outputs.package_name }}
               path: ${{ steps.branch.outputs.package_name }}
-              if-no-files-found: fail
+              if-no-files-found: error
     release:
         needs: build
         runs-on: ubuntu-22.04
