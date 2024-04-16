@@ -67,8 +67,8 @@ jobs:
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                tag_name: "V${{ env.version }}-Pre-$(date '+%Y-%m-%d-%H%M%S')"
-                release_name: "VPL-JAIL-SYSTEM V${{ env.version }}"
+                tag_name: "V${{ env.version }}dev"
+                release_name: "VPL-JAIL-SYSTEM V${{ env.version }} Development"
                 draft: false
                 prerelease: true
                 body: |
