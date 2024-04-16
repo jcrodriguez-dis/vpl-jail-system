@@ -74,7 +74,7 @@ jobs:
                 draft: false
                 prerelease: true
                 body: |
-                  ## This is an automated build of VPL-JAIL-SYSTEM V$${{ env.package_version }} Dev
+                  ## This is an automated build of VPL-JAIL-SYSTEM V${{ env.package_version }} Dev
 
                   This release was generated through our Continuous Integration (CI) process.
                   Please be aware that this build is not an official release.
@@ -91,6 +91,6 @@ jobs:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                 upload_url: ${{ steps.create_release.outputs.upload_url }}
-                asset_path: "./assets/build_package.gz"
+                asset_path: "./assets/${{ env.package_name }}"
                 asset_name: ${{ env.package_name }}
                 asset_content_type: application/gzip 
