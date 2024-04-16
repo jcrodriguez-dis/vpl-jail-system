@@ -7,7 +7,7 @@ jobs:
     build:
         runs-on: ubuntu-22.04
         strategy:
-          fail-fast: false
+          fail-fast: true
     
         steps:
           - name: Check out repository code
@@ -30,46 +30,60 @@ jobs:
           - name: Build and Check
             run: make distcheck
 
+          - name: Extract branch name
+            id: branch
+            run: |
+                package_name=$(ls *.gz | head -n1)
+                echo "##[set-output name=version;]$(echo ${package_name#refs/heads/})"
+                echo "##[set-output name=package_name;]$package_name"
+
           - name: Upload package
             uses: actions/upload-artifact@v2
             with:
-              name: packaged-file
-              path: ./*.gz
+              name: ${{ steps.branch.outputs.package_name }}
+              path: ${{ steps.branch.outputs.package_name }}
+              if-no-files-found: fail
     release:
         needs: build
         runs-on: ubuntu-22.04
         strategy:
           fail-fast: false
-        
+        env:
+          version: ${{ needs.build.outputs.version }}
+          package_name: ${{ needs.build.outputs.package_name }}
         steps:
-            - name: Extract branch name
-              id: branch
-              run: echo "##[set-output name=name;]$(echo ${GITHUB_REF#refs/heads/})"
-              env:
-                GITHUB_REF: ${{ github.ref }}
             - name: Download package
               uses: actions/download-artifact@v2
               with:
-                name: packaged-file
-                path: .
+                name: ${{ needs.build.outputs.package_name }}
+                path: ${{ needs.build.outputs.package_name }}
             - name: Create Release
               uses: actions/create-release@v1
               id: create_release
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                tag_name: "V${{ steps.branch.outputs.name }}"
-                release_name: "VPL-JAIL-SYSTEM V${{ steps.branch.outputs.name }}"
-                draft: true
+                tag_name: "V${{ needs.build.outputs.version }}"
+                release_name: "VPL-JAIL-SYSTEM V${{ needs.build.outputs.version }}"
+                draft: false
                 prerelease: true
-                body: "VPL Jail System ${{ steps.branch.outputs.name }} Draft Release"
-                #files: packaged-file
+                body: |
+                  "This is an automated build of VPL-JAIL-SYSTEM V${{ needs.build.outputs.version }}
+                  generated through our Continuous Integration (CI) process.
+                  Please be aware that this build is not an official release.
+                  It is intended primarily for testing and development purposes.
+                  Users should employ this build with the understanding that it has
+                  not undergone the same level of testing as our official releases
+                  and may contain bugs or unfinished features.
+
+                  Use this build with caution and consider the potential risks before
+                  deployment in a production environment."
             - name: Upload Release Asset
               uses: actions/upload-release-asset@v1
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                 upload_url: ${{ steps.create_release.outputs.upload_url }}
-                asset_path: ./*.gz
-                asset_name: packaged-file
+                asset_path: ${{ needs.build.outputs.package_name }}
+                asset_name: ${{ needs.build.outputs.package_name }}
                 asset_content_type: application/gzip 
