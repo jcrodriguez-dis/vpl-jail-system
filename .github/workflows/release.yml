@@ -50,6 +50,24 @@ jobs:
               path: ${{ steps.branch.outputs.package_name }}
               if-no-files-found: error
 
+          - name: Get previous release ID by Tag
+            id: previous_release
+            uses: actions/github-script@v6
+            with:
+              script: |
+                  const tag = '${{ steps.branch.outputs.tag_name }}';
+                  const releases = await github.rest.repos.listReleases({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo
+                  });
+                  const release = releases.data.find(release => release.tag_name === tag);
+                  if (release) {
+                    core.setOutput('id', release.id);
+                    console.log('Release ID:' + release.id);
+                  } else {
+                    console.log('Release not found for tag: ' + tag);
+                  }
+
           - name: Delete previous tag
             continue-on-error: true
             run: |
@@ -65,6 +83,7 @@ jobs:
           package_version: ${{ steps.branch.outputs.package_version }}
           package_name: ${{ steps.branch.outputs.package_name }}
           tag_name: ${{ steps.branch.outputs.tag_name }}
+          previous_release_id: ${{ steps.previous_release.outputs.id }}
 
     release:
         needs: build
@@ -75,7 +94,7 @@ jobs:
           package_version: ${{ needs.build.outputs.package_version }}
           package_name: ${{ needs.build.outputs.package_name }}
           tag_name: ${{ needs.build.outputs.tag_name }}
-          release_id_filename: "release_id_${{ needs.build.outputs.tag_name }}"
+          previous_release_id: ${{ needs.build.outputs.previous_release_id }}
 
         steps:
             - name: Download package
@@ -84,25 +103,14 @@ jobs:
                 name: build_package.gz
                 path: ./assets
 
-            - name: Download previous release ID
-              continue-on-error: true
-              uses: actions/download-artifact@v4
-              with:
-                name: ${{ env.release_id_filename }}
-                path: ./assets
-
-            - name: Get release ID
-              id: previous_release
-              run: |
-                [ -f ${{ env.release_id_filename }} ] && id=$(cat ./assets/${{ env.release_id_filename }})
-                echo "id=$id"  >> "$GITHUB_OUTPUT"
-            
             - name: Remove previous realease
-              if: steps.previous_release.outputs.id
+              if: env.previous_release_id
               uses: actions/github-script@v7
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                 script: |
-                  const release_id = ${{ steps.previous_release.outputs.id }};
+                  const release_id = ${{ env.previous_release_id }};
                   await github.rest.repos.deleteRelease({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
@@ -142,13 +150,3 @@ jobs:
                 asset_name: ${{ env.package_name }}
                 asset_content_type: application/gzip
 
-            - name: Create/update Release ID file
-              run: echo "${{ steps.create_release.outputs.id }}" > ${{ env.release_id_filename }}
-            
-            - name: Save Release ID file
-              uses: actions/upload-artifact@v4
-              with:
-                retention-days: 90
-                overwrite: true
-                name: ${{ env.release_id_filename }}
-                path: ${{ env.release_id_filename }}
