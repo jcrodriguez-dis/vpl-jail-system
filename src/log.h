@@ -29,9 +29,8 @@ public:
 		setForeground(foreground);
 		openlog("vpl-jail-system", LOG_PID, LOG_DAEMON);
 		if (level > 7 || level < 0) {
-			level=7;
+			level = 7;
 		}
-		setlogmask(level);
 		Logger::loglevel = level;
 		log(LOG_INFO, "Set log mask up to LOG_%s", levelName[level]);
 	}
