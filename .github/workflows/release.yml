@@ -89,11 +89,12 @@ jobs:
               uses: actions/download-artifact@v4
               with:
                 name: ${{ env.release_id_filename }}
+                path: ./assets
 
             - name: Get release ID
               id: previous_release
               run: |
-                [ -f ${{ env.release_id_filename }} ] && id=$(cat ${{ env.release_id_filename }})
+                [ -f ${{ env.release_id_filename }} ] && id=$(cat ./assets/${{ env.release_id_filename }})
                 echo "id=$id"  >> "$GITHUB_OUTPUT"
             
             - name: Remove previous realease
