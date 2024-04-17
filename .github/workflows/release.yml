@@ -75,6 +75,7 @@ jobs:
           package_version: ${{ needs.build.outputs.package_version }}
           package_name: ${{ needs.build.outputs.package_name }}
           tag_name: ${{ needs.build.outputs.tag_name }}
+          release_id_filename: "release_id_${{ needs.build.outputs.tag_name }}"
 
         steps:
             - name: Download package
@@ -82,6 +83,30 @@ jobs:
               with:
                 name: build_package.gz
                 path: ./assets
+
+            - name: Download previous release ID
+              continue-on-error: true
+              uses: actions/download-artifact@v4
+              with:
+                name: ${{ env.release_id_filename }}
+
+            - name: Get release ID
+              id: previous_release
+              run: |
+                [ -f ${{ env.release_id_filename }} ] && id=$(cat ${{ env.release_id_filename }})
+                echo "id=$id"  >> "$GITHUB_OUTPUT"
+            
+            - name: Remove previous realease
+              if: steps.previous_release.outputs.id
+              uses: actions/github-script@v7
+              with:
+                script: |
+                  const release_id = ${{ steps.previous_release.outputs.id }};
+                  await github.rest.repos.deleteRelease({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    release_id: release_id,
+                  });
 
             - name: Create Release
               uses: actions/create-release@v1
@@ -114,4 +139,14 @@ jobs:
                 upload_url: ${{ steps.create_release.outputs.upload_url }}
                 asset_path: "./assets/${{ env.package_name }}"
                 asset_name: ${{ env.package_name }}
-                asset_content_type: application/gzip 
+                asset_content_type: application/gzip
+
+            - name: Create/update Release ID file
+              run: echo "${{ steps.create_release.outputs.id }}" > ${{ env.release_id_filename }}
+            
+            - name: Save Release ID file
+              uses: actions/upload-artifact@v4
+              with:
+                overwrite: true
+                name: ${{ env.release_id_filename }}
+                path: ${{ env.release_id_filename }}
