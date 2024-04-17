@@ -147,6 +147,7 @@ jobs:
             - name: Save Release ID file
               uses: actions/upload-artifact@v4
               with:
+                retention-days: 90
                 overwrite: true
                 name: ${{ env.release_id_filename }}
                 path: ${{ env.release_id_filename }}
