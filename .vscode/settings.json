@@ -67,7 +67,10 @@
         "queue": "cpp",
         "stack": "cpp",
         "cstdbool": "cpp",
-        "set": "cpp"
+        "set": "cpp",
+        "iomanip": "cpp",
+        "mutex": "cpp",
+        "thread": "cpp"
     },
     "esbonio.sphinx.confDir": "${workspaceFolder}/docs/source"
 }
