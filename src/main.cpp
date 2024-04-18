@@ -19,11 +19,16 @@ int main(int const argc, const char ** const argv, char * const * const env) {
 	bool foreground = false;
 	bool inContaier = false;
 	for (int i = 1; i < argc; i++) {
-		if (string(argv[i]) == "foreground") {
+		string arg = argv[i];
+		if (arg == "foreground") {
 			foreground = true;
 		}
-		if (string(argv[i]) == "in_container") {
+		if (arg ==  "in_container") {
 			inContaier = true;
+		}
+		if (arg ==  "version" || arg == "-version") {
+			cout << Util::version() <<endl;
+			exit(EXIT_SUCCESS);
 		}
 	}
 	cout << "Server running";
