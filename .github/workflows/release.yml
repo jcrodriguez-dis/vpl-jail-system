@@ -38,6 +38,7 @@ jobs:
                 package_version=${package_name#vpl-jail-system-}
                 package_version=${package_version%.tar.gz}
                 tag_name="V${package_version}dev"
+                ([ "${{ github.ref }}" = "refs/heads/master" ] && tag_name=latest) || is_master=
                 echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
                 echo "package_name=$package_name"  >> "$GITHUB_OUTPUT"
                 echo "tag_name=$tag_name"  >> "$GITHUB_OUTPUT"
@@ -55,18 +56,18 @@ jobs:
             uses: actions/github-script@v6
             with:
               script: |
-                  const tag = '${{ steps.branch.outputs.tag_name }}';
-                  const releases = await github.rest.repos.listReleases({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo
-                  });
-                  const release = releases.data.find(release => release.tag_name === tag);
-                  if (release) {
-                    core.setOutput('id', release.id);
-                    console.log('Release ID:' + release.id);
-                  } else {
-                    console.log('Release not found for tag: ' + tag);
-                  }
+                const tag = '${{ steps.branch.outputs.tag_name }};
+                const releases = await github.rest.repos.listReleases({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo
+                });
+                const release = releases.data.find(release => release.tag_name === tag);
+                if (release) {
+                  core.setOutput('id', release.id);
+                  console.log('Release ID:' + release.id);
+                } else {
+                  console.log('Release not found for tag: ' + tag);
+                }
 
           - name: Delete previous tag
             continue-on-error: true
@@ -117,9 +118,10 @@ jobs:
                     release_id: release_id,
                   });
 
-            - name: Create Release
+            - name: Create Development Release
+              if: ${{env.tag_name}} != 'latest'
               uses: actions/create-release@v1
-              id: create_release
+              id: create_dev_release
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
@@ -128,7 +130,7 @@ jobs:
                 draft: false
                 prerelease: true
                 body: |
-                  ## This is an automated build of VPL-JAIL-SYSTEM ${{ env.tag_name }}
+                  ## This is an automated build of VPL-JAIL-SYSTEM ${{ env.tag_name }} using ${{ github.ref }}
 
                   This release was generated through our Continuous Integration (CI) process.
                   Please be aware that this build is not an official release.
@@ -140,13 +142,45 @@ jobs:
                   **Use this build with caution** and consider the potential risks before
                   deployment in a production environment.
 
-            - name: Upload Release Asset
+            - name: Upload Development Release Asset
+              if: ${{env.tag_name}} != 'latest'
               uses: actions/upload-release-asset@v1
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                upload_url: ${{ steps.create_release.outputs.upload_url }}
+                upload_url: ${{ steps.create_dev_release.outputs.upload_url }}
                 asset_path: "./assets/${{ env.package_name }}"
                 asset_name: ${{ env.package_name }}
                 asset_content_type: application/gzip
 
+            - name: Create Latest Release
+              if: ${{env.tag_name}} = 'latest'
+              uses: actions/create-release@v1
+              id: create_latest_release
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                tag_name: ${{ env.tag_name }}
+                release_name: "VPL-JAIL-SYSTEM latest release build"
+                draft: false
+                prerelease: true
+                body: |
+                  ## This is an automated build of VPL-JAIL-SYSTEM V${{ env.package_version }}
+
+                  This release was generated for **latest download** porpouse from the master branch.
+
+            - name: Prepare Latest Asset
+              if: ${{env.tag_name}} = 'latest'
+              run: |
+                mv "./assets/${{ env.package_name }}" "./assets/vpl-jail-system-latest.tar.gz"
+
+            - name: Upload Latest Release Asset
+              if: ${{env.tag_name}} = 'latest'
+              uses: actions/upload-release-asset@v1
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                upload_url: ${{ steps.create_latest_release.outputs.upload_url }}
+                asset_path: "./assets/vpl-jail-system-latest.tar.gz"
+                asset_name: vpl-jail-system-latest.tar.gz
+                asset_content_type: application/gzip
