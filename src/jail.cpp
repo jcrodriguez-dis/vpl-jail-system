@@ -632,7 +632,7 @@ void Jail::process(Socket *socket){
 					response = predefinedURLResponse(socket->getURLPath());
 				}
 				if ( response.empty() ) {
-					throw HttpException(notFoundCode, "HTTP GET: URL path not found '" + socket->getURLPath() + "'");
+					throw HttpException(notFoundCode, "HTTP GET: URL path not found");
 				}
 				server.send200(response, false, VPL_SETIWASHERECOOKIE);
 				_exit(static_cast<int>(securityStatus));

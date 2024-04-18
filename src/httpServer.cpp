@@ -29,19 +29,19 @@
  * @param input lines that form the request line and headers
  */
 void HttpJailServer::validateRequest(string expected_path){
-	if(socket->getMethod() != "POST"){
+	if(socket->getMethod() != "POST") {
+		Logger::log(LOG_DEBUG, "http METHOD not implemented %s", socket->getMethod().c_str());
 		throw HttpException(notImplementedCode,
-				"http METHOD not implemented",socket->getMethod());
+				"http METHOD not implemented");
 	}
 	if(expected_path == "")
 		expected_path="/";
-	string URLPath=socket->getURLPath();
+	string URLPath = socket->getURLPath();
 	if(URLPath == "")
-		URLPath="/";
+		URLPath = "/";
 	if(expected_path != URLPath){
-		throw HttpException(notFoundCode
-				,"http request URL path not found"
-				, "unexpected path '"+URLPath+"'");
+		Logger::log(LOG_DEBUG, "http request URL path unexpected '%s'", URLPath.c_str());
+		throw HttpException(notFoundCode, "http request URL path not found");
 	}
 }
 
