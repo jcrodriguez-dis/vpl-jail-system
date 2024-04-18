@@ -1,0 +1,168 @@
+#!/bin/bash
+# package:		Part of VPL-Jail-System
+# copyright:    Copyright (C) 2014 Juan Carlos Rodriguez-del-Pino
+# license:      GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl.txt
+# Description:  Script to download install update the VPL-Jail-System
+
+echo "Running with parameters: $@"
+
+# Fixes UID if needed
+if [ -z "$UID" ] ; then
+	UID=$(id -u)
+	EUID=$(id -u -r)
+fi
+# Checks running as root
+if [ "$UID" != "0" ] && [ "$EUID" != "0" ] ; then
+	echo "This script must be run as the root user."
+	echo "Currently, it is being run as user $USER with UID $UID and EUID $EUID."
+	exit 1
+fi
+
+umask 077
+
+LOGFILE=/var/log/vpl_installation.log
+VPL_PROGRAMS_DIR=/usr/sbin/vpl
+VPL_CONFIG_DIR=/etc/vpl
+
+{
+	touch "$LOGFILE"
+	chmod 600 "$LOGFILE"
+	date > "$LOGFILE"
+	exec &> >(tee "$LOGFILE")
+} &> /dev/null
+
+function vpl_show_help() {
+    echo "VPL Jail System Downloader and Installer/Updater"
+    echo ""
+    echo "This script facilitates the downloading, installation, and updating"
+    echo "of the VPL Jail System using assets from the GitHub repository. By"
+    echo "default, it installs or updates to the latest version in a non-"
+    echo "interactive mode with full and start options enabled. It does not"
+    echo "reinstall the same version or perform a downgrade unless the"
+    echo "'force_update' option is used."
+    echo ""
+    echo "Usage:"
+    echo "  ./download-install-vpl.sh [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  help                Displays this help message and exits."
+    echo "  version [VERSION]   Specifies the version number to install or"
+    echo "                      update to."
+    echo "  force_update        Forces the installation or update to the"
+    echo "                      specified version, regardless of the current"
+    echo "                      version."
+	echo "  local installer ops Any local installer option."
+	echo "                      See ./install-vpl-sh help for details"
+    echo ""
+    echo "Examples:"
+    echo "  ./download-install-vpl.sh"
+    echo "    Installs the latest version or updates to a higher version if"
+    echo "    available."
+    echo ""
+    echo "  ./download-install-vpl.sh version V4.0.1"
+    echo "    Installs version 4.0.1 or updates to version 4.0.1 if the"
+    echo "    current version is lower."
+    echo ""
+    echo "  ./download-install-vpl.sh force_update version V4.0.1"
+    echo "    Forces the installation or update to version 4.0.1, regardless"
+    echo "    of the current version."
+}
+
+VERSION=lastest
+TAGVERSION=lastest
+FORCEUPDATE=
+for ((i = 1; i <= 10; i++))
+do
+	current=${@:$i:1}
+	[ "$current" = "" ] && break
+	if [ "$current" = "force_update" ] ; then
+		FORCEUPDATE=true
+		let fin=$i-1
+		let ini=$i+1
+		set -- "${@:1:$fin}" "${@:$ini:10}"
+		i=$fin
+		continue
+	fi
+	if [ "$current" = "help" ] ; then
+		vpl_show_help
+		exit 0 
+	fi
+	if [ "$current" = "version" ] ; then
+		let fin=$i-1
+		let ver=$i+1
+		let ini=$i+2
+		TAGVERSION=${@:$ver:1}
+		VERSION=${TAGVERSION#V}
+		VERSION=${VERSION%dev}
+		set -- "${@:1:$fin}" "${@:$ini:10}"
+		i=$fin
+		continue
+	fi
+done
+
+URL="https://github.com/jcrodriguez-dis/vpl-jail-system/releases/download/${TAGVERSION}/vpl-jail-system-${VERSION}.tar.gz"
+[ "$VERSION" = "latest" ] && URL="https://github.com/jcrodriguez-dis/vpl-jail-system/releases/download/latest/vpl-jail-system-latest.tar.gz"
+OLDDIR=$(pwd)
+TEMPDIR="$OLDDIR/temp_vpl_install_dir"
+OUPUTFILE=downloaded_vpl.tar.gz
+rm -R "$TEMPDIR"
+mkdir "$TEMPDIR"
+cd "$TEMPDIR"
+
+[ -f $OUPUTFILE ] && rm $OUPUTFILE 
+
+if [ "$(command -v wget)" != "" ] ; then
+	echo -n "Downloading"
+	wget $URL -O $OUPUTFILE &> download_log
+	[ $? -ne 0 ] && rm $OUPUTFILE
+	printf "\r%${num_columns}s\r" 
+elif [ "$(command -v curl)" != "" ] ; then
+	echo -n "Downloading"
+	curl -o $OUPUTFILE $URL &> download_log
+	[ $? -ne 0 ] && rm $OUPUTFILE
+	printf "\r%${num_columns}s\r" 
+else
+	echo "Error: need 'wget' or 'curl' to download the software"
+	cd "$OLDDIR"
+	exit 1
+fi
+if [ ! -f $OUPUTFILE ]; then
+	echo "Error: downloading '$TAGVERSION' version"
+	cat  download_log
+	cd "$OLDDIR"
+	exit 2
+fi
+tar xvf $OUPUTFILE > filelist.txt
+if [ $? -ne 0 ] ; then
+	echo "Errors unpackging software"
+	cd "$OLDDIR"
+	exit 3
+fi
+PACKAGEDIRECTORY=$(basename $(head -n1 filelist.txt))
+LOAD_VERSION=${PACKAGEDIRECTORY#vpl-jail-system-}
+CURRENT_VERSION=0.old
+/usr/sbin/vpl/vpl-jail-server version 1> current_version.txt 2>/dev/null
+[ $? -eq 0 ] && CURRENT_VERSION=$(head -n1 current_version.txt)
+echo "Installed version '${CURRENT_VERSION#0.}' => requested version '$TAGVERSION' downloaded version '$LOAD_VERSION'"
+if [ -z "$FORCEUPDATE" ] ; then
+	if [[ "$CURRENT_VERSION" == "$LOAD_VERSION" ]] ; then
+		[[ "$VERSION" == "latest" ]] && echo "No new version available"
+		[[ "$VERSION" != "latest" ]] && echo "Downloaded version already installed. Use force_update if needed."
+		cd "$OLDDIR"
+		exit 0
+	fi
+	if [[ "$CURRENT_VERSION" > "$LOAD_VERSION" ]] ; then
+		[[ "$VERSION" == "latest" ]] && echo "Downloaded version is older than installed !!! Use force_update if needed."
+		[[ "$VERSION" != "latest" ]] && echo "To downgrade the installation you must use force_update."
+		cd "$OLDDIR"
+		exit 0
+	fi
+fi
+cd $PACKAGEDIRECTORY
+# Install/Update
+if [ "$1" == "" ] ; then
+	./install-vpl-sh noninteractive full start
+else
+	./install-vpl-sh $1 $2 $3 $4 $5
+fi
+cd "$OLDDIR"
