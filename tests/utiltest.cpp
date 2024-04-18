@@ -181,6 +181,30 @@ class UtilTest: public BaseTest {
 		assert(Util::fixMemSize(9999999999) == 9999999999);
 		assert(Util::fixMemSize(-1) == numeric_limits<long long>::max());
 	}
+
+	void testURLdecode() {
+		assert(Util::URLdecode("nada_queno/sea/valido?aqui") == "nada_queno/sea/valido?aqui");	
+		assert(Util::URLdecode("Space%20here") == "Space here"); 
+		assert(Util::URLdecode("Hello%2C%20World%21") == "Hello, World!"); 
+		assert(Util::URLdecode("caf%C3%A9") == "café"); 
+		assert(Util::URLdecode("John%26Jane%3DPartners") == "John&Jane=Partners"); 
+		assert(Util::URLdecode("10%25%20discount") == "10% discount"); 
+		assert(Util::URLdecode("path%2Fto%2Fresource") == "path/to/resource"); 
+		assert(Util::URLdecode("large+name/with%20query+string?key1=value&key2=++%20") ==
+		                       "large name/with query string?key1=value&key2=   ");
+		assert(Util::URLdecode("smile%20%F0%9F%98%8A") == "smile 😊"); 
+		assert(Util::URLdecode("email%40example.com") == "email@example.com"); 
+		assert(Util::URLdecode("%23hashTag") == "#hashTag");
+		try {
+			Util::URLdecode("hola%2");
+			assert(false);
+		} catch(HttpException e) {}
+		try {
+			Util::URLdecode("ho%gla");
+			assert(false);
+		} catch(HttpException e) {}
+	}
+
 public:
 	string name() {
 		return "Util class";
@@ -196,6 +220,7 @@ public:
 		testTimeOfFileModification();
 		testMemSizeToBytesl();
 		testMemSizeToBytesi();
+		testURLdecode();
 	}
 };
 UtilTest utilTest;

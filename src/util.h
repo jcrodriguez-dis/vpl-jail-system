@@ -602,6 +602,40 @@ public:
 	static const char *version(){
 		return VERSION;
 	}
+
+	/**
+	 * return server version
+	 */
+	static string URLdecode(const string& encoded){
+		static string hexChars = "0123456789abcdefABCDEF";
+		string decoded, hex;
+		int len = encoded.length();
+		decoded.reserve(len);
+		hex.reserve(2);
+		for (int i = 0; i < len; ++i) {
+			char currentChar = encoded[i];
+			if (currentChar == '%') {
+				if (i + 2 >= len) {
+					throw HttpException(badRequestCode,
+						"URLdecode: incomplete percent-encoding sequence at the end of string");
+				}
+				hex = encoded.substr(i + 1, 2);
+
+				if (hexChars.find(hex[0]) == string::npos || hexChars.find(hex[1]) == string::npos) {
+					throw HttpException(badRequestCode,
+						"URLdecode: non hex digits in percent-encoding sequence");
+				}
+				char value = static_cast<char>(std::strtol(hex.c_str(), nullptr, 16));
+				decoded.push_back(value);
+				i += 2;
+			} else if (currentChar == '+') {
+				decoded.push_back(' '); // Convert + to space
+			} else {
+				decoded.push_back(currentChar); // Copy other characters
+			}
+		}
+		return decoded;
+	}
 };
 
 #endif
