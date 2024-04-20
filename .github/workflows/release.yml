@@ -76,6 +76,7 @@ jobs:
             continue-on-error: true
             run: |
               tag_name=${{ steps.branch.outputs.tag_name }}
+              result=0
               (git tag -l | grep "^${tag_name}\$") || result=$?
               [ $result -ne 0 ] && exit 0
               git tag -d $tag_name
@@ -89,17 +90,35 @@ jobs:
           tag_name: ${{ steps.branch.outputs.tag_name }}
           previous_release_id: ${{ steps.previous_release.outputs.id }}
 
-    release:
+    remove_previous_release:
         needs: build
+        if: needs.build.outputs.previous_release_id
+        runs-on: ubuntu-22.04
+        steps:
+          - name: Remove previous realease
+            uses: actions/github-script@v7
+            env:
+              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            with:
+              script: |
+                const release_id = ${{ needs.build.outputs.previous_release_id }};
+                await github.rest.repos.deleteRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: release_id,
+                });
+
+    release_dev:
+        needs: build
+        if: needs.build.outputs.tag_name != 'latest'
         runs-on: ubuntu-22.04
         strategy:
           fail-fast: false
         env:
           package_version: ${{ needs.build.outputs.package_version }}
           package_name: ${{ needs.build.outputs.package_name }}
-          tag_name: ${{ needs.build.outputs.tag_name }}
+          tag_name: ${{  }}
           previous_release_id: ${{ needs.build.outputs.previous_release_id }}
-
         steps:
             - name: Download package
               uses: actions/download-artifact@v4
@@ -107,22 +126,7 @@ jobs:
                 name: build_package.gz
                 path: ./assets
 
-            - name: Remove previous realease
-              if: env.previous_release_id
-              uses: actions/github-script@v7
-              env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                script: |
-                  const release_id = ${{ env.previous_release_id }};
-                  await github.rest.repos.deleteRelease({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    release_id: release_id,
-                  });
-
             - name: Create Development Release
-              if: ${{env.tag_name}} != 'latest'
               uses: actions/create-release@v1
               id: create_dev_release
               env:
@@ -146,7 +150,6 @@ jobs:
                   deployment in a production environment.
 
             - name: Upload Development Release Asset
-              if: env.tag_name != 'latest'
               uses: actions/upload-release-asset@v1
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -156,34 +159,48 @@ jobs:
                 asset_name: ${{ env.package_name }}
                 asset_content_type: application/gzip
 
-            - name: Create Latest Release
-              if: env.tag_name == 'latest'
-              uses: actions/create-release@v1
-              id: create_latest_release
-              env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                tag_name: ${{ env.tag_name }}
-                release_name: "VPL-JAIL-SYSTEM latest release build"
-                draft: false
-                prerelease: true
-                body: |
-                  ## This is an automated build of VPL-JAIL-SYSTEM V${{ env.package_version }}
+    release_latest:
+      needs: build
+      if: needs.build.outputs.tag_name == 'latest'
+      runs-on: ubuntu-22.04
+      strategy:
+        fail-fast: false
+      env:
+        package_version: ${{ needs.build.outputs.package_version }}
+        package_name: ${{ needs.build.outputs.package_name }}
+        previous_release_id: ${{ needs.build.outputs.previous_release_id }}
+      steps:
+        - name: Download package
+          uses: actions/download-artifact@v4
+          with:
+            name: build_package.gz
+            path: ./assets
 
-                  This release was generated for **latest download** porpouse from the master branch.
+        - name: Create Latest Release
+          uses: actions/create-release@v1
+          id: create_latest_release
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            tag_name: 'latest'
+            release_name: "VPL-JAIL-SYSTEM latest release build"
+            draft: false
+            prerelease: true
+            body: |
+              ## This is an automated build of VPL-JAIL-SYSTEM V${{ env.package_version }}
 
-            - name: Prepare Latest Asset
-              if: env.tag_name == 'latest'
-              run: |
-                mv "./assets/${{ env.package_name }}" "./assets/vpl-jail-system-latest.tar.gz"
+              This release was generated for **latest download** porpouse from the master branch.
 
-            - name: Upload Latest Release Asset
-              if: ${{env.tag_name}} = 'latest'
-              uses: actions/upload-release-asset@v1
-              env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                upload_url: ${{ steps.create_latest_release.outputs.upload_url }}
-                asset_path: "./assets/vpl-jail-system-latest.tar.gz"
-                asset_name: vpl-jail-system-latest.tar.gz
-                asset_content_type: application/gzip
+        - name: Prepare Latest Asset
+          run: |
+            mv "./assets/${{ env.package_name }}" "./assets/vpl-jail-system-latest.tar.gz"
+
+        - name: Upload Latest Release Asset
+          uses: actions/upload-release-asset@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            upload_url: ${{ steps.create_latest_release.outputs.upload_url }}
+            asset_path: "./assets/vpl-jail-system-latest.tar.gz"
+            asset_name: vpl-jail-system-latest.tar.gz
+            asset_content_type: application/gzip
