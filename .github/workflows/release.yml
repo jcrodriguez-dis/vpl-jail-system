@@ -39,7 +39,7 @@ jobs:
                 package_version=${package_name#vpl-jail-system-}
                 package_version=${package_version%.tar.gz}
                 tag_name="V${package_version}dev"
-                ([ "${{ github.ref }}" == "refs/heads/master" ] && tag_name=latest) || is_master=
+                [ "${{ github.ref }}" == "refs/heads/master" ] && tag_name="latest" || nothing=
                 echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
                 echo "package_name=$package_name"  >> "$GITHUB_OUTPUT"
                 echo "tag_name=$tag_name"  >> "$GITHUB_OUTPUT"
