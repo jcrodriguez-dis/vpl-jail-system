@@ -42,7 +42,10 @@ jobs:
                 echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
                 echo "package_name=$package_name"  >> "$GITHUB_OUTPUT"
                 echo "tag_name=$tag_name"  >> "$GITHUB_OUTPUT"
-
+                echo "git ref=${{ github.ref }}"
+                echo "package_version=$package_version"
+                echo "package_name=$package_name"
+                echo "tag_name=$tag_name"
           - name: Upload package
             uses: actions/upload-artifact@v4
             with:
