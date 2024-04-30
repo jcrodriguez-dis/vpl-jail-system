@@ -1,7 +1,8 @@
 # Minimum packages for VPL jail system on Linux using APT (Debian, Ubuntu, etc.)
 "apt-utils" apt-utils
 "make" make
-"automake tools" automake
+"Autotools automake" automake
+"Autotools autoconf" autoconf
 "LSB" lsb lsb-core lsb-compat
 "C++ compiler" g++
 "SSL library" openssl

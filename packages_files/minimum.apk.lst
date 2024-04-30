@@ -1,8 +1,9 @@
 # Minimum packages for VPL jail system on Linux using APK (Alpine)
 "make" make
-"autoconf tools" autoconf
-"automake tools" automake
+"Autotools automake" automake
+"Autotools autoconf" autoconf
 "LSB" lsb-release-minimal
+"C compiler" gcc
 "C++ compiler" g++
 "SSL library" openssl
 "SSL library" openssl-dev
