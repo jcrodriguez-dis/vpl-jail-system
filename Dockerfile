@@ -6,8 +6,8 @@ USER root:root
 
 # Set default install levels: minimum < basic < standard < full
 ARG VPL_INSTALL_LEVEL=standard
-ARG VPL_JAIL_JAILPATH
-ARG VPL_JAIL_PORT
+ARG VPL_JAIL_JAILPATH=/
+ARG VPL_JAIL_PORT=80
 ARG VPL_JAIL_SECURE_PORT
 ARG VPL_CERTIFICATES_DIR=/etc/vpl/ssl
 ARG VPL_JAIL_SSL_CERT_FILE="${VPL_CERTIFICATES_DIR}/fullchain.pem"
