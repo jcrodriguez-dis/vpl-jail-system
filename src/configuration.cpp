@@ -49,21 +49,22 @@ void Configuration::checkConfigFile(string fileName, string men) {
 }
 
 void Configuration::readEnvironmentConfigVars(ConfigData &data) {
+	const char *ENV_PREFIX = "VPL_JAIL_";
 	extern char **environ;
 	for(ConfigData::iterator i=data.begin(); i != data.end(); i++) {
-		string parameter=i->first;
-		string new_value = Util::getEnv("VPL_JAIL_" + parameter);
+		string parameter = i->first;
+		string new_value = Util::getEnv(ENV_PREFIX + parameter);
         if (new_value.length() > 0) {
 			data[parameter] = new_value;
-			Logger::log(LOG_INFO, "Using parameter from environment var VPL_JAIL_%s = %s",
-			            parameter.c_str(), new_value.c_str());
+			Logger::log(LOG_INFO, "Using parameter from environment var %s%s = %s",
+			            ENV_PREFIX, parameter.c_str(), new_value.c_str());
 		}
     }
 	for (char **environArray = environ; *environArray; environArray++) {
-		string name = *environArray;
+		string name = Util::getEnvNameFromRaw(*environArray);
 		name = Util::toUppercase(name);
-		if (name.find("VPL_JAIL_") == 0 && data.find(name) == data.end()) {
-			Logger::log(LOG_ERR,"Warning: Unknown environment var %s", *environArray);
+		if (name.find(ENV_PREFIX) == 0 && data.find(name.substr(strlen(ENV_PREFIX))) == data.end()) {
+			Logger::log(LOG_ERR, "Warning: Unknown environment var %s", *environArray);
 		}
 	}
 }
