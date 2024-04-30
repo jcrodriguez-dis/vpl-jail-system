@@ -56,9 +56,9 @@ function runTests() {
 		if [ "$testresult" != "0" -a "$testresult" != "111" ] ; then
 			writeError "Errors found" " $X_MARK"
 			writeInfo "Standard error" " (max 100 lines)"
-			head -n 100 $ferrors
+			tail -n 100 $ferrors
 			writeInfo "Standard output" " (max 100 lines)"
-			head -n 100 $fmessages
+			tail -n 100 $fmessages
 			rm $fmessages 2> /dev/null
 			rm $ferrors 2> /dev/null
 			exit 1
