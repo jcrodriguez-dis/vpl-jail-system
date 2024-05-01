@@ -72,7 +72,6 @@ class UtilTest: public BaseTest {
 		assert(!Util::correctFileName("jc\005dis"));
 		assert(!Util::correctFileName("jc1di*s"));
 		assert(!Util::correctFileName("jc1dis!"));
-		assert(!Util::correctFileName("mal,c"));
 		assert(!Util::correctFileName("mal:c"));
 		assert(!Util::correctFileName("klsdjaf?"));
 		assert(!Util::correctFileName("kl@sdjaf"));
@@ -99,6 +98,7 @@ class UtilTest: public BaseTest {
 		assert(!Util::correctFileName("nose=mal"));
 		assert(!Util::correctFileName("kls*jaf.pp"));
 		assert(!Util::correctFileName("nose..mal"));
+		assert(!Util::correctFileName(".."));
 		assert(!Util::correctFileName(""));
 		assert(!Util::correctFileName(
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -107,13 +107,39 @@ class UtilTest: public BaseTest {
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
 		assert(Util::correctFileName("a"));
 		assert(Util::correctFileName("kkkk"));
+		assert(Util::correctFileName("mal,c"));
 		assert(Util::correctFileName("a.raro"));
 		assert(Util::correctFileName("normal.cvs"));
 		assert(Util::correctFileName("normal.cvs.old"));
 		assert(Util::correctFileName("normal-con-guiones.cvs"));
 		assert(Util::correctFileName("normal_con_guiones.cvs"));
 		assert(Util::correctFileName("b"));
+		assert(Util::correctFileName("."));
 		assert(Util::correctFileName("fichero con espacios. y varios . puntos"));
+	}
+	void testCorrectFilePath(){
+		assert(!Util::correctPath("jc\005dis"));
+		assert(!Util::correctPath("jc1di*s"));
+		assert(!Util::correctPath("jc1dis!"));
+		assert(!Util::correctPath(""));
+		assert(!Util::correctPath("correcto/a/../b"));
+		assert(!Util::correctPath("correcto/a/.."));
+		assert(!Util::correctPath("correcto/a/..f/b"));
+		assert(!Util::correctPath("correcto/a/..f"));
+		assert(!Util::correctPath("correcto/a/d..f/b"));
+		assert(!Util::correctPath("correcto/a/d..f"));
+		assert(Util::correctPath("/a/b/c/s"));
+		assert(Util::correctPath("./algo"));
+		assert(Util::correctPath("a.raro/b.c"));
+		assert(Util::correctPath("correcto/a/mal,c/b"));
+		assert(Util::correctPath("correcto/a/mal,c"));
+		assert(Util::correctPath("correcto/a/mal,c"));
+		assert(Util::correctPath("/dir1/dis2/normal.cvs"));
+		assert(Util::correctPath("/dir1/dis2/normal.cvs.old"));
+		assert(Util::correctPath("/dir1/dis2/normal-con-guiones.cvs"));
+		assert(Util::correctPath("/dir1/dis2/normal_con_guiones.cvs"));
+		assert(Util::correctPath("b"));
+		assert(Util::correctPath("fichero con/espacios. y/varios . puntos"));
 	}
 	void testTimeOfFileModification(){
 		string fileName = "timeOfFileModification.test_file";
@@ -205,6 +231,12 @@ class UtilTest: public BaseTest {
 		} catch(HttpException e) {}
 	}
 
+	void testGetEnvNameFromRaw() {
+		assert(Util::getEnvNameFromRaw("ALGO=") == "ALGO");	
+		assert(Util::getEnvNameFromRaw("NADA=j fd sk") == "NADA"); 
+		assert(Util::getEnvNameFromRaw("LONG_VAR=long value") == "LONG_VAR"); 
+		assert(Util::getEnvNameFromRaw("long_env_name=long values =") == "long_env_name"); 
+	}
 public:
 	string name() {
 		return "Util class";
@@ -216,11 +248,13 @@ public:
 		testItos();
 		testToUppercase();
 		testCorrectFileName();
+		testCorrectFilePath();
 		testWriteReadRemoveFile();
 		testTimeOfFileModification();
 		testMemSizeToBytesl();
 		testMemSizeToBytesi();
 		testURLdecode();
+		testGetEnvNameFromRaw();
 	}
 };
 UtilTest utilTest;

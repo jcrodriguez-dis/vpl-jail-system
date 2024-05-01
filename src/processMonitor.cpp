@@ -345,7 +345,7 @@ bool processMonitor::controlFileExists(string name) {
  * @return File content
  */
 string processMonitor::readFile(string name) {
-	return Util::readFile(getHomePath() + "/" + name);
+	return Util::readFile(getHomePath() + "/" + name, false, getHomePath().size() + 1);
 }
 
 void processMonitor::writeFile(string name, const string &data) {
@@ -374,7 +374,7 @@ void processMonitor::writeFile(string name, const string &data) {
  * Delete a file from prisoner home directory
  */
 void processMonitor::deleteFile(string name) {
-	Util::deleteFile(getHomePath() + "/" + name);
+	Util::deleteFile(getHomePath() + "/" + name, getHomePath().size() + 1);
 }
 
 bool processMonitor::installScript(string to, string from) {

@@ -43,6 +43,15 @@ string Jail::commandAvailable(long long memRequested){
 	return "ready";
 }
 
+void Jail::checkFilesNameCorrectness(mapstruct files) {
+	for(mapstruct::iterator i = files.begin(); i != files.end(); i++) {
+		if (! Util::correctPath(i->first)) {
+			Logger::log(LOG_ERR,"Incorrect filename '%s'", i->first.c_str());
+			throw HttpException(badRequestCode, "Incorrect file name");
+		}
+	}
+}
+
 void Jail::saveParseFiles(processMonitor &pm, RPC &rpc) {
 	mapstruct files = rpc.getFiles();
 	mapstruct fileencoding = rpc.getFileEncoding();
@@ -93,7 +102,10 @@ ExecutionLimits Jail::getParseExecutionLimits(RPC &rpc) {
 void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,string &executionticket){
 	mapstruct parsedata = rpc.getData();
 	Logger::log(LOG_INFO,"Request for process");
+	checkFilesNameCorrectness(rpc.getFiles());
+	checkFilesNameCorrectness(rpc.getFileToDelete());
 	processMonitor pm(adminticket, monitorticket, executionticket);
+	// TODO: Cheking file names before the fork will give a proper response to the caller or not?
 	pid_t pid=fork();
 	if(pid==0){ //new process
 		try {

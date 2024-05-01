@@ -13,6 +13,9 @@
 #include <limits>
 #include <map>
 #include <iostream>
+#ifdef HAVE_WEAKLY_CANONICAL
+#include <filesystem>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -233,8 +236,8 @@ public:
 	 */
 	static bool dirExists(const string &fileName){
 		struct stat info;
-		int res = lstat(fileName.c_str(),&info);
-		return res==0 && S_ISDIR(info.st_mode);
+		int res = lstat(fileName.c_str(), &info);
+		return res == 0 && S_ISDIR(info.st_mode);
 	}
 
 	/**
@@ -378,8 +381,21 @@ public:
 		return res;
 	}
 
+	/**
+	 * @return environment var name value or ""
+	 * @param env string var in raw format name=value
+	 */
+	static string getEnvNameFromRaw(const string env) {
+		size_t pos = env.find("=");
+		if (pos == string::npos) {
+			return env;
+		} else {
+			return env.substr(0, pos);
+		}
+	}
+
 	static bool correctFileName(const string &fn){
-		static vplregex reg("[[:cntrl:]]|[!-,]|[:-@]|[{-~]|\\\\|\\[|\\]|[\\/\\^`]|^ | $|^\\-|\\.\\.");
+		static vplregex reg("[[:cntrl:]]|[!-+]|[:-@]|[{-~]|\\\\|\\[|\\]|[\\/\\^`]|^ | $|^\\-|\\.\\.");
 		if (fn.size() < 1) return false;
 		if (fn.size() > JAIL_FILENAME_SIZE_LIMIT) return false;
 		vplregmatch found(1);
@@ -449,30 +465,62 @@ public:
 		}
 		return true;
 	}
-	//FIXME TODO with owner group
+
+	static bool pathChanged(const string& filePath, size_t pos) {
+		if (pos) {
+			// TODO Check
+			#ifdef HAVE_WEAKLY_CANONICAL
+			auto result = std::filesystem::weakly_canonical(filePath);
+			return result.string().substr(0, pos) != filePath.substr(0, pos);
+			#endif
+		}
+		return false;
+	}
+
 	/**
-	 * Write a file
+	 * Writes to a file, creating or replacing it if it already exists.
+	 * Directories are created as needed from a specified position.
+	 * 
+	 * @param name The file path where the data will be written.
+	 * @param data The content to be written to the file.
+	 * @param user The user ID and group ID to set the file's ownership to; only sets if non-zero.
+	 * @param pos The position in the path from which directories will be created;
+	 *            directories before this position are not created.
 	 */
-	static void writeFile(string name, const string &data,uid_t user = 0,size_t pos = 0){
-		FILE *fd=fopen(name.c_str(),"wb");
+
+	static void writeFile(string name, const string &data, uid_t user = 0, size_t pos = 0){
+		if (!correctPath(name)) {
+			Logger::log(LOG_ERR, "Trying to write an incorrect filename '%s'", name.c_str());
+			throw HttpException(internalServerErrorCode, "I can't write file");
+		}
+		if (dirExists(name)) {
+			Logger::log(LOG_ERR, "Trying to replace a dir with a file '%s'", name.c_str());
+			throw HttpException(internalServerErrorCode, "I can't write file");
+		}
+		if (pathChanged(name, pos)) {
+			Logger::log(LOG_ERR, "Trying go aout of base directory with file '%s'", name.c_str());
+			throw HttpException(internalServerErrorCode, "I can't write file");
+		}
+		// TODO when C++17 => use canonical or weakly_canonical from std::filesystem
+		FILE *fd = fopen(name.c_str(), "wb");
 		if (fd == NULL) {
 			string dir = getDir(name);
-			Logger::log(LOG_DEBUG,"path '%s' dir '%s'",name.c_str(), dir.c_str());
+			Logger::log(LOG_DEBUG, "path '%s' dir '%s'", name.c_str(), dir.c_str());
 			if (dir.size())
-				createDir(dir,user,pos);
-			fd = fopen(name.c_str(),"wb");
+				createDir(dir, user, pos);
+			fd = fopen(name.c_str(), "wb");
 			if (fd == NULL)
-				throw HttpException(internalServerErrorCode
-						,"I can't write file");
+				throw HttpException(internalServerErrorCode, "I can't write file");
 		}
 		if (data.size() > 0 && fwrite(data.data(), data.size(), 1, fd) != 1) {
 			fclose(fd);
-			throw HttpException(internalServerErrorCode
-					,"I can't write to file");
+			throw HttpException(internalServerErrorCode, "I can't write to file");
 		}
 		fclose(fd);
-		if (lchown(name.c_str(),user,user))
-			Logger::log(LOG_ERR, "Can't change file owner %m");
+		if (user) {
+			if (lchown(name.c_str(), user, user))
+				Logger::log(LOG_WARNING, "Can't change file owner %m");
+		}
 		bool isScript = name.size() > 4 && name.substr(name.size() - 3) == ".sh";
 		if (chmod(name.c_str(), isScript ? 0700 : 0600))
 			Logger::log(LOG_ERR, "Can't change file perm %m");
@@ -481,8 +529,14 @@ public:
 	/**
 	 * Read a file
 	 */
-	static string readFile(string name, bool throwError=true){
-		FILE *fd=fopen(name.c_str(),"rb");
+	static string readFile(string name, bool throwError = true, size_t pos = 0) {
+		if (!correctPath(name) || pathChanged(name, pos)) {
+			Logger::log(LOG_ERR,"Trying to read an incorrect filename '%s'", name.c_str());
+			if(throwError)
+				throw HttpException(internalServerErrorCode, "I can't read file");
+			return "";
+		}
+		FILE *fd = fopen(name.c_str(),"rb");
 		if(fd==NULL){
 			if(throwError)
 				throw HttpException(internalServerErrorCode
@@ -503,9 +557,15 @@ public:
 	/**
 	 * Delete a file
 	 */
-	static void deleteFile(string name){
-		if(Util::fileExists(name)){
-			Logger::log(LOG_DEBUG,"Delete \"%s\"",name.c_str());
+	static void deleteFile(string name, size_t pos = 0){
+		if (!correctPath(name)) {
+			Logger::log(LOG_ERR,"Can't unlink \"%s\": incorrect path", name.c_str());
+		} else if (dirExists(name)) {
+			Logger::log(LOG_ERR,"Can't unlink \"%s\": is a directory", name.c_str());
+		} else if (pathChanged(name, pos)) {
+			Logger::log(LOG_ERR,"Can't unlink \"%s\": is a directory", name.c_str());
+		} else if(Util::fileExists(name)){
+			Logger::log(LOG_DEBUG,"Delete \"%s\"", name.c_str());
 			if(unlink(name.c_str())){
 				Logger::log(LOG_ERR,"Can't unlink \"%s\": %m",name.c_str());
 			}
@@ -518,8 +578,8 @@ public:
 	 * else remove files owned by prisoner
 	 * and complete directories owned by prisoner (all files and directories owns by prisoner or not)
 	 */
-	static int removeDir(string dir, uid_t owner,bool force){
-		if(! dirExists(dir) ) {
+	static int removeDir(string dir, uid_t owner, bool force) {
+		if (! dirExists(dir) || ! correctPath(dir)) {
 			return 0;
 		}
 		const string parent(".."), me(".");
@@ -600,7 +660,11 @@ public:
 	 * return server version
 	 */
 	static const char *version(){
+		#ifdef VERSION
 		return VERSION;
+		#else
+		return "Unknow";
+		#endif
 	}
 
 	/**

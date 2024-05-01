@@ -57,6 +57,7 @@ protected:
 	bool commandSetPassthroughCookie(string passthroughticket, HttpJailServer & server);
 public:
 	Jail(string);
+	void checkFilesNameCorrectness(mapstruct files);
 	bool isValidIPforRequest();
 	bool httpPassthrough(string passthroughticket, Socket *socket);
 	bool isRequestingCookie(string URLPath, string &ticket);
