@@ -440,10 +440,9 @@ function vpl_show_help() {
 
 function vpl_install_update_daemon() {
 	echo "Preparing daemon compilation"
-    (
-        autoreconf -i
-	    ./configure --disable-dependency-tracking
-	) >> "$LOGFILE"
+	[ -x "$(command -v autoreconf)" ] && (autoreconf --force -i &> /dev/null)
+	./configure -q
+	[ $? -ne 0 ] && ./configure -q --disable-dependency-tracking
 	echo "Compiling daemon (vpl-jail-server)"
 	make >> "$LOGFILE"
 	if [ -d $VPL_CONFIG_DIR ] ; then
