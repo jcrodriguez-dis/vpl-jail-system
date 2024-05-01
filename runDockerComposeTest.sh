@@ -90,36 +90,37 @@ function checkDockerComposeUp() {
     chekPortInUse $SECURE_PORT
 
     docker compose up -d 2>&1 | tee $ERRORS_LOG_FILE | show_progress
-    showMessageIfError $? "Docker compose up of $PROJECT_NAME $PRIVILEGED fail"
+    showMessageIfError $? "Docker compose up of '$PROJECT_NAME' $PRIVILEGED fail"
     [[ $? != 0 ]] && return 1
     docker compose ls
 
     # Test project
     result=1
     URL="http://localhost:$PLAIN_PORT/nada"
-    wget $URL &>> $ERRORS_LOG_FILE
+    wget -t 3 $URL &>> $ERRORS_LOG_FILE
     [[ $? != 0 ]] && result=0
     rm nada &>/dev/null
-    showMessageIfError $result "Project $PROJECT_NAME $PRIVILEGED answer to incorrect URL: $URL"
+    showMessageIfError $result "Project '$PROJECT_NAME' $PRIVILEGED answer to incorrect URL: $URL"
     [[ $result != 0 ]] && return 3
     writeCorrect "Correct response for bad URL $URL" $CHECK_MARK
 
     URL="http://localhost:$PLAIN_PORT/OK"
-    wget $URL &>> $ERRORS_LOG_FILE
+    wget -t 3 $URL &>> $ERRORS_LOG_FILE
     local result=$?
     rm OK &>/dev/null
-    showMessageIfError $result "Project $PROJECT_NAME $PRIVILEGED fail for correct URL: $URL"
+    showMessageIfError $result "Project '$PROJECT_NAME' $PRIVILEGED fail for correct URL: $URL"
     [[ $result != 0 ]] && return 4
     writeCorrect "Correct response for OK URL $URL" $CHECK_MARK
-
+    writeInfo "Service '$PROJECT_NAME' logs"
+    docker compose logs vpl-jail
     # Stop container
     docker compose down 2> $ERRORS_LOG_FILE
-    showMessageIfError $? "Error in compose down of $CONTAINER_NAME $PRIVILEGED"
+    showMessageIfError $? "Error in compose down of '$PROJECT_NAME' $PRIVILEGED"
     [[ $? != 0 ]] && return 5
 
     # Remove container
     docker compose rm 2> $ERRORS_LOG_FILE
-    showMessageIfError $? "Error removing container $CONTAINER_NAME $PRIVILEGED"
+    showMessageIfError $? "Error removing container '$PROJECT_NAME' $PRIVILEGED"
     [[ $? != 0 ]] && return 6
     return 0
 }
@@ -129,47 +130,77 @@ function checkDockerCompose() {
     export VPL_INSTALL_LEVEL=$2
     export VPL_EXPOSE_PORT=$PLAIN_PORT
     export VPL_EXPOSE_SECURE_PORT=$SECURE_PORT
-    local PROJECT_NAME="$1-$2"
+    local PROJECT_NAME="jail-$1-$2"
     # Build compose
     export VPL_RUN_PRIVILEGED=false
-    writeInfo "Creating project $PROJECT_NAME"
+    writeInfo "Creating project '$PROJECT_NAME'"
     docker compose build --no-cache 2>&1 | tee $ERRORS_LOG_FILE | show_progress
-    showMessageIfError $? "Docker compose build of $PROJECT_NAME fail"
+    showMessageIfError $? "Docker compose build of '$PROJECT_NAME' fail"
     [[ $? != 0 ]] && return 1
 
     # Run project
-    checkDockerComposeUp "$CONTAINER_NAME"
+    checkDockerComposeUp "$PROJECT_NAME"
 
     # Build compose
     export VPL_RUN_PRIVILEGED=true
-    writeInfo "Creating project $PROJECT_NAME privileged"
+    writeInfo "Creating project '$PROJECT_NAME' privileged"
     docker compose build --no-cache 2>&1 | tee $ERRORS_LOG_FILE | show_progress
-    showMessageIfError $? "Docker compose build of $PROJECT_NAME privileged fail"
+    showMessageIfError $? "Docker compose build of '$PROJECT_NAME' privileged fail"
     [[ $? != 0 ]] && return 1
 
     # Run project
-    checkDockerComposeUp "$CONTAINER_NAME" "privileged"
+    checkDockerComposeUp "$PROJECT_NAME" "privileged"
 }
 
 function runTests() {
+    # Parameters:
+    #    $1 Ditro name [Optional]
+    #    $2 Install level [Optional]
     local n=0
-    # DISTROS e.g. ( alpine ubuntu debian fedora )
-	local DISTROS=( alpine )
-    # INSTALL_LEVELS e.g. ( minimum basic standard full )
-    local INSTALL_LEVELS=( minimum )
-
+	local DISTROS=( alpine ubuntu debian fedora )
+    local INSTALL_LEVELS=( minimum basic standard full )
+    local AUX=
+    if [ "$1" != "" ] ; then
+        for AUX in "${DISTROS[@]}"; do
+            if [[ "$AUX" == "$1" ]]; then
+                DISTROS=( $AUX )
+                shift
+                break
+            fi
+        done
+    fi
+    if [ "$1" != "" ] ; then
+        for AUX in "${INSTALL_LEVELS[@]}"; do
+            if [[ "$AUX" == "$1" ]]; then
+                INSTALL_LEVELS=( $AUX )
+                shift
+                break
+            fi
+        done
+    fi
     # Build distribution package
     rm vpl-jail-system-*.tar.gz &> /dev/null
-    echo "Building distribution package"
-    make distcheck &> /dev/null
-    [ $? != 0 ] && (echo "Distribution build fails" ; exit 1)
+    writeInfo "Test Matrix [ ${DISTROS[@]} ] X [ ${INSTALL_LEVELS[@]} ]"
+    writeInfo "Building distribution package"
+    (
+        autoreconf -i
+        ./configure
+        make distcheck
+     ) >> $ERRORS_LOG_FILE
+    if [ $? -ne 0 ] ; then
+        writeError "Distribution build fails. See '$ERRORS_LOG_FILE' file"
+        exit 1
+    fi
     [ -f ./config.h ] && VERSION=$(grep -E "PACKAGE_VERSION" ./config.h | sed -e "s/[^\"]\+\"\([^\"]\+\).*/\1/")
     PACKAGE="vpl-jail-system-$VERSION"
     TARPACKAGE="$PACKAGE.tar.gz"
-    [ ! -s $TARPACKAGE ] && (echo "Package file not found" ; exit 1)
+    if [ ! -s $TARPACKAGE ] ; then 
+        writeError "Package file not found"
+        exit 1
+    fi
 
     # Use distribution package
-    echo "Unpacking distribution $VERSION"
+    writeInfo "Unpacking distribution $VERSION"
     tar xvf "$PACKAGE.tar.gz" > /dev/null
     cd $PACKAGE
     local nfails=0
@@ -189,12 +220,12 @@ function runTests() {
     if [ $nfails = 0 ] ; then
         writeInfo "$CHECK_MARK All $n tests passed"
     else
-        writeInfo "$X_MARK $nfails of $n tests failed"
+        writeError "$X_MARK $nfails of $n tests failed"
     fi
     cd ..
     rm -R -f $PACKAGE
     rm $TARPACKAGE
 }
 
-writeHeading "Testing vpl-jail-system running in Docker with compose"
-runTests
+writeHeading "Testing vpl-jail-system running in Docker with compose $1 $2"
+runTests $1 $2

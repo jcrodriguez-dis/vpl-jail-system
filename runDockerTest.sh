@@ -11,14 +11,14 @@ PLAIN_PORT=8080
 SECURE_PORT=9000
 
 function writeHeading {
-	echo -e "\e[33m RUNNING \e[0m \e[34m$1\e[0m"
+	echo -e "\e[33m$2\e[0m\e[34m$1\e[0m"
 }
 function writeInfo {
-	echo -e $3 "\e[33m$1\e[0m$2"
+	echo -e $3 " \e[33m$1\e[0m$2"
 }
 function writeError {
     echo
-	echo -e "\e[31m$1\e[0m$2"
+	echo -e " \e[31m$1\e[0m$2"
 }
 
 function writeCorrect {
@@ -75,7 +75,7 @@ function chekPortInUse() {
 }
 
 function showMessageIfError() {
-    if [[ $1 != 0 ]] ; then
+    if [[ $1 -eq 0 ]] ; then
         writeError "$2"
         writeInfo "Logs:"
         if [ -f "$ERRORS_LOG_FILE" ] ; then
@@ -94,48 +94,51 @@ function checkDockerRunContainer() {
     local RUNOPTION="-e VPL_JAIL_JAILPATH=/"
     local result=
 
-    [ "$PRIVILEGED" = "privileged" ] && RUNOPTION="--privileged"
+    [ "$PRIVILEGED" = "privileged" ] && RUNOPTION="-e VPL_JAIL_JAILPATH=/jail --privileged"
     chekPortInUse $PLAIN_PORT
     chekPortInUse $SECURE_PORT
+    writeInfo "Starting container '$CONTAINER_NAME'"
     docker run --name $CONTAINER_NAME \
                $RUNOPTION \
                -d \
                -p $PLAIN_PORT:80 -p $SECURE_PORT:443 \
                -d $IMAGE_NAME &>> $ERRORS_LOG_FILE
-    showMessageIfError $? "Container $CONTAINER_NAME run fail."
+    showMessageIfError $? "The container '$CONTAINER_NAME' run fail."
     [[ $? != 0 ]] && return 2
-
+    writeInfo "Container '$CONTAINER_NAME' state:"
     docker container ls | head -1
     docker container ls | grep $CONTAINER_NAME
-    writeCorrect "Container $CONTAINER_NAME on $IMAGE_NAME image running" $CHECK_MARK
+    writeCorrect "The container '$CONTAINER_NAME' on image '$IMAGE_NAME' is running" "$CHECK_MARK"
 
     # Test container
     result=1
     URL="http://localhost:$PLAIN_PORT/nada"
-    wget $URL &>> $ERRORS_LOG_FILE
+    wget -t 3 $URL &>> $ERRORS_LOG_FILE
     [[ $? != 0 ]] && result=0
     rm nada &>/dev/null
-    showMessageIfError $result "Container $CONTAINER_NAME answer to incorrect URL: $URL"
-    [[ $result != 0 ]] && return 3
-    writeCorrect "Correct response for bad URL $URL" $CHECK_MARK
+    showMessageIfError $result "Container '$CONTAINER_NAME' answer to incorrect URL: $URL"
+    [[ $result -ne 0 ]] && return 3
+    writeCorrect "Correct response for bad URL $URL" "$CHECK_MARK"
 
     URL="http://localhost:$PLAIN_PORT/OK"
-    wget $URL &>> $ERRORS_LOG_FILE
+    wget -t 3 $URL &>> $ERRORS_LOG_FILE
     local result=$?
     rm OK &>/dev/null
-    showMessageIfError $result "Container $CONTAINER_NAME fail for correct URL: $URL"
+    showMessageIfError $result "Container '$CONTAINER_NAME' fail for correct URL: $URL"
     [[ $result != 0 ]] && return 4
-    writeCorrect "Correct response for OK URL $URL" $CHECK_MARK
-
+    writeCorrect "Correct response for OK URL $URL" "$CHECK_MARK"
+    writeInfo "Container '$CONTAINER_NAME' running logs"
+    docker logs $CONTAINER_NAME
     # Stop container
     docker stop -t 3 $CONTAINER_NAME &>> $ERRORS_LOG_FILE
-    showMessageIfError $? "Error stopping $CONTAINER_NAME"
+    showMessageIfError $? "Error stopping '$CONTAINER_NAME'"
     [[ $? != 0 ]] && return 5
 
     # Remove container
     docker container rm -f $CONTAINER_NAME &>> $ERRORS_LOG_FILE
-    showMessageIfError $? "Error removing container $CONTAINER_NAME"
+    showMessageIfError $? "Error removing container '$CONTAINER_NAME'"
     [[ $? != 0 ]] && return 6
+    writeInfo "Container '$CONTAINER_NAME' removed"
 }
 
 function checkDockerBuild() { 
@@ -147,7 +150,7 @@ function checkDockerBuild() {
     local CLEAN="removeImageContainer \"$IMAGE_NAME\" \"$CONTAINER_NAME\" \"$VOLUMEN_NAME\""
 
     # Build image
-    writeInfo "Creating image"
+    writeInfo "Creating image $IMAGE_NAME"
     docker build \
         --build-arg VPL_BASE_DISTRO=$VPL_BASE_DISTRO \
         --build-arg VPL_INSTALL_LEVEL=$VPL_INSTALL_LEVEL \
@@ -156,7 +159,7 @@ function checkDockerBuild() {
     [[ $? != 0 ]] && return 1
 
     docker image ls $IMAGE_NAME
-    writeCorrect "Image $IMAGE_NAME created" $CHECK_MARK
+    writeCorrect "Image '$IMAGE_NAME' created" "$CHECK_MARK"
 
     # Run container in privileged and non-privileged mode
     checkDockerRunContainer "$CONTAINER_NAME" "noprivileged"
@@ -167,33 +170,60 @@ function checkDockerBuild() {
         docker rmi $IMAGE_NAME &> $ERRORS_LOG_FILE
         showMessageIfError $? "Error removing image $IMAGE_NAME"
         [[ $? != 0 ]] && return 9
+        writeCorrect "Image '$IMAGE_NAME' removed" "$CHECK_MARK"
+    else
+        writeInfo "Image '$IMAGE_NAME' was kept at user request"
     fi
 }
 
 function runTests() {
+    # Parameters:
+    #    $1 Ditro name [Optional]
+    #    $2 Install level [Optional]
     local n=0
 	local DISTROS=( alpine ubuntu debian fedora )
-    if [ "$1" == "full" ] ; then
-	    local INSTALL_LEVELS=( minimum basic standard full )
-        shift
-    elif [ "$1" == "standard" ] ; then
-	    local INSTALL_LEVELS=( minimum basic standard )
-        shift
-    elif [ "$1" == "basic" ] ; then
-	    local INSTALL_LEVELS=( minimum basic)
-        shift
-    else
-	    local INSTALL_LEVELS=( minimum )
+    local INSTALL_LEVELS=( minimum basic standard full )
+    local AUX=
+    if [ "$1" != "" ] ; then
+        for AUX in "${DISTROS[@]}"; do
+            if [[ "$AUX" == "$1" ]]; then
+                DISTROS=( $AUX )
+                shift
+                break
+            fi
+        done
     fi
+    if [ "$1" != "" ] ; then
+        for AUX in "${INSTALL_LEVELS[@]}"; do
+            if [[ "$AUX" == "$1" ]]; then
+                INSTALL_LEVELS=( $AUX )
+                shift
+                break
+            fi
+        done
+    fi
+
     rm vpl-jail-system-*.tar.gz &> /dev/null
-    echo "Building distribution package"
-    make distcheck &> /dev/null
-    [ $? != 0 ] && (echo "Distribution build fails" ; exit 1)
+    writeHeading "Test Matrix [ ${DISTROS[@]} ] X [ ${INSTALL_LEVELS[@]} ]"
+    writeHeading "Building distribution package"
+    (
+        autoreconf -i
+        ./configure
+        make distcheck
+     ) > $ERRORS_LOG_FILE
+    if [ $? -ne 0 ] ; then
+        writeError "Packge build fails. See '$ERRORS_LOG_FILE' file"
+        exit 1
+    fi
     [ -f ./config.h ] && VERSION=$(grep -E "PACKAGE_VERSION" ./config.h | sed -e "s/[^\"]\+\"\([^\"]\+\).*/\1/")
     PACKAGE="vpl-jail-system-$VERSION"
     TARPACKAGE="$PACKAGE.tar.gz"
-    [ ! -s $TARPACKAGE ] && (echo "Package file not found" ; exit 1)
-    echo "Unpacking distribution $VERSION"
+    if [ ! -s $TARPACKAGE ] ; then 
+        writeError "Package file not found"
+        exit 1
+    fi
+
+    writeHeading "Unpacking distribution $VERSION"
     tar xvf "$PACKAGE.tar.gz" > /dev/null
     cd $PACKAGE
     local nfails=0
@@ -203,11 +233,11 @@ function runTests() {
         do
             SECONDS=0
             ((n=n+1))
-            writeInfo "Test $n: " "Testing vpl-jail-system in $VPL_BASE_DISTRO install $VPL_INSTALL_LEVEL"
+            writeHeading "Testing vpl-jail-system in $VPL_BASE_DISTRO install $VPL_INSTALL_LEVEL" "Test $n: "
             checkDockerBuild $VPL_BASE_DISTRO $VPL_INSTALL_LEVEL $1
             [ "$?" != "0" ] && ((nfails++))
             ELT=$SECONDS
-            writeInfo "Test took " "$(($ELT / 60)) minutes and $(($ELT % 60)) seconds"
+            writeHeading "Test took $(($ELT / 60)) minutes and $(($ELT % 60)) seconds"
         done
     done
     if [ $nfails = 0 ] ; then
@@ -218,7 +248,8 @@ function runTests() {
     cd ..
     rm -R $PACKAGE
     rm $TARPACKAGE
+    return $nfails
 }
 
-writeHeading "Testing vpl-jail-system running in Docker $1"
-runTests $1 $2
+writeHeading "vpl-jail-system running in Docker $1 $2 $3" "TESTING "
+runTests $1 $2 $3
