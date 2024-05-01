@@ -70,7 +70,9 @@
         "set": "cpp",
         "iomanip": "cpp",
         "mutex": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "filesystem": "cpp",
+        "codecvt": "cpp"
     },
     "esbonio.sphinx.confDir": "${workspaceFolder}/docs/source"
 }

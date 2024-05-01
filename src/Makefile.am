@@ -16,5 +16,10 @@ log.cpp log.h
 
 # the library search path.
 #AM_LDFLAGS = $(all_libraries)
-
-AM_CXXFLAGS = -std=c++11
+# Detected C++17 or higher
+if CPP17
+AM_CXXFLAGS=
+else
+# Minimum C++ version
+AM_CXXFLAGS= -std=c++11
+endif

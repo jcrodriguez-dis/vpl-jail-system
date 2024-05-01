@@ -73,7 +73,7 @@
 #define HAVE_SSL_CTX_SET_CIPHERSUITES 1
 
 /* Define to 1 if stdbool.h conforms to C99. */
-#define HAVE_STDBOOL_H 1
+/* #undef HAVE_STDBOOL_H */
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
@@ -125,6 +125,10 @@
 /* Define to 1 if you have the <vfork.h> header file. */
 /* #undef HAVE_VFORK_H */
 
+/* Define to 1 if you have the weakly_canonical function using the filesystem
+   header file */
+/* #undef HAVE_WEAKLY_CANONICAL */
+
 /* Define to 1 if `fork' works. */
 #define HAVE_WORKING_FORK 1
 
@@ -132,7 +136,7 @@
 #define HAVE_WORKING_VFORK 1
 
 /* Define to 1 if the system has the type `_Bool'. */
-#define HAVE__BOOL 1
+/* #undef HAVE__BOOL */
 
 /* Define to 1 if `lstat' dereferences a symlink specified with a trailing
    slash. */

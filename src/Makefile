@@ -197,6 +197,7 @@ CFLAGS = -g -O2
 CPP = gcc -E
 CPPFLAGS = -Wall
 CXX = g++
+CXXCPP = g++ -E
 CXXDEPMODE = depmode=gcc3
 CXXFLAGS = -g -O2
 CYGPATH_W = echo
@@ -288,13 +289,16 @@ util.cpp util.h requestmessage.h rpc.h xmlrpc.h xml.h xml.cpp jsonrpc.h json.h j
 cgroup.cpp cgroup.h vplregex.h\
 log.cpp log.h
 
+# Minimum C++ version
+#AM_CXXFLAGS = -std=c++11
 
 # set the include path found by configure
 #INCLUDES= $(all_includes)
 
 # the library search path.
 #AM_LDFLAGS = $(all_libraries)
-AM_CXXFLAGS = -std=c++11
+# Detected C++17 or higher
+AM_CXXFLAGS = 
 all: all-am
 
 .SUFFIXES:
