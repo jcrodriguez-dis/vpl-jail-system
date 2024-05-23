@@ -1,7 +1,7 @@
 # Basic packages for VPL jail system on Linux using DNF (fedora, etc.)
 "General purpose debugger (GNU)" gdb
 "DDD graphical front end debugger (GNU)" ddd
-"Java (OpenJDK)" java-17-openjdk-devel java-11-openjdk-devel java-1.8.0-openjdk-devel java-1.7.0-openjdk-devel
+"Java (OpenJDK)" java-21-openjdk-devel java-17-openjdk-devel java-11-openjdk-devel java-1.8.0-openjdk-devel java-1.7.0-openjdk-devel
 "JavaFX" openjfx
 "Junit framework" junit
 "PHP interpreter" php-cli
