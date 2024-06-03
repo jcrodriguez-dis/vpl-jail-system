@@ -17,6 +17,7 @@ jobs:
       - name: Install required software
         run: |
           pip install websockets
+          sudo apt-get update
           sudo apt-get install valgrind
 
       - name: Run tests of autotools
