@@ -141,6 +141,29 @@ class UtilTest: public BaseTest {
 		assert(Util::correctPath("b"));
 		assert(Util::correctPath("fichero con/espacios. y/varios . puntos"));
 	}
+	void testPathChanged(){
+		assert(!Util::pathChanged("files.test/dis", 0));
+		assert(!Util::pathChanged("files.test/dis", 12));
+		assert(!Util::pathChanged("files.test/a", 12));
+		assert(!Util::pathChanged("files.test/a/b", 12));
+		assert(!Util::pathChanged("files.test/a/b", 14));
+		assert(!Util::pathChanged("correcto/a/b", 9));
+		assert(!Util::pathChanged("a/b/c/s", 2));
+		assert(Util::pathChanged("files.test/a/l1", 12));
+		assert(Util::pathChanged("files.test/a/l1", 14));
+		assert(Util::pathChanged("files.test/a/l1/b/c", 12));
+		assert(Util::pathChanged("files.test/a/l1/vv", 14));
+		assert(Util::pathChanged("files.test/a/l2", 12));
+		assert(Util::pathChanged("files.test/a/l2", 14));
+		assert(Util::pathChanged("files.test/a/l2/b/c", 12));
+		assert(Util::pathChanged("files.test/a/l2/vv", 14));
+		assert(Util::pathChanged("files.test/a/b/l3", 12));
+		assert(Util::pathChanged("files.test/a/b/l3", 14));
+		assert(Util::pathChanged("files.test/a/b/l3", 16));
+		assert(Util::pathChanged("files.test/a/b/l3/b/c", 12));
+		assert(Util::pathChanged("files.test/a/b/l3/vv", 14));
+		assert(Util::pathChanged("files.test/a/b/l3/vv", 16));
+	}
 	void testTimeOfFileModification(){
 		string fileName = "timeOfFileModification.test_file";
 		time_t now = time(NULL);
@@ -249,6 +272,7 @@ public:
 		testToUppercase();
 		testCorrectFileName();
 		testCorrectFilePath();
+		testPathChanged();
 		testWriteReadRemoveFile();
 		testTimeOfFileModification();
 		testMemSizeToBytesl();

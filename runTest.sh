@@ -99,6 +99,14 @@ function Unit_tests() {
 	if test -f program-test ; then
 		rm -R cgroup.test 2> /dev/null
 		cp -a cgroup cgroup.test
+		rm -R files.test 2> /dev/null
+		mkdir files.test
+		mkdir files.test/a
+		mkdir files.test/b
+		mkdir files.test/a/b
+		ln -s c files.test/a/l1
+		ln -s ../a/b files.test/a/l2
+		ln -s ../../b files.test/a/b/l3
 		if [ -x "$(command -v valgrind)" ] ; then
 			valgrind ./program-test 2> run.log
 		else
@@ -107,6 +115,7 @@ function Unit_tests() {
 		fi
 		result=$?
 		rm -R cgroup.test 2> /dev/null
+		rm -R files.test 2> /dev/null
 		rm program-test
 		if [ "$result" != "0" -o "$SHOW_LOG" != "" ] ; then
 			cat run.log

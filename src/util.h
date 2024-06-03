@@ -468,11 +468,18 @@ public:
 
 	static bool pathChanged(const string& filePath, size_t pos) {
 		if (pos) {
-			// TODO Check
-			#ifdef HAVE_WEAKLY_CANONICAL
-			auto result = std::filesystem::weakly_canonical(filePath);
-			return result.string().substr(0, pos) != filePath.substr(0, pos);
-			#endif
+
+			size_t found;
+			string dn;
+			struct stat info;
+			while((found = filePath.find('/', pos)) != string::npos){
+				dn = filePath.substr(0, found);
+				if (lstat(dn.c_str(), &info) != 0) return false;
+				if (S_ISLNK(info.st_mode)) return true;
+				pos = found + 1;
+			}
+			if (lstat(filePath.c_str(), &info) != 0) return false;
+			if (S_ISLNK(info.st_mode)) return true;
 		}
 		return false;
 	}
@@ -498,7 +505,7 @@ public:
 			throw HttpException(internalServerErrorCode, "I can't write file");
 		}
 		if (pathChanged(name, pos)) {
-			Logger::log(LOG_ERR, "Trying go aout of base directory with file '%s'", name.c_str());
+			Logger::log(LOG_ERR, "Trying go out of base directory with file '%s'", name.c_str());
 			throw HttpException(internalServerErrorCode, "I can't write file");
 		}
 		// TODO when C++17 => use canonical or weakly_canonical from std::filesystem

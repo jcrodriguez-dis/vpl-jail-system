@@ -176,6 +176,8 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 void Jail::commandDirectRun(RPC &rpc, string &homepath, string &adminticket, string &executionticket){
 	mapstruct parsedata = rpc.getData();
 	Logger::log(LOG_INFO,"Request for direct run");
+	checkFilesNameCorrectness(rpc.getFiles());
+	checkFilesNameCorrectness(rpc.getFileToDelete());
 	processMonitor pm(adminticket, executionticket);
 	homepath = pm.getRelativeHomePath();
 	pid_t pid = fork();
@@ -241,6 +243,7 @@ void Jail::commandGetResult(string adminticket, string &compilation,
 }
 
 bool Jail::commandUpdate(string adminticket, RPC &rpc){
+	checkFilesNameCorrectness(rpc.getFiles());
 	processMonitor pm(adminticket);
 	try {
 		mapstruct files = rpc.getFiles();
