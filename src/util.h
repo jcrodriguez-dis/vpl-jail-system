@@ -718,7 +718,7 @@ public:
 			else if ((c >> 3) == 0b11110) num_bytes = 4; // 4-byte sequence
 			else if ((c >> 7)) return -1;                // Unexpected continuation or invalid byte
 			if (pos + num_bytes > text.size()) return -1;
-			for (size_t i = 1; i < num_bytes; i++) {
+			for (int i = 1; i < num_bytes; i++) {
 				c = text[pos + i];
 				if ((c >> 6) != 0b10) return -(i + 1); // Ignore bad bytes
 			}
