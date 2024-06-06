@@ -108,7 +108,8 @@ public:
 		root = processRawData();
 	}
 
-	static string encodeXML(const string &data) {
+	static string encodeXML(const string &rawdata) {
+		string data = Util::get_clean_utf8(rawdata);
 		string ret;
 		ret.reserve(data.size());
 		size_t l = data.size();

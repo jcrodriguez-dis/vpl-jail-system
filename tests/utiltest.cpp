@@ -260,6 +260,25 @@ class UtilTest: public BaseTest {
 		assert(Util::getEnvNameFromRaw("LONG_VAR=long value") == "LONG_VAR"); 
 		assert(Util::getEnvNameFromRaw("long_env_name=long values =") == "long_env_name"); 
 	}
+
+	void testGet_clean_utf8() {
+	    std::vector<string> test_cases = {
+			"Hello, world!", "Hello, world!",
+        	"Valid UTF-8: ©, 你好, Привет", "Valid UTF-8: ©, 你好, Привет",
+        	"Valid UTF-8:\n\r\t ©,\n\r\t 你好,\n\r\t Привет", "Valid UTF-8:\n\r\t ©,\n\r\t 你好,\n\r\t Привет",
+			"😀😇👺🤜🔲🔢", "😀😇👺🤜🔲🔢",
+        	"Invalid single byte: \x80\x81\x82", "Invalid single byte: ",
+        	"Mixed valid and invalid: Hello \x80World ©", "Mixed valid and invalid: Hello World ©",
+        	"Invalid continuation: \xC3\x28", "Invalid continuation: ",
+        	"Truncated multi-byte: ©\xE2\x82", "Truncated multi-byte: ©",
+        	"Valid followed by invalid: ©\x80", "Valid followed by invalid: ©",
+        	"", "",
+		};
+		for ( int i = 0; i< test_cases.size(); i += 2) {
+			assert(Util::get_clean_utf8(test_cases[i]) == test_cases[i + 1]);
+		}
+
+    };
 public:
 	string name() {
 		return "Util class";
@@ -279,6 +298,7 @@ public:
 		testMemSizeToBytesi();
 		testURLdecode();
 		testGetEnvNameFromRaw();
+		testGet_clean_utf8();
 	}
 };
 UtilTest utilTest;

@@ -707,6 +707,43 @@ public:
 		}
 		return decoded;
 	}
+
+	static int get_utf8_nbytes_char(const std::string& text, size_t pos) {
+		int num_bytes = -1;
+		if (pos < text.size()) {
+			unsigned char c = text[pos];
+			if ((c >> 7) == 0) return 1;                 // ASCII
+			if ((c >> 5) == 0b110) num_bytes = 2;        // 2-byte sequence
+			else if ((c >> 4) == 0b1110) num_bytes = 3;  // 3-byte sequence
+			else if ((c >> 3) == 0b11110) num_bytes = 4; // 4-byte sequence
+			else if ((c >> 7)) return -1;                // Unexpected continuation or invalid byte
+			if (pos + num_bytes > text.size()) return -1;
+			for (size_t i = 1; i < num_bytes; i++) {
+				c = text[pos + i];
+				if ((c >> 6) != 0b10) return -(i + 1); // Ignore bad bytes
+			}
+		}
+		else return 0;
+		return num_bytes;
+	}
+
+	static std::string get_clean_utf8(const std::string& text) {
+		std::string clean;
+		clean.reserve(text.size());
+		size_t pos = 0;
+		while (pos < text.size()) {
+			int num_bytes = get_utf8_nbytes_char(text, pos);
+			if (num_bytes > 0) {
+				clean.append(text.c_str() + pos, num_bytes);
+				pos += num_bytes;
+			} else if (num_bytes == 0) {
+				return clean;
+			} else {
+				pos += (-num_bytes);
+			}
+		}
+		return clean;
+    }
 };
 
 #endif
