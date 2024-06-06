@@ -70,7 +70,7 @@ function chekPortInUse() {
 }
 
 function showMessageIfError() {
-    if [[ $1 != 0 ]] ; then
+    if [[ $1 -ne 0 ]] ; then
         writeError "$2"
         writeInfo "Logs:"
         if [ -f "$ERRORS_LOG_FILE" ] ; then
@@ -91,17 +91,17 @@ function checkDockerComposeUp() {
 
     docker compose up -d 2>&1 | tee $ERRORS_LOG_FILE | show_progress
     showMessageIfError $? "Docker compose up of '$PROJECT_NAME' $PRIVILEGED fail"
-    [[ $? != 0 ]] && return 1
+    [[ $? -ne 0 ]] && return 1
     docker compose ls
 
     # Test project
     result=1
     URL="http://localhost:$PLAIN_PORT/nada"
     wget -t 3 $URL &>> $ERRORS_LOG_FILE
-    [[ $? != 0 ]] && result=0
+    [[ $? -ne 0 ]] && result=0
     rm nada &>/dev/null
     showMessageIfError $result "Project '$PROJECT_NAME' $PRIVILEGED answer to incorrect URL: $URL"
-    [[ $result != 0 ]] && return 3
+    [[ $result -ne 0 ]] && return 3
     writeCorrect "Correct response for bad URL $URL" $CHECK_MARK
 
     URL="http://localhost:$PLAIN_PORT/OK"
@@ -109,19 +109,19 @@ function checkDockerComposeUp() {
     local result=$?
     rm OK &>/dev/null
     showMessageIfError $result "Project '$PROJECT_NAME' $PRIVILEGED fail for correct URL: $URL"
-    [[ $result != 0 ]] && return 4
+    [[ $result -ne 0 ]] && return 4
     writeCorrect "Correct response for OK URL $URL" $CHECK_MARK
     writeInfo "Service '$PROJECT_NAME' logs"
     docker compose logs vpl-jail
     # Stop container
     docker compose down 2> $ERRORS_LOG_FILE
     showMessageIfError $? "Error in compose down of '$PROJECT_NAME' $PRIVILEGED"
-    [[ $? != 0 ]] && return 5
+    [[ $? -ne 0 ]] && return 5
 
     # Remove container
     docker compose rm 2> $ERRORS_LOG_FILE
     showMessageIfError $? "Error removing container '$PROJECT_NAME' $PRIVILEGED"
-    [[ $? != 0 ]] && return 6
+    [[ $? -ne 0 ]] && return 6
     return 0
 }
 
@@ -136,7 +136,7 @@ function checkDockerCompose() {
     writeInfo "Creating project '$PROJECT_NAME'"
     docker compose build --no-cache 2>&1 | tee $ERRORS_LOG_FILE | show_progress
     showMessageIfError $? "Docker compose build of '$PROJECT_NAME' fail"
-    [[ $? != 0 ]] && return 1
+    [[ $? -ne 0 ]] && return 1
 
     # Run project
     checkDockerComposeUp "$PROJECT_NAME"
@@ -146,7 +146,7 @@ function checkDockerCompose() {
     writeInfo "Creating project '$PROJECT_NAME' privileged"
     docker compose build --no-cache 2>&1 | tee $ERRORS_LOG_FILE | show_progress
     showMessageIfError $? "Docker compose build of '$PROJECT_NAME' privileged fail"
-    [[ $? != 0 ]] && return 1
+    [[ $? -ne 0 ]] && return 1
 
     # Run project
     checkDockerComposeUp "$PROJECT_NAME" "privileged"
@@ -212,7 +212,7 @@ function runTests() {
             ((n=n+1))
             writeInfo "Test $n: " "Testing vpl-jail-system in $VPL_BASE_DISTRO install $VPL_INSTALL_LEVEL"
             checkDockerCompose $VPL_BASE_DISTRO $VPL_INSTALL_LEVEL
-            [ "$?" != "0" ] && ((nfails++))
+            [ $? -ne 0 ] && ((nfails++))
             ELT=$SECONDS
             writeInfo "Test took " "$(($ELT / 60)) minutes and $(($ELT % 60)) seconds"
         done

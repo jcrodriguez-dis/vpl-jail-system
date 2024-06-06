@@ -75,7 +75,7 @@ function chekPortInUse() {
 }
 
 function showMessageIfError() {
-    if [[ $1 -eq 0 ]] ; then
+    if [[ $1 -ne 0 ]] ; then
         writeError "$2"
         writeInfo "Logs:"
         if [ -f "$ERRORS_LOG_FILE" ] ; then
@@ -104,7 +104,7 @@ function checkDockerRunContainer() {
                -p $PLAIN_PORT:80 -p $SECURE_PORT:443 \
                -d $IMAGE_NAME &>> $ERRORS_LOG_FILE
     showMessageIfError $? "The container '$CONTAINER_NAME' run fail."
-    [[ $? != 0 ]] && return 2
+    [[ $? -ne 0 ]] && return 2
     writeInfo "Container '$CONTAINER_NAME' state:"
     docker container ls | head -1
     docker container ls | grep $CONTAINER_NAME
@@ -114,7 +114,7 @@ function checkDockerRunContainer() {
     result=1
     URL="http://localhost:$PLAIN_PORT/nada"
     wget -t 3 $URL &>> $ERRORS_LOG_FILE
-    [[ $? != 0 ]] && result=0
+    [[ $? -ne 0 ]] && result=0
     rm nada &>/dev/null
     showMessageIfError $result "Container '$CONTAINER_NAME' answer to incorrect URL: $URL"
     [[ $result -ne 0 ]] && return 3
@@ -125,19 +125,19 @@ function checkDockerRunContainer() {
     local result=$?
     rm OK &>/dev/null
     showMessageIfError $result "Container '$CONTAINER_NAME' fail for correct URL: $URL"
-    [[ $result != 0 ]] && return 4
+    [[ $result -ne 0 ]] && return 4
     writeCorrect "Correct response for OK URL $URL" "$CHECK_MARK"
     writeInfo "Container '$CONTAINER_NAME' running logs"
     docker logs $CONTAINER_NAME
     # Stop container
     docker stop -t 3 $CONTAINER_NAME &>> $ERRORS_LOG_FILE
     showMessageIfError $? "Error stopping '$CONTAINER_NAME'"
-    [[ $? != 0 ]] && return 5
+    [[ $? -ne 0 ]] && return 5
 
     # Remove container
     docker container rm -f $CONTAINER_NAME &>> $ERRORS_LOG_FILE
     showMessageIfError $? "Error removing container '$CONTAINER_NAME'"
-    [[ $? != 0 ]] && return 6
+    [[ $? -ne 0 ]] && return 6
     writeInfo "Container '$CONTAINER_NAME' removed"
 }
 
@@ -156,7 +156,7 @@ function checkDockerBuild() {
         --build-arg VPL_INSTALL_LEVEL=$VPL_INSTALL_LEVEL \
         --progress=plain -t $IMAGE_NAME . 2>&1 | tee $ERRORS_LOG_FILE | show_progress
     showMessageIfError $? "Build $IMAGE_NAME fail"
-    [[ $? != 0 ]] && return 1
+    [[ $? -ne 0 ]] && return 1
 
     docker image ls $IMAGE_NAME
     writeCorrect "Image '$IMAGE_NAME' created" "$CHECK_MARK"
@@ -169,7 +169,7 @@ function checkDockerBuild() {
     if [ "$3" = "" ] ; then
         docker rmi $IMAGE_NAME &> $ERRORS_LOG_FILE
         showMessageIfError $? "Error removing image $IMAGE_NAME"
-        [[ $? != 0 ]] && return 9
+        [[ $? -ne 0 ]] && return 9
         writeCorrect "Image '$IMAGE_NAME' removed" "$CHECK_MARK"
     else
         writeInfo "Image '$IMAGE_NAME' was kept at user request"
@@ -235,7 +235,7 @@ function runTests() {
             ((n=n+1))
             writeHeading "Testing vpl-jail-system in $VPL_BASE_DISTRO install $VPL_INSTALL_LEVEL" "Test $n: "
             checkDockerBuild $VPL_BASE_DISTRO $VPL_INSTALL_LEVEL $1
-            [ "$?" != "0" ] && ((nfails++))
+            [ $? -ne 0 ] && ((nfails++))
             ELT=$SECONDS
             writeHeading "Test took $(($ELT / 60)) minutes and $(($ELT % 60)) seconds"
         done
