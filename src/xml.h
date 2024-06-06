@@ -108,38 +108,13 @@ public:
 		root = processRawData();
 	}
 
-	static string encodeXML(const string &data){
-		iconv_t cd=iconv_open("UTF-8//TRANSLIT", "UTF-8");
-		char *chars=(char *)data.c_str();
-		size_t inbytesleft=data.size();
-		size_t outbytesleft=data.size();
-		char *output= new char[inbytesleft+1];
-		char *out=output;
-		//Filter not UTF-8 chars
-		while(inbytesleft>0){
-			size_t res=iconv(cd,&chars,&inbytesleft,&out,&outbytesleft);
-			if(res == (size_t)(-1)){
-				*out=126;
-				out++;
-				outbytesleft--;
-				chars++;
-				inbytesleft--;
-			}
-		}
-		iconv_close(cd);
-		//Convert entities
+	static string encodeXML(const string &data) {
 		string ret;
-		size_t l=out-output;
-		for(size_t i=0; i<l; i++){
-			unsigned char c=output[i];
-			if(c <= 0x1f){ //Control char
-				if(c== '\n' || c=='\r' || c=='\t' ) //Accept TAB, LF and CR
-					ret += c;
-				else
-					ret += 126; //Change by tilde
-			}
-			else
-				switch(c){
+		ret.reserve(data.size());
+		size_t l = data.size();
+		for (size_t i=0; i<l; i++) {
+			unsigned char c = data[i];
+			switch(c) {
 				case '&':ret += "&amp;";
 				break;
 				case '<':ret += "&lt;";
@@ -150,13 +125,10 @@ public:
 				break;
 				case '"':ret += "&quot;";
 				break;
-				case 127:ret += 126;
-				break;
 				default: ret += c;
 				break;
-				}
+			}
 		}
-		delete []output;
 		return ret;
 	}
 

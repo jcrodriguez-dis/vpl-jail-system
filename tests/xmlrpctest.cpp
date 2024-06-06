@@ -130,6 +130,21 @@ class XMLRPCTest: public BaseTest {
 		assert(fileencoding.size() == 3);
 	}
 
+	void testEncodeXML(){
+		string text, textEncoded;
+		assert(XML::encodeXML("") == "");
+		assert(XML::encodeXML("correcto") == "correcto");
+		text = "text\n\rcommon with spaces \t\t and new lines correcto";
+		textEncoded = text;
+		assert(XML::encodeXML(text) == textEncoded);
+		text = "\"<>&'";
+		textEncoded = "&quot;&lt;&gt;&amp;&apos;";
+		assert(XML::encodeXML(text) == textEncoded);
+		text = "a \" b < c > d & ee '";
+		textEncoded = "a &quot; b &lt; c &gt; d &amp; ee &apos;";
+		assert(XML::encodeXML(text) == textEncoded);
+	}
+
 public:
 	string name() {
 		return "XMLRPC class";
@@ -141,6 +156,7 @@ public:
 		testRunning();
 		testRequest();
 		testDirectrun();
+		testEncodeXML();
 	}
 };
 
