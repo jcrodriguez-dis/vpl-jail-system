@@ -130,7 +130,8 @@ string HttpJailServer::prepare_HTTP(int code, const string &codeText, const stri
  * @param extraHeader Extra headers to add (optional)
  */
 void HttpJailServer::send(int code, const string &codeText, const string &load,
-                          const bool headMethod, const string extraHeader) {	
+                          const bool headMethod, const string extraHeader) {
+	Logger::log(LOG_DEBUG, "Sending http %d %s", (int)code, codeText.c_str());		
 	sendRaw(prepare_HTTP(code, codeText, load, headMethod, extraHeader));
 	if(code != 100){ //If code != CONTINUE
 		socket->close();

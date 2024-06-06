@@ -655,7 +655,7 @@ void Jail::process(Socket *socket){
 			if (httpMethod == "HEAD") {
 				string response = predefinedURLResponse(socket->getURLPath());
 				if ( response.size() == 0 ) {
-					throw HttpException(notFoundCode, "Http HEAD: Url path not found '" + socket->getURLPath() + "'");
+					throw HttpException(notFoundCode, "HTTP HEAD: URL path not found '" + socket->getURLPath() + "'");
 				}
 				server.send200(response, true);
 				_exit(static_cast<int>(neutral));
@@ -759,23 +759,24 @@ void Jail::process(Socket *socket){
 		_exit(EXIT_SUCCESS);
 	}
 	catch(HttpException &exception){
-		Logger::log(LOG_ERR,"%s:%s",IP.c_str(),exception.getLog().c_str());
-		server.sendCode(exception.getCode(),exception.getMessage());
+		Logger::log(LOG_INFO, "%s:%s", IP.c_str(), exception.getLog().c_str());
+		server.sendCode(exception.getCode(), exception.getMessage());
+		_exit(EXIT_SUCCESS);
 	}
 	catch(std::exception &e){
-		Logger::log(LOG_ERR,"%s:Unexpected exception %s on %s:%d",IP.c_str(), e.what(),__FILE__,__LINE__);
-		server.sendCode(internalServerErrorCode,"Unknown error");
+		Logger::log(LOG_WARNING, "%s:Unexpected exception %s on %s:%d", IP.c_str(), e.what(), __FILE__, __LINE__);
+		server.sendCode(internalServerErrorCode, "Unknown error");
 	}
 	catch(string &exception){
-		Logger::log(LOG_ERR,"%s:%s",IP.c_str(),exception.c_str());
-		server.sendCode(internalServerErrorCode,exception);
+		Logger::log(LOG_WARNING, "%s:%s",IP.c_str(), exception.c_str());
+		server.sendCode(internalServerErrorCode, exception);
 	}
 	catch(const char *s){
-		Logger::log(LOG_ERR,"%s:%s",IP.c_str(),s);
-		server.sendCode(internalServerErrorCode,s);
+		Logger::log(LOG_WARNING, "%s:%s",IP.c_str(), s);
+		server.sendCode(internalServerErrorCode, s);
 	}
 	catch(...){
-		Logger::log(LOG_ERR, "%s:Unexpected exception %s:%d",IP.c_str(),__FILE__,__LINE__);
+		Logger::log(LOG_WARNING, "%s:Unexpected exception %s:%d",IP.c_str(),__FILE__,__LINE__);
 		server.sendCode(internalServerErrorCode,"Unknown error");
 	}
 	_exit(EXIT_FAILURE);
