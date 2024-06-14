@@ -143,10 +143,11 @@ function checkDockerRunContainer() {
 
 function checkDockerBuild() { 
     export VPL_BASE_DISTRO=$1
+    export CLEAN_BASE_NAME=$(echo "$1" | sed 's/:/./g')
     export VPL_INSTALL_LEVEL=$2
-    export IMAGE_NAME=jail-$VPL_BASE_DISTRO-$VPL_INSTALL_LEVEL
-    export CONTAINER_NAME=check-$VPL_BASE_DISTRO-$VPL_INSTALL_LEVEL
-    export VOLUMEN_NAME=ssl-$VPL_BASE_DISTRO-$VPL_INSTALL_LEVEL
+    export IMAGE_NAME=jail-$CLEAN_BASE_NAME-$VPL_INSTALL_LEVEL
+    export CONTAINER_NAME=check-$CLEAN_BASE_NAME-$VPL_INSTALL_LEVEL
+    export VOLUMEN_NAME=ssl-$CLEAN_BASE_NAME-$VPL_INSTALL_LEVEL
     local CLEAN="removeImageContainer \"$IMAGE_NAME\" \"$CONTAINER_NAME\" \"$VOLUMEN_NAME\""
 
     # Build image
@@ -166,7 +167,7 @@ function checkDockerBuild() {
     checkDockerRunContainer "$CONTAINER_NAME-privileged" "privileged"
 
     # Remove image
-    if [ "$3" = "" ] ; then
+    if [ "$3" == "" ] ; then
         docker rmi $IMAGE_NAME &> $ERRORS_LOG_FILE
         showMessageIfError $? "Error removing image $IMAGE_NAME"
         [[ $? -ne 0 ]] && return 9
@@ -176,35 +177,34 @@ function checkDockerBuild() {
     fi
 }
 
+function checkParameter() {
+    local parameter
+}
+
 function runTests() {
     # Parameters:
-    #    $1 Ditro name [Optional]
-    #    $2 Install level [Optional]
+    #    $1 Ditro name [Optional] default [alpine ubuntu debian fedora]
+    #    $2 Install level [Optional] [minimum basic standard full]
+    #    $3 keep [Optional] Indicate do not delete the image after the test.
     local n=0
 	local DISTROS=( alpine ubuntu debian fedora )
     local INSTALL_LEVELS=( minimum basic standard full )
-    local AUX=
-    if [ "$1" != "" ] ; then
-        for AUX in "${DISTROS[@]}"; do
-            if [[ "$AUX" == "$1" ]]; then
-                DISTROS=( $AUX )
-                shift
-                break
-            fi
-        done
-    fi
-    if [ "$1" != "" ] ; then
-        for AUX in "${INSTALL_LEVELS[@]}"; do
-            if [[ "$AUX" == "$1" ]]; then
-                INSTALL_LEVELS=( $AUX )
-                shift
-                break
-            fi
-        done
-    fi
-
+    local param=
+    local keepimage=
+    for param in "$@"; do
+        if printf '%s\n' "${INSTALL_LEVELS[@]}" | grep -q -x "$param" ; then
+            INSTALL_LEVELS=( $param )
+            continue
+        fi
+        if [[ $param == "keep" ]] ; then
+            keepimage=$param
+            continue
+        fi
+        DISTROS=( $param )
+    done
     rm vpl-jail-system-*.tar.gz &> /dev/null
-    writeHeading "Test Matrix [ ${DISTROS[@]} ] X [ ${INSTALL_LEVELS[@]} ]"
+    local matrix="[ ${DISTROS[@]} ] X [ ${INSTALL_LEVELS[@]} ] $keepimage"
+    writeHeading "$matrix" "Test Matrix "
     writeHeading "Building distribution package"
     (
         autoreconf -i
@@ -234,7 +234,7 @@ function runTests() {
             SECONDS=0
             ((n=n+1))
             writeHeading "Testing vpl-jail-system in $VPL_BASE_DISTRO install $VPL_INSTALL_LEVEL" "Test $n: "
-            checkDockerBuild $VPL_BASE_DISTRO $VPL_INSTALL_LEVEL $1
+            checkDockerBuild $VPL_BASE_DISTRO $VPL_INSTALL_LEVEL $keepimage
             [ $? -ne 0 ] && ((nfails++))
             ELT=$SECONDS
             writeHeading "Test took $(($ELT / 60)) minutes and $(($ELT % 60)) seconds"
