@@ -59,7 +59,7 @@ struct ExecutionLimits {
 	long long maxmemory;
 	int maxprocesses;
 	void log(const char *s){
-		Logger::log(LOG_DEBUG, "%s: maxtime: %d seg, maxfilesize: %lld Kb, maxmemory %lld Kb, maxprocesses: %d",
+		Logger::log(LOG_DEBUG, "%s: maxtime: %d sec, maxfilesize: %lld Kb, maxmemory %lld Kb, maxprocesses: %d",
 				s, maxtime, maxfilesize/1024, maxmemory/1024, maxprocesses);
 	}
 };
@@ -466,6 +466,33 @@ public:
 		return true;
 	}
 
+	static void removeCRs(string &text) {
+		size_t len = text.size();
+		bool noNL = true;
+		for(size_t i = 0; i < len; i++) {
+			if (text[i] == '\n') {
+				noNL = false;
+				break;
+			};
+		}
+		if (noNL) { //Replace CR by NL
+			for(size_t i = 0; i < len; i++) {
+				if (text[i] == '\r') {
+					text[i] = '\n';
+				}
+			}
+		} else { //Remove CRs if any
+			size_t lenClean = 0;
+			for(size_t i = 0; i < len; i++) {
+				if (text[i] != '\r') {
+					text[lenClean] = text[i];
+					lenClean++;
+				}
+			}
+			text.resize(lenClean);
+		}
+	}
+
 	static bool pathChanged(const string& filePath, size_t pos) {
 		if (pos) {
 
@@ -586,31 +613,30 @@ public:
 	 * and complete directories owned by prisoner (all files and directories owns by prisoner or not)
 	 */
 	static int removeDir(string dir, uid_t owner, bool force) {
-		if (! dirExists(dir) || ! correctPath(dir)) {
+		if (! dirExists(dir)) {
 			return 0;
 		}
 		const string parent(".."), me(".");
 		int nunlinks = 0;
 		struct stat filestat;
 		lstat(dir.c_str(), &filestat);
-		force = force || (filestat.st_uid == owner || filestat.st_gid == owner);
-
+		bool removeAll = force || (filestat.st_uid == owner || filestat.st_gid == owner);
 		dirent *ent;
 		DIR *dirfd = opendir(dir.c_str());
 		if(dirfd==NULL){
 			Logger::log(LOG_ERR, "Can't open dir \"%s\": %m", dir.c_str());
 			return 0;
 		}
-		while( ( ent = readdir(dirfd) ) != NULL){
+		while((ent = readdir(dirfd)) != NULL) {
 			const string name(ent->d_name);
 			const string fullname = dir + "/" + name;
 			lstat(fullname.c_str(), &filestat);
 			if(S_ISDIR(filestat.st_mode)){
 				if(name != parent && name != me){
-					nunlinks += removeDir(fullname, owner, force);
+					nunlinks += removeDir(fullname, owner, removeAll);
 				}
 			} else {
-				bool remove = force;
+				bool remove = removeAll;
 				if ( ! remove ) {
 					lstat(fullname.c_str(), &filestat);
 					remove = filestat.st_uid == owner || filestat.st_gid == owner;
@@ -626,7 +652,7 @@ public:
 			}
 		}
 		closedir(dirfd);
-		if (force) {
+		if (removeAll) {
 			Logger::log(LOG_DEBUG,"rmdir \"%s\"",dir.c_str());
 			if ( rmdir(dir.c_str()) ) {
 				Logger::log(LOG_ERR,"Can't rmdir \"%s\": %m",dir.c_str());
