@@ -36,8 +36,8 @@ function vpl_detect_package_manager() {
 	if [ "$(command -v dnf)" != "" ] ; then
 		echo "Using DNF package manager" 
 		echo "Upgrading installed software"
-		dnf -y -q check-update
-		dnf -y -q upgrade
+		dnf -y -q check-update >> "$LOGFILE"
+		dnf -y -q upgrade >> "$LOGFILE"
 		function vpl_install_base {
 			dnf -y -q install $1 >> "$LOGFILE"
 			return $?
@@ -47,17 +47,31 @@ function vpl_detect_package_manager() {
 			return $?
 		}
 		PMTYPE="dnf"
+	elif [ "$(command -v yum)" != "" ] ; then
+		echo "Using YUM deprecated package manager" 
+		echo "Upgrading installed software"
+		yum -y -q check-update >> "$LOGFILE"
+		yum -y -q upgrade >> "$LOGFILE"
+		function vpl_install_base {
+			yum -y -q install $1 >> "$LOGFILE"
+			return $?
+		}
+		function vpl_install_check {
+			yum -y -q list $1 &> /dev/null
+			return $?
+		}
+		PMTYPE="dnf"
 	elif [ "$(command -v apt-get)" != "" ] ; then
 		echo "Using APT package manager"
 		echo "Upgrading installed software"
-		apt-get update >> "$LOGFILE"
+		apt-get -q update >> "$LOGFILE"
 		apt-get -q -y upgrade >> "$LOGFILE"
 		function vpl_install_base {
 			apt-get -q -y --allow-unauthenticated install $1 >> "$LOGFILE"
 			return $?
 		}
 		function vpl_install_check {
-			apt-cache pkgnames $1 | grep -q -x -F $1
+			apt-cache pkgnames $1 | grep -q -x -F $1 &> /dev/null
 			return $?
 		}
 		PMTYPE="apt"
