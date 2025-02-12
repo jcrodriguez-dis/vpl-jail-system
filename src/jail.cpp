@@ -308,7 +308,7 @@ void Jail::commandStop(string adminticket){
 		_exit(EXIT_SUCCESS);
 	}
 }
-void Jail::commandMonitor(string monitorticket, Socket *s){
+void Jail::commandMonitor(string monitorticket, Socket *s) {
 	processMonitor pm(monitorticket);
 	webSocket ws(s);
 	processState state = prestarting;
@@ -323,7 +323,7 @@ void Jail::commandMonitor(string monitorticket, Socket *s){
 		time_t now = time(NULL);
 		time_t timeout = pm.getStartTime() + pm.getMaxTime();
 		if( ! lastMessage.empty() && now != lastMessageTime){
-			ws.send(lastMessage + ": "+Util::itos(now-startTime)+" seg");
+			ws.send(lastMessage + ": " + Util::itos(now-startTime) + " sec");
 			lastMessageTime = now;
 		}
 		if (newstate != state) {
@@ -332,14 +332,14 @@ void Jail::commandMonitor(string monitorticket, Socket *s){
 			case prestarting:
 				break;
 			case starting:
-				Logger::log(LOG_DEBUG,"Monitor starting");
+				Logger::log(LOG_DEBUG, "Monitor starting");
 				startTime = now;
 				lastMessageTime = now;
 				lastMessage = "message:starting";
 				ws.send(lastMessage);
 				break;
 			case compiling:
-				Logger::log(LOG_DEBUG,"Monitor compiling");
+				Logger::log(LOG_DEBUG, "Monitor compiling");
 				timeout = now + pm.getMaxTime();
 				startTime = now;
 				lastMessageTime = now;
@@ -347,7 +347,7 @@ void Jail::commandMonitor(string monitorticket, Socket *s){
 				ws.send(lastMessage);
 				break;
 			case beforeRunning:
-				Logger::log(LOG_DEBUG,"Monitor beforeRunning");
+				Logger::log(LOG_DEBUG, "Monitor beforeRunning");
 				ws.send("compilation:" + pm.getCompilation());
 				timeout = now + JAIL_SOCKET_TIMEOUT;
 				if (pm.FileExists(VPL_EXECUTION)) {
@@ -372,7 +372,7 @@ void Jail::commandMonitor(string monitorticket, Socket *s){
 				}
 				break;
 			case running:
-				Logger::log(LOG_DEBUG,"Monitor running");
+				Logger::log(LOG_DEBUG, "Monitor running");
 				startTime = now;
 				timeout = now + pm.getMaxTime() + 6 /* execution cleanup */;
 				lastMessageTime = now;
@@ -425,9 +425,9 @@ void Jail::commandMonitor(string monitorticket, Socket *s){
 		}
 
 		if (lastTime != now && pm.isOutOfMemory()) { //Every second check memory usage
-			string ml= pm.getMemoryLimit();
-			Logger::log(LOG_DEBUG,"Out of memory (%s)",ml.c_str());
-			ws.send("message:outofmemory:"+ml);
+			string ml = pm.getMemoryLimit();
+			Logger::log(LOG_DEBUG, "Out of memory (%s)", ml.c_str());
+			ws.send("message:outofmemory:" + ml);
 			usleep(1500000);
 			usleep(1500000);
 			ws.send("close:");
@@ -985,7 +985,7 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 	int max_iter = VNCLaunch ? 5 : 50;
 	for(int i=0; redirector.isActive() && i < max_iter; i++){
 		redirector.advance();
-		usleep(100000); // 1/10 seg
+		usleep(100000); // 1/10 sec
 	}
 	string output = redirector.getOutput();
 	Logger::log(LOG_DEBUG,"Complete program output: %s", output.c_str());
@@ -1072,7 +1072,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 	//wait until 5sg for redirector to read and send program output
 	for (int i = 0; redirector.isActive() && i < 50; i++) {
 		redirector.advance();
-		usleep(100000); // 1/10 seg
+		usleep(100000); // 1/10 sec
 	}
 	pm.cleanTask();
 }
@@ -1124,7 +1124,7 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 	//wait until 5sg for redirector to read and send program output
 	for(int i=0;redirector.isActive() && i<50; i++){
 		redirector.advance();
-		usleep(100000); // 1/10 seg
+		usleep(100000); // 1/10 sec
 	}
 	if(pm.installScript(".vpl_vnc_stopper.sh","vpl_vnc_stopper.sh")){
 		output=run(pm,".vpl_vnc_stopper.sh",5); //FIXME use constant
