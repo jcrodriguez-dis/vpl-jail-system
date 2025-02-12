@@ -353,17 +353,8 @@ void processMonitor::writeFile(string name, const string &data) {
 	string fullName = homePath + "/" + name;
 	bool isScript = name.size()>4 && name.substr(name.size()-3) == ".sh";
 	if (isScript) { //Endline converted to linux
-		string newdata;
-		for (size_t i = 0; i < data.size(); i++) {
-			if (data[i] != '\r') {
-				newdata += data[i];
-			} else {
-				char p = ' ', n = ' ';
-				if (i > 0) p = data[i-1];
-				if (i + 1 < data.size()) n = data[i + 1];
-				if (p != '\n' && n != '\n') newdata += '\n';
-			}
-		}
+		string newdata = data;
+		Util::removeCRs(newdata);
 		Util::writeFile(fullName, newdata, getPrisonerID(), homePath.size() + 1);
 	}else{
 		Util::writeFile(fullName, data, getPrisonerID(), homePath.size() + 1);
@@ -538,7 +529,7 @@ void processMonitor::setCompilationOutput(const string &compilation) {
 	Lock lock(getProcessControlPath());
 	fileName = getProcessControlPath("compilation");
 	if (Util::fileExists(fileName))
-		throw "Compilation already save";
+		throw "Compilation already saved";
 	Util::writeFile(fileName, compilation);
 }
 void processMonitor::setExecutionOutput(const string &execution, bool executed) {
