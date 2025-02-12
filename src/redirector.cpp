@@ -293,7 +293,7 @@ void RedirectorVNC::advance() {
 			break;
 		}else{
 			Logger::log(LOG_INFO, "socket connect to (127.0.0.1:%d) error: %m",(int)port);
-			usleep(100000); // 1/10 seg
+			usleep(100000); // 1/10 sec
 		}
 		if (timeout < time(NULL)) {
 			Logger::log(LOG_ERR, "socket connect timeout: %m");
@@ -424,7 +424,7 @@ void RedirectorWebServer::advance() {
 			break;
 		} else {
 			Logger::log(LOG_INFO, "socket connecting to (%s) error: %m", serverAddress.c_str());
-			usleep(100000); // 1/10 seg
+			usleep(100000); // 1/10 sec
 		}
 		if (timeout < time(NULL)) {
 			Logger::log(LOG_ERR, "socket connect timeout: %m");
