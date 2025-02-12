@@ -35,8 +35,8 @@ export -f writeError
 export -f write
 
 function removeImageContainer() {
-    docker rm "$2" & > /dev/null
-    docker rmi "$1" & > /dev/null
+    docker rm "$2" &> /dev/null
+    docker rmi "$1" &> /dev/null
 }
 
 function show_progress() {
@@ -143,7 +143,7 @@ function checkDockerRunContainer() {
 
 function checkDockerBuild() { 
     export VPL_BASE_DISTRO=$1
-    export CLEAN_BASE_NAME=$(echo "$1" | sed 's/:/./g')
+    export CLEAN_BASE_NAME=$(echo "$1" | sed 's/:/./g' | sed 's/\//./g')
     export VPL_INSTALL_LEVEL=$2
     export IMAGE_NAME=jail-$CLEAN_BASE_NAME-$VPL_INSTALL_LEVEL
     export CONTAINER_NAME=check-$CLEAN_BASE_NAME-$VPL_INSTALL_LEVEL
