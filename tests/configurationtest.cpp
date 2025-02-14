@@ -78,7 +78,7 @@ class ConfigurationTest: public BaseTest {
 		assert(taskOnly[4] == "21.22.23.24");
 		assert(taskOnly[5] == "1.2.3.4");
 		assert(config->getInterface() == "128.1.1.7");
-		assert(config->getURLPath() == "/secr$et$");
+		assert(config->getURLPath() == "/secr$et$superlargo0123456789fin");
 		assert(config->getPort() == 8081);
 		assert(config->getSecurePort() == 44300);
 		assert(config->getLogLevel() == 1);

@@ -47,7 +47,7 @@ SECURE_PORT=44300
 
 #URL path for task request
 #act as a password, if no matches with the path of the request then it's rejected 
-URLPATH=/secr$et$
+URLPATH=/secr$et$superlargo0123456789fin
 
 #FIREWALL=0|1|2|3|4
 #0: No firewall

@@ -77,6 +77,72 @@ class VPLregexTest: public BaseTest {
 		}
 		{
 			vplregmatch found(5);
+			string text = "/estoesunaclavelargalarga1234567890";
+			regURL.search(text, found);
+			assert(found.size() == 5);
+			assert(found[0] == text);
+			assert(found[1] == "");
+			assert(found[2] == "");
+			assert(found[3] == "/estoesunaclavelargalarga1234567890");
+			assert(found[4] == "");
+		}
+		{
+			vplregmatch found(5);
+			string text = "/estoesunaclavelargalarga1234567890?";
+			regURL.search(text, found);
+			assert(found.size() == 5);
+			assert(found[0] == text);
+			assert(found[1] == "");
+			assert(found[2] == "");
+			assert(found[3] == "/estoesunaclavelargalarga1234567890");
+			assert(found[4] == "");
+		}
+		{
+			vplregmatch found(5);
+			string text = "/estoesunaclavelargalarga1234567890?algo";
+			regURL.search(text, found);
+			assert(found.size() == 5);
+			assert(found[0] == text);
+			assert(found[1] == "");
+			assert(found[2] == "");
+			assert(found[3] == "/estoesunaclavelargalarga1234567890");
+			assert(found[4] == "algo");
+		}
+		{
+			vplregmatch found(5);
+			string text = "/estoesunaclavelargalarga1234567890?algo#";
+			regURL.search(text, found);
+			assert(found.size() == 5);
+			assert(found[0] == text);
+			assert(found[1] == "");
+			assert(found[2] == "");
+			assert(found[3] == "/estoesunaclavelargalarga1234567890");
+			assert(found[4] == "algo#");
+		}
+		{
+			vplregmatch found(5);
+			string text = "/estoesunaclavelargalarga1234567890?algo#algo";
+			regURL.search(text, found);
+			assert(found.size() == 5);
+			assert(found[0] == text);
+			assert(found[1] == "");
+			assert(found[2] == "");
+			assert(found[3] == "/estoesunaclavelargalarga1234567890");
+			assert(found[4] == "algo#algo");
+		}
+		{
+			vplregmatch found(5);
+			string text = "/estoesunaclavelargalarga1234567890?algo#algo#";
+			regURL.search(text, found);
+			assert(found.size() == 5);
+			assert(found[0] == text);
+			assert(found[1] == "");
+			assert(found[2] == "");
+			assert(found[3] == "/estoesunaclavelargalarga1234567890");
+			assert(found[4] == "algo#algo#");
+		}
+		{
+			vplregmatch found(5);
 			string text = "/";
 			regURL.search(text, found);
 			assert(found.size() == 5);
@@ -110,6 +176,15 @@ class VPLregexTest: public BaseTest {
 		{
 			vplregmatch found(3);
 			string text = "name1=value1";
+			regCookie.search(text, found);
+			assert(found.size() == 3);
+			assert(found[0] == text);
+			assert(found[1] == "name1");
+			assert(found[2] == "value1");
+		}
+		{
+			vplregmatch found(3);
+			string text = "name1=value1; ";
 			regCookie.search(text, found);
 			assert(found.size() == 3);
 			assert(found[0] == text);
