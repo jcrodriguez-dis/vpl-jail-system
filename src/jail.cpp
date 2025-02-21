@@ -594,7 +594,7 @@ string Jail::predefinedURLResponse(string URLPath) {
 		if (challenge.search(URLPath, path)) {
 			string filePath = configuration->getCerbotWebrootPath() + URLPath;
 			if (Util::fileExists(filePath)) {
-				page = Util::readFile(filePath, false);
+				page = Util::readFile(filePath, false, configuration->getCerbotWebrootPath().size() + 1);
 			}
 		}
 	}
