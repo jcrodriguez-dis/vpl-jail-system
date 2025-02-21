@@ -71,7 +71,7 @@ public:
 	const string & getSSLCipherSuites() const { return SSLCipherSuites;}
 	const string & getSSLCertFile() const { return SSLCertFile;}
 	const string & getSSLKeyFile() const { return SSLKeyFile;}
-	const string & getCerbotWebrootPath() const { return certbotWebrootPath; }
+	const string & getCertbotWebrootPath() const { return certbotWebrootPath; }
 	int getHSTSMaxAge() const { return HSTSMaxAge;};
 	bool getUseCGroup() const { return useCgroup;};
 	int getRequestMaxSize() const { return requestMaxSize;};

@@ -588,13 +588,13 @@ string Jail::predefinedURLResponse(string URLPath) {
 				"<style> .logo { font: bold 12px Arial Rounded MT,Arial,Helvetica;"
 				"fill: #277ab0; stroke: black; stroke-width: 0.7px;} </style>"
 				"<text x=\"0\" y=\"12\" class=\"logo\">VPL</text></svg>";
-	} else if(configuration->getCerbotWebrootPath() != "") {
+	} else if(configuration->getCertbotWebrootPath() != "") {
 		static vplregex challenge("^\\/\\.well-known\\/acme-challenge\\/([^\\/]*)$");
 		static vplregmatch path(2);
 		if (challenge.search(URLPath, path)) {
-			string filePath = configuration->getCerbotWebrootPath() + URLPath;
+			string filePath = configuration->getCertbotWebrootPath() + URLPath;
 			if (Util::fileExists(filePath)) {
-				page = Util::readFile(filePath, false, configuration->getCerbotWebrootPath().size() + 1);
+				page = Util::readFile(filePath, false, configuration->getCertbotWebrootPath().size() + 1);
 			}
 		}
 	}
