@@ -67,73 +67,101 @@ class UtilTest: public BaseTest {
 		assert(Util::toUppercase("jc\\ndis") == "JC\\NDIS");
 	}
 
-	void testCorrectFileName(){
+	void testCorrectFileName() {
 		assert(!Util::correctFileName("jc\ndis"));
 		assert(!Util::correctFileName("jc\005dis"));
-		assert(!Util::correctFileName("jc1di*s"));
-		assert(!Util::correctFileName("jc1dis!"));
-		assert(!Util::correctFileName("mal:c"));
-		assert(!Util::correctFileName("klsdjaf?"));
-		assert(!Util::correctFileName("kl@sdjaf"));
 		assert(!Util::correctFileName("kl'sdjaf"));
-		assert(!Util::correctFileName("kl[sdjaf"));
 		assert(!Util::correctFileName("klsdjaf^"));
+		assert(!Util::correctFileName("klsd/jaf"));
 		assert(!Util::correctFileName("kl\"sdjaf"));
-		assert(!Util::correctFileName("klsdjaf\x60"));
-		assert(!Util::correctFileName("(klsdjaf"));
-		assert(!Util::correctFileName("klsd{jaf"));
-		assert(!Util::correctFileName("klsdja~f"));
 		assert(!Util::correctFileName("kls/djaf"));
 		assert(!Util::correctFileName("\\klsdjaf.pp"));
-		assert(!Util::correctFileName("kls<djaf.pp"));
-		assert(!Util::correctFileName("kls>djaf.pp"));
-		assert(!Util::correctFileName("kls&djaf.pp"));
-		assert(!Util::correctFileName("kls%djaf.pp"));
-		assert(!Util::correctFileName("kls#jaf.pp"));
-		assert(!Util::correctFileName("kls@jaf.pp"));
-		assert(!Util::correctFileName("kls?jaf.pp"));
+		assert(!Util::correctFileName("klsdjaf\x60"));
+		assert(!Util::correctFileName(" espacio_al_pricipio"));
+		assert(!Util::correctFileName("espacio_al_final "));
+		assert(!Util::correctFileName("con_apostrofe'"));
+		assert(!Util::correctFileName("con_comillas\""));
+		assert(!Util::correctFileName("con_barra\\"));
 		assert(!Util::correctFileName("kls`jaf.pp"));
-		assert(!Util::correctFileName("nose<mal"));
-		assert(!Util::correctFileName("nose>mal"));
-		assert(!Util::correctFileName("nose=mal"));
-		assert(!Util::correctFileName("kls*jaf.pp"));
-		assert(!Util::correctFileName("nose..mal"));
 		assert(!Util::correctFileName(".."));
+		assert(!Util::correctFileName("."));
 		assert(!Util::correctFileName(""));
 		assert(!Util::correctFileName(
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+
+		assert(Util::correctFileName("mal:c"));
+		assert(Util::correctFileName("klsdjaf?"));
+		assert(Util::correctFileName("kl@sdjaf"));
+		assert(Util::correctFileName("kl[sdjaf"));
+		assert(Util::correctFileName("(klsdjaf"));
+		assert(Util::correctFileName("klsd{jaf"));
+		assert(Util::correctFileName("klsdja~f"));
+		assert(Util::correctFileName("kls<djaf.pp"));
+		assert(Util::correctFileName("kls>djaf.pp"));
+		assert(Util::correctFileName("kls&djaf.pp"));
+		assert(Util::correctFileName("kls%djaf.pp"));
+		assert(Util::correctFileName("kls#jaf.pp"));
+		assert(Util::correctFileName("kls@jaf.pp"));
+		assert(Util::correctFileName("kls?jaf.pp"));
+		assert(Util::correctFileName("kls*jaf.pp"));
+		assert(Util::correctFileName("con!admiración.pp"));
+		assert(Util::correctFileName("con¿interrogación.pp"));
+		assert(Util::correctFileName("con¡exclamación.pp"));
+		assert(Util::correctFileName("coc(parenthesis.pp"));
+		assert(Util::correctFileName("coc)parenthesis.pp"));
+		assert(Util::correctFileName("coc[brackets.pp"));
+		assert(Util::correctFileName("coc]brackets.pp"));
+		assert(Util::correctFileName("coc{braces.pp"));
+		assert(Util::correctFileName("coc}braces.pp"));
+		assert(Util::correctFileName("coc|pipe.pp"));		
+		assert(Util::correctFileName("nose<mal"));
+		assert(Util::correctFileName("nose>mal"));
+		assert(Util::correctFileName("nose=mal"));
+		assert(Util::correctFileName("nose..mal"));
 		assert(Util::correctFileName("a"));
 		assert(Util::correctFileName("kkkk"));
 		assert(Util::correctFileName("mal,c"));
+		assert(Util::correctFileName("jc1dis!"));
 		assert(Util::correctFileName("a.raro"));
 		assert(Util::correctFileName("normal.cvs"));
 		assert(Util::correctFileName("normal.cvs.old"));
 		assert(Util::correctFileName("normal-con-guiones.cvs"));
 		assert(Util::correctFileName("normal_con_guiones.cvs"));
 		assert(Util::correctFileName("b"));
-		assert(Util::correctFileName("."));
 		assert(Util::correctFileName("fichero con espacios. y varios . puntos"));
 	}
-	void testCorrectFilePath(){
+	void testCorrectFilePath() {
 		assert(!Util::correctPath("jc\005dis"));
-		assert(!Util::correctPath("jc1di*s"));
-		assert(!Util::correctPath("jc1dis!"));
 		assert(!Util::correctPath(""));
-		assert(!Util::correctPath("correcto/a/../b"));
+		assert(!Util::correctPath("."));
+		assert(!Util::correctPath("./"));
+		assert(!Util::correctPath("./ "));
+		assert(!Util::correctPath("./."));
+		assert(!Util::correctPath(".."));
+		assert(!Util::correctPath("../"));
+		assert(!Util::correctPath("/../"));
 		assert(!Util::correctPath("correcto/a/.."));
-		assert(!Util::correctPath("correcto/a/..f/b"));
-		assert(!Util::correctPath("correcto/a/..f"));
-		assert(!Util::correctPath("correcto/a/d..f/b"));
-		assert(!Util::correctPath("correcto/a/d..f"));
+		assert(!Util::correctPath("correcto/a/../b"));
+		assert(!Util::correctPath("correcto/a/ d..f/b"));
+		assert(!Util::correctPath("correcto/a/d..f /b"));
+		assert(!Util::correctPath("correcto/a/     /b"));
+		assert(!Util::correctPath("algo/algo/."));
+		assert(!Util::correctPath("correcto/a/./b/c"));
+		assert(Util::correctPath("jc1di*s"));
+		assert(Util::correctPath("correcto/a/d..f/b"));
+		assert(Util::correctPath("correcto/a/d..f"));
+		assert(Util::correctPath("correcto/a/..f/b"));
+		assert(Util::correctPath("correcto/a/..f"));
+		assert(Util::correctPath("jc1dis!"));
 		assert(Util::correctPath("/a/b/c/s"));
-		assert(Util::correctPath("./algo"));
 		assert(Util::correctPath("a.raro/b.c"));
 		assert(Util::correctPath("correcto/a/mal,c/b"));
 		assert(Util::correctPath("correcto/a/mal,c"));
 		assert(Util::correctPath("correcto/a/mal,c"));
+		assert(Util::correctPath("./algo"));
 		assert(Util::correctPath("/dir1/dis2/normal.cvs"));
 		assert(Util::correctPath("/dir1/dis2/normal.cvs.old"));
 		assert(Util::correctPath("/dir1/dis2/normal-con-guiones.cvs"));
@@ -141,7 +169,7 @@ class UtilTest: public BaseTest {
 		assert(Util::correctPath("b"));
 		assert(Util::correctPath("fichero con/espacios. y/varios . puntos"));
 	}
-	void testPathChanged(){
+	void testPathChanged() {
 		assert(!Util::pathChanged("files.test/dis", 0));
 		assert(!Util::pathChanged("files.test/dis", 12));
 		assert(!Util::pathChanged("files.test/a", 12));
@@ -164,7 +192,7 @@ class UtilTest: public BaseTest {
 		assert(Util::pathChanged("files.test/a/b/l3/vv", 14));
 		assert(Util::pathChanged("files.test/a/b/l3/vv", 16));
 	}
-	void testTimeOfFileModification(){
+	void testTimeOfFileModification() {
 		string fileName = "timeOfFileModification.test_file";
 		time_t now = time(NULL);
 		Util::writeFile(fileName, fileName, geteuid());
@@ -173,7 +201,7 @@ class UtilTest: public BaseTest {
 		assert(now <= modification &&  (modification - now) < 3 );
 	}
 
-	void testWriteReadRemoveFile(){
+	void testWriteReadRemoveFile() {
 		string fileName = "/tmp/to_be_or_not_to_be";
 		Util::writeFile(fileName, "mi texto único", getuid());
 		assert( Util::fileExists(fileName) );

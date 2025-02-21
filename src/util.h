@@ -395,9 +395,22 @@ public:
 	}
 
 	static bool correctFileName(const string &fn){
-		static vplregex reg("[[:cntrl:]]|[!-+]|[:-@]|[{-~]|\\\\|\\[|\\]|[\\/\\^`]|^ | $|^\\-|\\.\\.");
-		if (fn.size() < 1) return false;
-		if (fn.size() > JAIL_FILENAME_SIZE_LIMIT) return false;
+		static vplregex reg("[[:cntrl:]]|[\"']|\\\\|[\\/\\^`]|^ | $|^\\.\\.$|^\\.$");
+		if (fn.size() < 1) {
+			Logger::log(LOG_DEBUG, "incorrectFile size = 0");
+			return false;
+		}
+		if (fn.size() > JAIL_FILENAME_SIZE_LIMIT) {
+			Logger::log(LOG_DEBUG, "incorrectFile size > %d", JAIL_FILENAME_SIZE_LIMIT);
+			return false;
+		}
+		for (int i = 0; i < fn.size(); i++) {
+			if (fn[i] == '\0') {
+				Logger::log(LOG_DEBUG, "incorrectFile containing 0 char code '%s'",
+							fn.c_str());
+				return false;
+			}
+		}
 		vplregmatch found(1);
 		bool incorrect = reg.search(fn, found);
 		if (incorrect) {
@@ -409,12 +422,23 @@ public:
 	}
 
 	static bool correctPath(const string &path){ //No trailing /
-		if (path.size() == 0) return false;
-		if (path.size() > JAIL_PATH_SIZE_LIMIT) return false;
+		if (path.size() == 0) {
+			Logger::log(LOG_DEBUG, "file path size = 0");
+			return false;
+		}
+		if (path.size() > JAIL_PATH_SIZE_LIMIT) {
+			Logger::log(LOG_DEBUG, "file path size > %d", JAIL_PATH_SIZE_LIMIT);
+			return false;
+		}
 		size_t pos = 0;
 		size_t found;
 		string fn;
 		if (path[0] == '/') pos = 1; //skip absolute path
+		if (path.size() > 1 && path[0] == '.' && path[1] == '/') pos = 2; //skip relative path
+		if (path.size() <= pos) {
+			Logger::log(LOG_DEBUG, "file path with no file '%s'", path.c_str());
+			return false;
+		}
 		while((found = path.find('/', pos)) != string::npos){
 			fn = path.substr(pos, found - pos);
 			if (!correctFileName(fn)) return false;
@@ -495,14 +519,15 @@ public:
 
 	static bool pathChanged(const string& filePath, size_t pos) {
 		if (pos) {
-
 			size_t found;
 			string dn;
 			struct stat info;
 			while((found = filePath.find('/', pos)) != string::npos){
 				dn = filePath.substr(0, found);
-				if (lstat(dn.c_str(), &info) != 0) return false;
-				if (S_ISLNK(info.st_mode)) return true;
+				if (dn == "..") return true;
+				if (lstat(dn.c_str(), &info) == 0) {
+					if (S_ISLNK(info.st_mode)) return true;
+				}
 				pos = found + 1;
 			}
 			if (lstat(filePath.c_str(), &info) != 0) return false;
@@ -592,9 +617,7 @@ public:
 	 * Delete a file
 	 */
 	static void deleteFile(string name, size_t pos = 0){
-		if (!correctPath(name)) {
-			Logger::log(LOG_ERR,"Can't unlink \"%s\": incorrect path", name.c_str());
-		} else if (dirExists(name)) {
+		if (dirExists(name)) {
 			Logger::log(LOG_ERR,"Can't unlink \"%s\": is a directory", name.c_str());
 		} else if (pathChanged(name, pos)) {
 			Logger::log(LOG_ERR,"Can't unlink \"%s\": is a directory", name.c_str());
