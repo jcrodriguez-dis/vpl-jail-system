@@ -2,8 +2,8 @@
 "C compiler (GNU)" gcc
 "General purpose debugger (GNU)" gdb
 "DDD graphical front end debugger (GNU)" ddd
-"Java runtime" default-jre openjdk-11-jre openjdk-8-jre openjdk-7-jre
-"Java jdk" default-jdk openjdk-11-jdk openjdk-8-jdk openjdk-7-jdk
+"Java runtime" openjdk-21-jre openjdk-17-jre default-jre openjdk-11-jre openjdk-8-jre openjdk-7-jre
+"Java jdk" openjdk-21-jdk openjdk-17-jdk default-jdk openjdk-11-jdk openjdk-8-jdk openjdk-7-jdk
 "JavaFX" openjfx
 "Java Checkstyle" checkstyle
 "Junit framework" junit4 junit
