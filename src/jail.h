@@ -56,6 +56,9 @@ protected:
 	void commandExecute(string userticket,Socket *s);
 	bool commandSetPassthroughCookie(string passthroughticket, HttpJailServer & server);
 public:
+	static const vplregex regPassthroughTicket;
+	static const vplregex regChallenge;
+	static const vplregex regWebSocketPath;
 	Jail(string);
 	void checkFilesNameCorrectness(mapstruct files);
 	bool isValidIPforRequest();

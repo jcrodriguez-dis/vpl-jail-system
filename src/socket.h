@@ -166,10 +166,6 @@ class Socket{
 	string header;
 	string readBuffer;
 	string writeBuffer;
-	static vplregex regRequestLine;
-	static vplregex regHeader;
-	static vplregex regURL;
-	static vplregex regCookie;
 	bool closed;
 	void parseRequestLine(const string &line);
 	void parseHeader(const string &line);
@@ -178,6 +174,10 @@ class Socket{
 	virtual ssize_t netWrite(const void *, size_t);
 	virtual ssize_t netRead(void *, size_t);
 public:
+	static const vplregex regRequestLine;
+	static const vplregex regHeader;
+	static const vplregex regURL;
+	static const vplregex regCookie;
 	Socket(int socket);
 	virtual ~Socket();
 	void readHeaders();

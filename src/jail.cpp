@@ -533,6 +533,7 @@ bool Jail::httpPassthrough(string passthroughticket, Socket *socket){
 	return false;
 }
 
+const vplregex Jail::regPassthroughTicket("^\\/([^\\/]+)\\/httpPassthrough$");
 /**
  * Checks for http Passthrough setting request
  * 
@@ -542,9 +543,8 @@ bool Jail::httpPassthrough(string passthroughticket, Socket *socket){
  * @return true if valid request structure found
  */
 bool Jail::isRequestingCookie(string URLPath, string &ticket) {
-	static vplregex reg("^\\/([^\\/]+)\\/httpPassthrough$");
 	vplregmatch match(3);
-	if (! reg.search(URLPath, match)) {
+	if (! regPassthroughTicket.search(URLPath, match)) {
 		return false;
 	}
 	ticket = match[1];
@@ -577,6 +577,8 @@ Jail::Jail(string IP){
 	configuration = Configuration::getConfiguration();
 }
 
+const vplregex Jail::regChallenge("^\\/\\.well-known\\/acme-challenge\\/([^\\/]*)$");
+
 string Jail::predefinedURLResponse(string URLPath) {
 	string page;
 	if( Util::toUppercase(URLPath) == "/OK"){
@@ -589,9 +591,8 @@ string Jail::predefinedURLResponse(string URLPath) {
 				"fill: #277ab0; stroke: black; stroke-width: 0.7px;} </style>"
 				"<text x=\"0\" y=\"12\" class=\"logo\">VPL</text></svg>";
 	} else if(configuration->getCertbotWebrootPath() != "") {
-		static vplregex challenge("^\\/\\.well-known\\/acme-challenge\\/([^\\/]*)$");
 		static vplregmatch path(2);
-		if (challenge.search(URLPath, path)) {
+		if (regChallenge.search(URLPath, path)) {
 			string filePath = configuration->getCertbotWebrootPath() + URLPath;
 			if (Util::fileExists(filePath)) {
 				page = Util::readFile(filePath, false, configuration->getCertbotWebrootPath().size() + 1);
@@ -600,6 +601,9 @@ string Jail::predefinedURLResponse(string URLPath) {
 	}
 	return page;
 }
+
+const vplregex Jail::regWebSocketPath("^\\/([^\\/]+)\\/(.+)$");
+
 /**
  * Process request
  *  3) read http request and header
@@ -740,9 +744,8 @@ void Jail::process(Socket *socket){
 				throw "ws(s) Unsupported METHOD " + httpMethod;
 			}
 			string URLPath = socket->getURLPath();
-			vplregex webSocketPath("^\\/([^\\/]+)\\/(.+)$");
 			vplregmatch found(3);
-			bool isfound = webSocketPath.search(URLPath, found);
+			bool isfound = regWebSocketPath.search(URLPath, found);
 			if (! isfound) {
 				throw string("Bad URL");
 			}

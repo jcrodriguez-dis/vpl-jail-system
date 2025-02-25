@@ -109,6 +109,7 @@ public:
 		this->server = -1;
 		this->timeout = time(NULL) + 10;
 	}
+	static const vplregex regServerAddress;
 	void advance();
 };
 

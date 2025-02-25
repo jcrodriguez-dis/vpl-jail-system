@@ -19,10 +19,10 @@
 
 SSLBase* SSLBase::singlenton=NULL;
 
-vplregex Socket::regRequestLine("^([^ ]+) ([^ ]+) ([^ ]+)$");
-vplregex Socket::regHeader("^[ \t]*([^ \t:]+):[ \t]*(.*)$");
-vplregex Socket::regURL("^([a-zA-Z]+)?(:\\/\\/[^\\/]+)?([^?]*)($|\\?.*$)");
-vplregex Socket::regCookie("([^=]+)=([^;]+)(; )?");
+const vplregex Socket::regRequestLine("^([^ ]+) ([^ ]+) ([^ ]+)$");
+const vplregex Socket::regHeader("^[ \t]*([^ \t:]+):[ \t]*(.*)$");
+const vplregex Socket::regURL("^([a-zA-Z]+)?(:\\/\\/[^\\/]+)?([^?]*)[?]?(.*$)");
+const vplregex Socket::regCookie("([^=]+)=([^;]+)(; )?");
 
 /**
  * Process the http request line

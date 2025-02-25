@@ -7,4 +7,5 @@
 
 int Base64::C642int[256];
 static Base64 nothingBase64; 
-
+const vplregex Util::regMemSize("^[ \t]*([0-9]+)[ \t]*([GgMmKk]?)");
+const vplregex Util::correctFileNameReg("[[:cntrl:]]|[\"']|\\\\|[\\/\\^`]|^ | $|^\\.\\.$|^\\.$");

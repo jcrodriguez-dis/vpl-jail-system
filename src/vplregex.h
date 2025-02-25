@@ -33,7 +33,7 @@ public:
 	~vplregex() {
 		regfree(& creg);
 	}
-	bool search(const string &input, vplregmatch &found) {
+	bool search(const string &input, vplregmatch &found) const {
 		const int maxmatch = 10;
 		int limit = (int) found.size();
 		regmatch_t match[maxmatch];

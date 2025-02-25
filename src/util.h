@@ -320,11 +320,12 @@ public:
 		return value;
 	}
 
+	static const vplregex regMemSize;
+
 	/**
 	 * return a memory size in Gb, Mb or Kb to as bytes long long
 	 */
 	static long long memSizeToBytesl(const string &memSize){
-		static vplregex regMemSize("^[ \t]*([0-9]+)[ \t]*([GgMmKk]?)");
 		const int numberGroup = 1;
 		const int abbrebiationGroup = 2;
 		vplregmatch found(3);
@@ -394,8 +395,9 @@ public:
 		}
 	}
 
+	static const vplregex correctFileNameReg;
+
 	static bool correctFileName(const string &fn){
-		static vplregex reg("[[:cntrl:]]|[\"']|\\\\|[\\/\\^`]|^ | $|^\\.\\.$|^\\.$");
 		if (fn.size() < 1) {
 			Logger::log(LOG_DEBUG, "incorrectFile size = 0");
 			return false;
@@ -412,7 +414,7 @@ public:
 			}
 		}
 		vplregmatch found(1);
-		bool incorrect = reg.search(fn, found);
+		bool incorrect = correctFileNameReg.search(fn, found);
 		if (incorrect) {
 			string incorrect = found[0];
 			Logger::log(LOG_DEBUG,"incorrectFile '%s' found '%s'"

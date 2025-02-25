@@ -376,12 +376,11 @@ void RedirectorVNC::advance() {
 		Logger::log(LOG_INFO,"New redirector state %d => %d",oldstate,state);
 }
 
+const vplregex RedirectorWebServer::regServerAddress("(127\\.[0-9]+\\.[0-9]+\\.[0-9]+):([0-9]+)");
 /**
  * Advance for Web
  */
 void RedirectorWebServer::advance() {
-	static string regexp = "(127\\.[0-9]+\\.[0-9]+\\.[0-9]+):([0-9]+)";
-	static vplregex regServerAddress(regexp);
 	States oldstate = state;
 	switch(state) {
 	case begin: {
