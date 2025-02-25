@@ -1,7 +1,7 @@
 # Basic packages for VPL jail system on Linux using APK (Alpine)
 "C compiler (GNU)" gcc
 "General purpose debugger (GNU)" gdb
-"Java" openjdk21 openjdk20 openjdk19 openjdk17 openjdk11 openjdk8
+"Java" openjdk25 openjdk21 openjdk17 openjdk11 openjdk8
 "JavaFX" openjfx
 "Junit framework" junit4 junit
 "PHP interpreter" php83 php82 php81 php8
