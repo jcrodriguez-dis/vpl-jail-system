@@ -1,7 +1,7 @@
 # Full additional packages for VPL jail system on Linux using APT (Debian, Ubuntu, etc.)
 "Clisp" clisp
 "Clojure" clojure clojure1.6 clojure1.4
-"Cobol" open-cobol
+"Cobol" gnucobol
 "CoffeeScript" coffeescript
 "D compiler (GNU)" gdc
 "Erlang" erlang
