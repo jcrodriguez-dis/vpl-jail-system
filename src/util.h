@@ -450,7 +450,12 @@ public:
 		return correctFileName(fn);
 	}
 
-	static string getDir(const string &filePath){
+	/**
+	 * Retruns the directory path of a filepath
+	 * @param filePath file path
+	 * @return directory path or ""
+	 */
+	static string getDirectory(const string &filePath){
 		size_t pos;
 		if ((pos = filePath.rfind('/')) != string::npos) {
 			return filePath.substr(0, pos);
@@ -458,34 +463,41 @@ public:
 		return "";
 	}
 
-	static bool createDir(const string &path, uid_t user,size_t pos = 1){ //absolute path
+	/**
+	 * Create a directory from position in path
+	 * @param filePath file path
+	 * @return file name or ""
+	 */
+	static bool createDir(const string &path, uid_t user, size_t pos = 1) { //absolute path
+		pos = pos == 0 ? 1 : pos;
+		Logger::log(LOG_DEBUG, "createDir '%s' user %d pos %u", path.c_str(), user, pos);
 		string curDir;
-		while((pos = path.find('/',pos)) != string::npos){
-			curDir=path.substr(0,pos++);
-			Logger::log(LOG_DEBUG,"dir to check or create '%s' user %d",curDir.c_str(),user);
-			if(! dirExists(curDir) ){
-				if(mkdir(curDir.c_str(),0700)){
-					Logger::log(LOG_DEBUG,"Can't create dir '%s'",curDir.c_str());
+		while((pos = path.find('/', pos)) != string::npos) {
+			curDir = path.substr(0, pos);
+			pos++;
+			Logger::log(LOG_DEBUG, "Dir to check or create '%s' user %d", curDir.c_str(), user);
+			if(! dirExists(curDir) ) {
+				if(mkdir(curDir.c_str(), 0700)) {
+					Logger::log(LOG_DEBUG, "Can't create dir '%s'", curDir.c_str());
 					return false;
 				}
-				Logger::log(LOG_DEBUG,"Change owner to %d",user);
-				if(lchown(curDir.c_str(),user,user)){
-					Logger::log(LOG_DEBUG,"Can't lchown dir '%s'",curDir.c_str());
+				Logger::log(LOG_DEBUG, "Change owner to %d", user);
+				if(lchown(curDir.c_str(), user, user)) {
+					Logger::log(LOG_DEBUG, "Can't lchown dir '%s'", curDir.c_str());
 					return false;
 				}
-
 			}
 		}
-		Logger::log(LOG_DEBUG,"dir to check or create '%s'",path.c_str());
-		if(! dirExists(path) ){
-			Logger::log(LOG_DEBUG,"Create '%s'",path.c_str());
-			if(mkdir(path.c_str(),0700)){
-				Logger::log(LOG_DEBUG,"Can't create dir '%s' %m",path.c_str());
+		Logger::log(LOG_DEBUG, "Dir to check or create '%s'", path.c_str());
+		if(! dirExists(path) ) {
+			Logger::log(LOG_DEBUG, "Create '%s'",path.c_str());
+			if(mkdir(path.c_str(), 0700)) {
+				Logger::log(LOG_DEBUG, "Can't create dir '%s' %m", path.c_str());
 				return false;
 			}
-			Logger::log(LOG_DEBUG,"Change owner to %d",user);
-			if(lchown(path.c_str(),user,user)){
-				Logger::log(LOG_DEBUG,"Can't lchown dir '%s' %m",path.c_str());
+			Logger::log(LOG_DEBUG, "Change owner to %d", user);
+			if(lchown(path.c_str(),user,user)) {
+				Logger::log(LOG_DEBUG, "Can't lchown dir '%s' %m", path.c_str());
 				return false;
 			}
 		}
@@ -524,9 +536,9 @@ public:
 			size_t found;
 			string dn;
 			struct stat info;
-			while((found = filePath.find('/', pos)) != string::npos){
+			while((found = filePath.find('/', pos)) != string::npos) {
+				if (filePath.substr(pos, found - pos) == "..") return true;
 				dn = filePath.substr(0, found);
-				if (dn == "..") return true;
 				if (lstat(dn.c_str(), &info) == 0) {
 					if (S_ISLNK(info.st_mode)) return true;
 				}
@@ -550,7 +562,7 @@ public:
 	 */
 
 	static void writeFile(string name, const string &data, uid_t user = 0, size_t pos = 0){
-		if (!correctPath(name)) {
+		if (! correctPath(name)) {
 			Logger::log(LOG_ERR, "Trying to write an incorrect filename '%s'", name.c_str());
 			throw HttpException(internalServerErrorCode, "I can't write file");
 		}
@@ -565,7 +577,7 @@ public:
 		// TODO when C++17 => use canonical or weakly_canonical from std::filesystem
 		FILE *fd = fopen(name.c_str(), "wb");
 		if (fd == NULL) {
-			string dir = getDir(name);
+			string dir = getDirectory(name);
 			Logger::log(LOG_DEBUG, "path '%s' dir '%s'", name.c_str(), dir.c_str());
 			if (dir.size())
 				createDir(dir, user, pos);
@@ -617,16 +629,24 @@ public:
 
 	/**
 	 * Delete a file
+	 * @param fileNamePath file path
+	 * @param pos position in the path from which directories will be checked;
+	 *            directories before this position are not checked.
 	 */
-	static void deleteFile(string name, size_t pos = 0){
-		if (dirExists(name)) {
-			Logger::log(LOG_ERR,"Can't unlink \"%s\": is a directory", name.c_str());
-		} else if (pathChanged(name, pos)) {
-			Logger::log(LOG_ERR,"Can't unlink \"%s\": is a directory", name.c_str());
-		} else if(Util::fileExists(name)){
-			Logger::log(LOG_DEBUG,"Delete \"%s\"", name.c_str());
-			if(unlink(name.c_str())){
-				Logger::log(LOG_ERR,"Can't unlink \"%s\": %m",name.c_str());
+	static void deleteFile(string fileNamePath, size_t pos = 0){
+		if (dirExists(fileNamePath)) {
+			Logger::log(LOG_ERR,"Can't unlink \"%s\": is a directory", fileNamePath.c_str());
+			return;
+		}
+		string dirPath = getDirectory(fileNamePath);
+		if (pathChanged(dirPath, 1)) {
+			Logger::log(LOG_ERR,"Can't unlink \"%s\": is under symlink directory?", fileNamePath.c_str());
+			return;
+		}
+		if (Util::fileExists(fileNamePath)) {
+			Logger::log(LOG_DEBUG,"Delete \"%s\"", fileNamePath.c_str());
+			if (unlink(fileNamePath.c_str())) {
+				Logger::log(LOG_ERR,"Can't unlink \"%s\": %m", fileNamePath.c_str());
 			}
 		}
 	}

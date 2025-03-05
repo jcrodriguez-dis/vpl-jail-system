@@ -203,6 +203,8 @@ class UtilTest: public BaseTest {
 
 	void testWriteReadRemoveFile() {
 		string fileName = "/tmp/to_be_or_not_to_be";
+		Util::deleteFile(fileName);
+		Util::removeDir(fileName, getuid(), false);
 		Util::writeFile(fileName, "mi texto único", getuid());
 		assert( Util::fileExists(fileName) );
 		assert( Util::readFile(fileName) == "mi texto único" );
@@ -214,6 +216,92 @@ class UtilTest: public BaseTest {
 		Util::writeFile(fileName, text);
 		assert( Util::readFile(fileName) == text );
 		Util::deleteFile(fileName);
+	}
+
+	void testWriteReadRemoveBadFile() {
+		const int ncases = 6;
+		const char *badFilenames[] = {
+			"/tmp/../to_be_or_not_to_be",
+			"/tmp/to_be_or_not_to_be/.",
+			"/tmp/to_be_or_not_to_be/..",
+			"/tmp/to_be_or_not_to_be/../",
+			"/tmp/to_be_or_not_to_be/./",
+			"../tmp/to_be_or_not_to_be/algo"
+		};
+		// Check that bad files are not created
+		for (int i = 0; i < ncases; i++) {
+			string fileName = badFilenames[i];
+			try {
+				Util::writeFile(fileName, "mi texto único", getuid());
+				assert(false);
+			}
+			catch (HttpException e) {}
+			assert(! Util::fileExists(fileName));
+			Util::removeDir("/tmp/to_be_or_not_to_be", getuid(), false);
+		}
+		// Remove test file if exists
+		Util::deleteFile("/tmp/algo");
+		string baseDir = "/tmp/to_be_or_not_to_be";
+		Util::createDir(baseDir, getuid());
+		string symDir = baseDir + "/fake";
+		// Create a symlink to the directory /tmp
+		assert(symlink("/tmp", symDir.c_str()) == 0);
+		string fileName = symDir + "/algo";
+		// Check symlink are not followed
+		try {
+			Util::writeFile(symDir, "mi texto único", getuid(), 1);
+			assert(false);
+		}
+		catch (HttpException e) {
+			cout << e.getMessage() << endl;
+		}
+		// Check that symlink is not followed
+		try {
+			Util::writeFile(fileName, "mi texto único", getuid(), 1);
+			assert(false);
+		}
+		catch (HttpException e) {
+			cout << e.getMessage() << endl;
+		}
+		// Check that symlink is not followed and create file
+		assert(! Util::fileExists(fileName));
+		Util::deleteFile("/tmp/nada");
+		// Check create directory checking not from root
+		assert(Util::createDir(baseDir + "/algo/nada", getuid(), baseDir.size()));
+		// Check create file checking not from root followinf symlinks
+		Util::writeFile(fileName, "mi texto único", getuid(), symDir.size() + 1);
+		assert(Util::fileExists(fileName));
+		// Check delete file following symlinks checking not from root
+		Util::deleteFile(fileName, 10000);
+		Util::removeDir(baseDir, getuid(), false);
+		assert(! Util::fileExists(fileName));
+		assert(! Util::dirExists(baseDir));
+		assert(! Util::dirExists(symDir));
+		Util::deleteFile(symDir, 10000);
+	}
+
+	void testDeleteFileOK() {
+		string fileName = "/tmp/to_be_or_not_to_be";
+		Util::deleteFile(fileName);
+		Util::removeDir(fileName, getuid(), false);
+		Util::writeFile(fileName, "mi texto único", getuid());
+		assert( Util::fileExists(fileName) );
+		Util::deleteFile(fileName);
+		assert( ! Util::fileExists(fileName) );
+		string dirName = "/tmp/to/_be_/or_/not_to_";
+		fileName = dirName + "/be.txt";
+		Util::writeFile(fileName, "mi texto único", getuid());
+		assert(Util::dirExists(dirName));
+		assert( Util::fileExists(fileName) );
+		Util::deleteFile(fileName);
+		assert( ! Util::fileExists(fileName) );
+		assert(Util::dirExists(dirName));
+		Util::writeFile(dirName + ".algo", "mi texto único", getuid());
+		Util::writeFile(dirName + "./algo", "mi texto único", getuid());
+		Util::writeFile(dirName + "algo con cosas 😊", "😊mi texto único😊", getuid());
+		string topDir = "/tmp/to";
+		Util::removeDir(topDir, getuid(), true);
+		assert( ! Util::dirExists(topDir) );
 	}
 
 	void testMemSizeToBytesl() {
@@ -319,8 +407,10 @@ public:
 		testToUppercase();
 		testCorrectFileName();
 		testCorrectFilePath();
+		testDeleteFileOK();
 		testPathChanged();
 		testWriteReadRemoveFile();
+		testWriteReadRemoveBadFile();
 		testTimeOfFileModification();
 		testMemSizeToBytesl();
 		testMemSizeToBytesi();
