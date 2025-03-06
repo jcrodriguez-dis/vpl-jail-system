@@ -218,7 +218,23 @@ public:
 	bool end(ssize_t ret){
 		if (ret > 0) return true;
 		int code = SSL_get_error(ssl, ret);
-		const char *scode = NULL;
+		const char *scode = "UNKNOW SSL ERROR ";
+		switch (code) {
+			case SSL_ERROR_WANT_CONNECT:
+				scode = "SSL_ERROR_WANT_CONNECT ";
+			break;
+			case SSL_ERROR_WANT_ACCEPT:
+				scode = "SSL_ERROR_WANT_ACCEPT ";
+			break;
+			case SSL_ERROR_SYSCALL:
+				scode = "SSL_ERROR_SYSCALL ";
+			break;
+			case SSL_ERROR_SSL:
+				scode = "SSL_ERROR_SSL ";
+			break;
+			default:
+				scode = "UNKNOW SSL_ERROR ";
+		}
 		switch (code) {
 			case SSL_ERROR_NONE: return true;
 			case SSL_ERROR_ZERO_RETURN: return true;
@@ -229,34 +245,13 @@ public:
 				devices[0].events = POLLOUT;
 				break;
 			case SSL_ERROR_WANT_CONNECT:
-				if (scode == NULL) {
-					scode = "SSL_ERROR_WANT_CONNECT ";
-				}
-				/* no break */
 			case SSL_ERROR_WANT_ACCEPT:
-				if (scode == NULL) {
-					scode = "SSL_ERROR_WANT_ACCEPT ";
-				}
-				/* no break */
 			case SSL_ERROR_SYSCALL:
-				if (scode == NULL) {
-					scode = "SSL_ERROR_SYSCALL ";
-				}
-				if(ret == 0){
-					Logger::log(LOG_INFO,"SSL socket closed unexpected ret==0: %s %s",
-						message.c_str(), scode);
-					return true;
-				}
-				/* no break */
+				Logger::log(LOG_INFO,"SSL socket closed unexpected ret==0: %s %s",
+					message.c_str(), scode);
+				return true;
 			case SSL_ERROR_SSL:
-				if (scode == NULL) {
-					scode = "SSL_ERROR_SSL ";
-				}
-				/* no break */
 			default:
-				if (scode == NULL) {
-					scode = "UNKNOW SSL_ERROR ";
-				}
 				throw HttpException(internalServerErrorCode,
 				      	message + scode + SSLBase::getError()); //Error
 		}
