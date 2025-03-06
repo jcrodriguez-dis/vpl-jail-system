@@ -41,7 +41,7 @@ AC_TYPE_UID_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT8_T
-CPPFLAGS="-Wall"
+CPPFLAGS="-Wall -Wextra -Wpedantic"
 AM_INIT_AUTOMAKE
 
 # Checks for library functions.

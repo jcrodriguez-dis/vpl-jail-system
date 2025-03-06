@@ -4831,7 +4831,7 @@ _ACEOF
 ;;
   esac
 
-CPPFLAGS="-Wall"
+CPPFLAGS="-Wall -Wextra -Wpedantic"
 am__api_version='1.16'
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether build environment is sane" >&5
