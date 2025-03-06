@@ -33,9 +33,11 @@ function runTests() {
 	local test
 	local fmessages=messages.txt
 	local ferrors=errors.txt
+	local fallerrors=allerrors.txt
 	local ntests=$#
 	local n=1
 	local testresult
+	[ -f $fallerrors ] && rm $fallerrors
 	if [ $ntests -gt 1 ] ; then
 		writeInfo "" "$ntests tests"
 	fi
@@ -53,6 +55,10 @@ function runTests() {
 			fi
 		} 1>$fmessages 2>$ferrors
 		testresult=$?
+		if [[ -s "$ferrors" ]] ; then
+			echo "Errors in test $n: $test" >> $fallerrors
+			cat $ferrors >> $fallerrors
+		fi
 		if [ "$testresult" != "0" -a "$testresult" != "111" ] ; then
 			writeError "Errors found" " $X_MARK"
 			writeInfo "Standard error" " (max 100 lines)"
@@ -142,7 +148,7 @@ function WebSocket_tests() {
 		running=$!
 		python3 ./webSocketClient.py
 		result=$?
-		kill $running
+		kill $running 2> /dev/null
 		cd ..
 		if [ "$result" != "0" ] ; then
 			tail /var/log/syslog
