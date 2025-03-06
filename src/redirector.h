@@ -25,10 +25,10 @@ using namespace std;
 
 class Redirector {
 protected:
-	const int MAX = JAIL_NET_BUFFER_SIZE; //Buffer size to read
-	const int POLLBAD = POLLERR | POLLHUP | POLLNVAL;
-	const int POLLREAD = POLLIN | POLLPRI;
-	const int polltimeout = 100; //  0.1 sec 
+	static const int MAX; //Buffer size to read
+	static const int POLLBAD;
+	static const int POLLREAD;
+	static const int polltimeout;
 	time_t timeout; //Timeout when connecting
 	string messageBuf; //Buffer of messages from Jail system
 	string programbuf; //Buffer from net to program

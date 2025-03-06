@@ -14,6 +14,11 @@
 #include "jail_limits.h"
 #include "redirector.h"
 
+const int Redirector::MAX = JAIL_NET_BUFFER_SIZE; //Buffer size to read
+const int Redirector::POLLBAD = POLLERR | POLLHUP | POLLNVAL;
+const int Redirector::POLLREAD = POLLIN | POLLPRI;
+const int Redirector::polltimeout = 100; //  0.1 sec 
+
 Redirector::Redirector(): bufferSizeLimit(50*1024) {
 	state = error;
 	timeout = 0; //Timeout when connecting
@@ -102,278 +107,291 @@ string Redirector::eventsToString(int events){
 /**
  * Advance for batch execution
  */
-void RedirectorTerminalBatch::advance(){
-	int oldstate = state;
-	switch(state) {
-	case begin:
-		if (fdps < 0) {
-			state = error; //fd pseudo terminal error
-			break;
-		}
-		Util::fdblock(fdps, false);
-		/* no break */
-	case connecting:
-		state = connected;
-		/* no break */
-	case connected:{
-		//Poll to read from program
-		struct pollfd devices[1];
-		devices[0].fd = fdps;
-		char buf[MAX];
-		devices[0].events = POLLREAD; //removed |POLLOUT
-		int res = poll(devices, 1, polltimeout);
-		if (res == -1) { //Error
-			state = error;
-			break;
-		}
-		if(res == 0) break; //Nothing to do
-		//Logger::log(LOG_INFO,"poll: program %d %s.",
-		//			devices[0].revents,eventsToString(devices[0].revents).c_str());
-		if (devices[0].revents & POLLREAD) { //Read program output
-			int readsize = read(fdps, buf, MAX);
-			if (readsize == 0) {
-				Logger::log(LOG_INFO, "program output end: %m");
-				state = end;
-				break;		
-			}
-			if (readsize < 0) {
-				Logger::log(LOG_INFO, "program output read error: %m");
-				state = error;
-				break; //program output read error
-			}
-			if (readsize >0) {
-				netbuf += string(buf,readsize);
+void RedirectorTerminalBatch::advance() {
+	int oldstate;
+	do {
+		oldstate = state;
+		switch(state) {
+			case begin:
+				if (fdps < 0) {
+					state = error; //fd pseudo terminal error
+					break;
+				}
+				Util::fdblock(fdps, false);
+				break;
+			case connecting:
+				state = connected;
+				break;
+			case connected:{
+				//Poll to read from program
+				struct pollfd devices[1];
+				devices[0].fd = fdps;
+				char buf[MAX];
+				devices[0].events = POLLREAD; //removed |POLLOUT
+				int res = poll(devices, 1, polltimeout);
+				if (res == -1) { //Error
+					state = error;
+					break;
+				}
+				if(res == 0) break; //Nothing to do
+				//Logger::log(LOG_INFO,"poll: program %d %s.",
+				//			devices[0].revents,eventsToString(devices[0].revents).c_str());
+				if (devices[0].revents & POLLREAD) { //Read program output
+					int readsize = read(fdps, buf, MAX);
+					if (readsize == 0) {
+						Logger::log(LOG_INFO, "program output end: %m");
+						state = end;
+						break;		
+					}
+					if (readsize < 0) {
+						Logger::log(LOG_INFO, "program output read error: %m");
+						state = error;
+						break; //program output read error
+					}
+					if (readsize >0) {
+						netbuf += string(buf,readsize);
+						break;
+					}
+				}
+				if (devices[0].revents & POLLBAD) {
+					Logger::log(LOG_INFO, "Program end or I/O error: %m %d %s.",
+							devices[0].revents,eventsToString(devices[0].revents).c_str());
+					state = error;
+					break;
+				}
 				break;
 			}
+			case ending:
+				state = end;
+				break;
+			case end:
+			case error:
+				usleep(50000);
+				break;
 		}
-		if (devices[0].revents & POLLBAD) {
-			Logger::log(LOG_INFO, "Program end or I/O error: %m %d %s.",
-					devices[0].revents,eventsToString(devices[0].revents).c_str());
-			state = error;
-			break;
-		}
-		break;
-	}
-	case ending:
-		state = end;
-		/* no break */
-	case end:
-	case error:
-		usleep(50000);
-		break;
-	}
-	if(oldstate != state)
-		Logger::log(LOG_INFO,"New redirector state %d => %d",oldstate,state);
-
+		if(oldstate != state)
+			Logger::log(LOG_INFO,"New redirector state %d => %d",oldstate,state);
+	} while (oldstate != state);
 }
 
 /**
  * Advance for online execution
  */
 void RedirectorTerminal::advance() {
-	States oldstate=state;
-	switch(state){
-	case connecting:
-		break;
-	case begin:{
-		if(fdps<0) {
-			state=error; //fd pseudo terminal error
-			break;
-		}
-		Util::fdblock(fdps,false);
-		state=connected;
-	case connected:{
-		//Poll to write and read from program and net
-		if(ws->isReadBuffered())
-			programbuf += ws->receive();
-		struct pollfd devices[2];
-		devices[0].fd=fdps;
-		devices[1].fd=ws->getSocket();
-		char buf[MAX];
-		if(programbuf.size()) devices[0].events=POLLREAD|POLLOUT;
-		else devices[0].events=POLLREAD;
-		devices[1].events=POLLREAD;
-		int res=poll(devices,2,polltimeout);
-		if(res==-1) { //Error
-			Logger::log(LOG_INFO,"pool error %m");
-			state = error;
-			break;
-		}
-		if(res==0) break; //Nothing to do
-		Logger::log(LOG_INFO,"poll: program %d %s",
-				devices[0].revents,eventsToString(devices[0].revents).c_str());
-		if(devices[1].revents & POLLREAD)
-			programbuf += ws->receive();
-		if((devices[0].revents & POLLREAD) && !isOutputBufferFull()){ //Read program output
-			int readsize=read(fdps,buf,MAX);
-			if(readsize <= 0){
-				Logger::log(LOG_INFO,"program output read error: %m");
-				state=ending;
-				break; //program output read error
-			}
-			if(readsize >0) {
-				ws->send(string(buf,readsize));
-			}
-		}
-		if(programbuf.size()>0 && (devices[0].revents & POLLOUT)){ //Write to program
-			int written=write(fdps,programbuf.data(),programbuf.size());
-			if(written <=0) {
-				Logger::log(LOG_INFO,"Write to program error: %m");
-				state=ending;
+	States oldstate;
+	do {
+		oldstate = state;
+		switch(state) {
+			case connecting:
 				break;
-			}
-			programbuf.erase(0,written);
+			case begin:
+				if(fdps<0) {
+					state=error; //fd pseudo terminal error
+					break;
+				}
+				Util::fdblock(fdps,false);
+				state=connected;
+				break;
+			case connected:
+				{
+					//Poll to write and read from program and net
+					if(ws->isReadBuffered())
+						programbuf += ws->receive();
+					struct pollfd devices[2];
+					devices[0].fd=fdps;
+					devices[1].fd=ws->getSocket();
+					char buf[MAX];
+					if(programbuf.size()) devices[0].events=POLLREAD|POLLOUT;
+					else devices[0].events=POLLREAD;
+					devices[1].events=POLLREAD;
+					int res=poll(devices,2,polltimeout);
+					if(res==-1) { //Error
+						Logger::log(LOG_INFO,"pool error %m");
+						state = error;
+						break;
+					}
+					if(res==0) break; //Nothing to do
+					Logger::log(LOG_INFO,"poll: program %d %s",
+							devices[0].revents,eventsToString(devices[0].revents).c_str());
+					if(devices[1].revents & POLLREAD)
+						programbuf += ws->receive();
+					if((devices[0].revents & POLLREAD) && !isOutputBufferFull()){ //Read program output
+						int readsize=read(fdps,buf,MAX);
+						if(readsize <= 0){
+							Logger::log(LOG_INFO,"program output read error: %m");
+							state=ending;
+							break; //program output read error
+						}
+						if(readsize >0) {
+							ws->send(string(buf,readsize));
+						}
+					}
+					if(programbuf.size()>0 && (devices[0].revents & POLLOUT)){ //Write to program
+						int written=write(fdps,programbuf.data(),programbuf.size());
+						if(written <=0) {
+							Logger::log(LOG_INFO,"Write to program error: %m");
+							state=ending;
+							break;
+						}
+						programbuf.erase(0,written);
+					}
+					if((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)){
+						Logger::log(LOG_INFO,"Program end or I/O error: %m %d %s",devices[0].revents,eventsToString(devices[0].revents).c_str());
+						state=ending;
+						break;
+					}
+				}
+				break;
+			case ending:
+				{
+					if(isSilent()){
+						Logger::log(LOG_INFO,"Program terminated with no output");
+						ws->send("\nProgram terminated with no output\n");
+					}
+					if(messageBuf.size()>0){
+						Logger::log(LOG_INFO,"Add jail message to output");
+						ws->send(messageBuf);
+						messageBuf="";
+					}
+					state=end;
+				}
+				break;
+			case end:
+			case error:
+				if(ws->isClosed())
+					usleep(50000);
+				else ws->close();
+				break;
 		}
-		if((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)){
-			Logger::log(LOG_INFO,"Program end or I/O error: %m %d %s",devices[0].revents,eventsToString(devices[0].revents).c_str());
-			state=ending;
-			break;
-		}
-		break;
-	}
-	case ending:{
-		if(isSilent()){
-			Logger::log(LOG_INFO,"Program terminated with no output");
-			ws->send("\nProgram terminated with no output\n");
-		}
-		if(messageBuf.size()>0){
-			Logger::log(LOG_INFO,"Add jail message to output");
-			ws->send(messageBuf);
-			messageBuf="";
-		}
-	}
-	state=end;
-	/* no break */
-	case end:
-	case error:
-		if(ws->isClosed())
-			usleep(50000);
-		else ws->close();
-		break;
-	}
-	}
-	if(oldstate != state)
-		Logger::log(LOG_INFO,"New redirector state %d => %d",oldstate,state);
+		if(oldstate != state)
+			Logger::log(LOG_INFO,"New redirector state %d => %d", oldstate, state);
+	} while (oldstate != state);
 }
 
 /**
  * Advance for VNC
  */
 void RedirectorVNC::advance() {
-	States oldstate=state;
-	switch(state){
-	case begin:{
-		sock=socket(AF_INET,SOCK_STREAM,0);//0= IP protocol
-		if(sock<0){
-			state=error; //No socket available
-			break;
-		}
-		int on=1;
-		if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ) {
-			Logger::log(LOG_ERR,"setsockopt(SO_REUSEADDR) failed: %m");
-		}
-		#ifdef SO_REUSEPORT
-	    if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
-			Logger::log(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
-	    }
-		#endif
-		//fdblock(sock,false);
-		state=connecting;
-	}
-	/* no break */
-	case connecting: {
-		struct sockaddr_in sdir;
-		memset(&sdir, 0, sizeof(sdir));
-		sdir.sin_family = AF_INET;
-		inet_pton(AF_INET,"127.0.0.1",&sdir.sin_addr);
-		sdir.sin_port = htons( port );
-		if (connect(sock, (const sockaddr*)&sdir, sizeof(sdir))==0) {
-			//fdblock(sock,true);
-			state = connected;
-			break;
-		}else{
-			Logger::log(LOG_INFO, "socket connect to (127.0.0.1:%d) error: %m",(int)port);
-			usleep(100000); // 1/10 sec
-		}
-		if (timeout < time(NULL)) {
-			Logger::log(LOG_ERR, "socket connect timeout: %m");
-			state = error;
-		}
-		break;
-	}
-	case connected:{
-		//Poll to write and read from program and net
-		if (ws->isClosed()) {
-			Logger::log(LOG_INFO, "Websocket closed by client");
-			state = end;
-			break;
-		}
-		if (ws->isReadBuffered())
-			netbuf += ws->receive(); //Read client data
-		struct pollfd devices[2];
-		devices[0].fd = sock;
-		devices[1].fd = ws->getSocket();
-		if (netbuf.size()) devices[0].events = POLLREAD | POLLOUT;
-		else devices[0].events = POLLREAD;
-		devices[1].events = POLLREAD;
-		int res = poll(devices, 2, polltimeout);
-		if (res == -1) { //Error
-			Logger::log(LOG_INFO,"pool error %m");
-			state = error;
-			break;
-		}
-		if (res == 0) break; //Nothing to do
-		Logger::log(LOG_INFO, "poll: server socket %d %s",
-				devices[0].revents,eventsToString(devices[0].revents).c_str());
-	    Logger::log(LOG_INFO, "poll: client socket %d %s",
-				devices[1].revents,eventsToString(devices[1].revents).c_str());
-		if (devices[1].revents & POLLREAD) { //Read vnc client data.
-			netbuf += ws->receive();
-		}
-		if (devices[0].revents & POLLREAD) { //Read vncserver data.
-			char buf[MAX];
-			int readsize = read(sock, buf, MAX);
-			if(readsize <= 0){ //Socket closed or error
-				if(readsize < 0)
-					Logger::log(LOG_INFO,"Receive from vncserver error: %m");
-				else
-					Logger::log(LOG_INFO,"Receive from vncserver size==0: %m");
-				state = ending;
+	States oldstate;
+	do {
+		oldstate = state;
+		switch(state){
+			case begin:
+				{
+					sock=socket(AF_INET,SOCK_STREAM,0);//0= IP protocol
+					if(sock<0){
+						state=error; //No socket available
+						break;
+					}
+					int on=1;
+					if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ) {
+						Logger::log(LOG_ERR,"setsockopt(SO_REUSEADDR) failed: %m");
+					}
+					#ifdef SO_REUSEPORT
+					if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
+						Logger::log(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
+					}
+					#endif
+					//fdblock(sock,false);
+					state=connecting;
+				}
 				break;
-			}
-			ws->send(string(buf, readsize), BINARY_FRAME);
-		}
-		if (netbuf.size()>0 && (devices[0].revents & POLLOUT)) { //Write to vncserver
-			int written = write(sock, netbuf.data(), netbuf.size());
-			if (written <= 0) { //close or error
-				if ( written < 0)
-					Logger::log(LOG_INFO,"Send to vncserver error: %m");
-				state = ending;
+			case connecting:
+				{
+					struct sockaddr_in sdir;
+					memset(&sdir, 0, sizeof(sdir));
+					sdir.sin_family = AF_INET;
+					inet_pton(AF_INET,"127.0.0.1",&sdir.sin_addr);
+					sdir.sin_port = htons( port );
+					if (connect(sock, (const sockaddr*)&sdir, sizeof(sdir))==0) {
+						//fdblock(sock,true);
+						state = connected;
+						break;
+					}else{
+						Logger::log(LOG_INFO, "socket connect to (127.0.0.1:%d) error: %m",(int)port);
+						usleep(100000); // 1/10 sec
+					}
+					if (timeout < time(NULL)) {
+						Logger::log(LOG_ERR, "socket connect timeout: %m");
+						state = error;
+					}
+				}
 				break;
-			}
-			netbuf.erase(0, written);
+			case connected:
+				{
+					//Poll to write and read from program and net
+					if (ws->isClosed()) {
+						Logger::log(LOG_INFO, "Websocket closed by client");
+						state = end;
+						break;
+					}
+					if (ws->isReadBuffered())
+						netbuf += ws->receive(); //Read client data
+					struct pollfd devices[2];
+					devices[0].fd = sock;
+					devices[1].fd = ws->getSocket();
+					if (netbuf.size()) devices[0].events = POLLREAD | POLLOUT;
+					else devices[0].events = POLLREAD;
+					devices[1].events = POLLREAD;
+					int res = poll(devices, 2, polltimeout);
+					if (res == -1) { //Error
+						Logger::log(LOG_INFO,"pool error %m");
+						state = error;
+						break;
+					}
+					if (res == 0) break; //Nothing to do
+					Logger::log(LOG_INFO, "poll: server socket %d %s",
+							devices[0].revents,eventsToString(devices[0].revents).c_str());
+					Logger::log(LOG_INFO, "poll: client socket %d %s",
+							devices[1].revents,eventsToString(devices[1].revents).c_str());
+					if (devices[1].revents & POLLREAD) { //Read vnc client data.
+						netbuf += ws->receive();
+					}
+					if (devices[0].revents & POLLREAD) { //Read vncserver data.
+						char buf[MAX];
+						int readsize = read(sock, buf, MAX);
+						if(readsize <= 0){ //Socket closed or error
+							if(readsize < 0)
+								Logger::log(LOG_INFO,"Receive from vncserver error: %m");
+							else
+								Logger::log(LOG_INFO,"Receive from vncserver size==0: %m");
+							state = ending;
+							break;
+						}
+						ws->send(string(buf, readsize), BINARY_FRAME);
+					}
+					if (netbuf.size()>0 && (devices[0].revents & POLLOUT)) { //Write to vncserver
+						int written = write(sock, netbuf.data(), netbuf.size());
+						if (written <= 0) { //close or error
+							if ( written < 0)
+								Logger::log(LOG_INFO,"Send to vncserver error: %m");
+							state = ending;
+							break;
+						}
+						netbuf.erase(0, written);
+					}
+					if ((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)) {
+						Logger::log(LOG_INFO,"Vncserver end or I/O error: %m %d %s",devices[0].revents,eventsToString(devices[0].revents).c_str());
+						state=ending;
+						break;
+					}
+				}
+				break;
+			case ending:
+				state = end;
+				break;
+			case end:
+			case error:
+				if (ws->isClosed()) {
+					usleep(50000);
+				} else {
+					ws->close();
+				}
+				break;
 		}
-		if ((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)) {
-			Logger::log(LOG_INFO,"Vncserver end or I/O error: %m %d %s",devices[0].revents,eventsToString(devices[0].revents).c_str());
-			state=ending;
-			break;
-		}
-		break;
-	}
-	case ending:
-		state=end;
-		/* no break */
-	case end:
-	case error:
-		if (ws->isClosed()) {
-			usleep(50000);
-		} else {
-			ws->close();
-		}
-		break;
-	}
-	if (oldstate != state)
-		Logger::log(LOG_INFO,"New redirector state %d => %d",oldstate,state);
+		if (oldstate != state)
+			Logger::log(LOG_INFO,"New redirector state %d => %d",oldstate,state);
+	} while (oldstate != state);
 }
 
 const vplregex RedirectorWebServer::regServerAddress("(127\\.[0-9]+\\.[0-9]+\\.[0-9]+):([0-9]+)");
@@ -381,136 +399,142 @@ const vplregex RedirectorWebServer::regServerAddress("(127\\.[0-9]+\\.[0-9]+\\.[
  * Advance for Web
  */
 void RedirectorWebServer::advance() {
-	States oldstate = state;
-	switch(state) {
-	case begin: {
-		server = socket(AF_INET,SOCK_STREAM, 0); // 0= IP protocol
-		if(server < 0){
-			state=error; //No socket available
-			break;
-		}
-		int on=1;
-		if(setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ) {
-			Logger::log(LOG_ERR,"setsockopt(SO_REUSEADDR) failed: %m");
-		}
-		#ifdef SO_REUSEPORT
-	    if (setsockopt(server, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
-			Logger::log(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
-	    }
-		#endif
-		state = connecting;
-	}
-	/* no break */
-	case connecting: {
-		struct sockaddr_in sdir;
-		memset(&sdir, 0, sizeof(sdir));
-		sdir.sin_family = AF_INET;
-		{
-			vplregmatch match(3);
-			if ( ! regServerAddress.search(serverAddress, match) ) {
-				Logger::log(LOG_ERR, "Bad local web server address %s", serverAddress.c_str());
-				state = error;
-				break;
-			}
-			string serverIP = match[1];
-			int port = Util::atoi(match[2].c_str());
-			inet_pton(AF_INET, match[1].c_str(), &sdir.sin_addr);
-			sdir.sin_port = htons( port );
-		}
-		if( connect(server, (const sockaddr*) &sdir, sizeof(sdir)) == 0 ) {
-			netbuf = client->getHeaders();
-			state = connected;
-			break;
-		} else {
-			Logger::log(LOG_INFO, "socket connecting to (%s) error: %m", serverAddress.c_str());
-			usleep(100000); // 1/10 sec
-		}
-		if (timeout < time(NULL)) {
-			Logger::log(LOG_ERR, "socket connect timeout: %m");
-			state = error;
-		}
-		break;
-	}
-	case connected: {
-		// Poll to write and read from program and net
-		if(client->isClosed()){
-			Logger::log(LOG_INFO, "Closed by client");
-			state = end;
-			break;
-		}
-		if( client->isReadBuffered() ) {
-			netbuf += client->receive(); //Read client data
-		}
-		struct pollfd devices[2];
-		devices[0].fd = server;
-		devices[1].fd = client->getSocket();
-		char buf[MAX];
-		if (netbuf.size()) {
-			devices[0].events = POLLREAD | POLLOUT;
-		} else {
-			devices[0].events = POLLREAD;
-		}
-		devices[1].events = POLLREAD;
-		int res = poll(devices, 2, polltimeout);
-		if ( res == -1 ) { //Error
-			Logger::log(LOG_INFO, "pool error %m");
-			state = error;
-			break;
-		}
-		if ( res == 0 ) {
-			break; //Nothing to do
-		}
-		Logger::log(LOG_INFO, "poll: server socket %d %s",
-				devices[0].revents, eventsToString(devices[0].revents).c_str());
-	    Logger::log(LOG_INFO, "poll: client socket %d %s",
-				devices[1].revents, eventsToString(devices[1].revents).c_str());
-		if (devices[1].revents & POLLREAD) { //Read message from client navigator
-			netbuf += client->receive();
-		}
-		if ( devices[0].revents & POLLREAD ) { // Read vncserver data
-			int readsize = read(server,buf,MAX);
-			if(readsize <= 0){ //Socket closed or error
-				if(readsize < 0)
-					Logger::log(LOG_INFO,"Receive from vncserver error: %m");
-				else
-					Logger::log(LOG_INFO,"Receive from vncserver size==0: %m");
-				state = ending;
-				break;
-			}
-			client->send(string(buf, readsize));
-		}
-		if (netbuf.size() > 0 && (devices[0].revents & POLLOUT)) { //Write to local server
-			int written = write(server, netbuf.data(), netbuf.size());
-			if (written <= 0) { //close or error
-				if (written < 0) {
-					Logger::log(LOG_INFO,"Send to vncserver error: %m");
+	States oldstate;
+	do {
+		oldstate = state;
+		switch(state) {
+			case begin:
+				{
+					server = socket(AF_INET,SOCK_STREAM, 0); // 0= IP protocol
+					if(server < 0){
+						state=error; //No socket available
+						break;
+					}
+					int on=1;
+					if(setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ) {
+						Logger::log(LOG_ERR,"setsockopt(SO_REUSEADDR) failed: %m");
+					}
+					#ifdef SO_REUSEPORT
+					if (setsockopt(server, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
+						Logger::log(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
+					}
+					#endif
+					state = connecting;
 				}
-				state = ending;
 				break;
-			}
-			netbuf.erase(0, written);
+			case connecting:
+				{
+					struct sockaddr_in sdir;
+					memset(&sdir, 0, sizeof(sdir));
+					sdir.sin_family = AF_INET;
+					{
+						vplregmatch match(3);
+						if ( ! regServerAddress.search(serverAddress, match) ) {
+							Logger::log(LOG_ERR, "Bad local web server address %s", serverAddress.c_str());
+							state = error;
+							break;
+						}
+						string serverIP = match[1];
+						int port = Util::atoi(match[2].c_str());
+						inet_pton(AF_INET, match[1].c_str(), &sdir.sin_addr);
+						sdir.sin_port = htons( port );
+					}
+					if( connect(server, (const sockaddr*) &sdir, sizeof(sdir)) == 0 ) {
+						netbuf = client->getHeaders();
+						state = connected;
+						break;
+					} else {
+						Logger::log(LOG_INFO, "socket connecting to (%s) error: %m", serverAddress.c_str());
+						usleep(100000); // 1/10 sec
+					}
+					if (timeout < time(NULL)) {
+						Logger::log(LOG_ERR, "socket connect timeout: %m");
+						state = error;
+					}
+				}
+				break;
+			case connected:
+				{
+					// Poll to write and read from program and net
+					if(client->isClosed()){
+						Logger::log(LOG_INFO, "Closed by client");
+						state = end;
+						break;
+					}
+					if( client->isReadBuffered() ) {
+						netbuf += client->receive(); //Read client data
+					}
+					struct pollfd devices[2];
+					devices[0].fd = server;
+					devices[1].fd = client->getSocket();
+					char buf[MAX];
+					if (netbuf.size()) {
+						devices[0].events = POLLREAD | POLLOUT;
+					} else {
+						devices[0].events = POLLREAD;
+					}
+					devices[1].events = POLLREAD;
+					int res = poll(devices, 2, polltimeout);
+					if ( res == -1 ) { //Error
+						Logger::log(LOG_INFO, "pool error %m");
+						state = error;
+						break;
+					}
+					if ( res == 0 ) {
+						break; //Nothing to do
+					}
+					Logger::log(LOG_INFO, "poll: server socket %d %s",
+							devices[0].revents, eventsToString(devices[0].revents).c_str());
+					Logger::log(LOG_INFO, "poll: client socket %d %s",
+							devices[1].revents, eventsToString(devices[1].revents).c_str());
+					if (devices[1].revents & POLLREAD) { //Read message from client navigator
+						netbuf += client->receive();
+					}
+					if ( devices[0].revents & POLLREAD ) { // Read vncserver data
+						int readsize = read(server,buf,MAX);
+						if(readsize <= 0){ //Socket closed or error
+							if(readsize < 0)
+								Logger::log(LOG_INFO,"Receive from vncserver error: %m");
+							else
+								Logger::log(LOG_INFO,"Receive from vncserver size==0: %m");
+							state = ending;
+							break;
+						}
+						client->send(string(buf, readsize));
+					}
+					if (netbuf.size() > 0 && (devices[0].revents & POLLOUT)) { //Write to local server
+						int written = write(server, netbuf.data(), netbuf.size());
+						if (written <= 0) { //close or error
+							if (written < 0) {
+								Logger::log(LOG_INFO,"Send to vncserver error: %m");
+							}
+							state = ending;
+							break;
+						}
+						netbuf.erase(0, written);
+					}
+					if ((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)) {
+						Logger::log(LOG_INFO, "Local web server end or I/O error: %m %d %s",
+										devices[0].revents, eventsToString(devices[0].revents).c_str());
+						state = ending;
+						break;
+					}
+				}
+				break;
+			case ending:
+				state = end;
+				break;
+			case end:
+			case error:
+				if(client->isClosed()) {
+					usleep(50000);
+				} else {
+					client->close();
+				}
+				break;
 		}
-		if ((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)) {
-			Logger::log(LOG_INFO, "Local web server end or I/O error: %m %d %s",
-			                 devices[0].revents, eventsToString(devices[0].revents).c_str());
-			state = ending;
-			break;
+		if ( oldstate != state ) {
+			Logger::log(LOG_INFO, "New web server redirector state %d => %d", oldstate, state);
 		}
-		break;
-	}
-	case ending:
-		state = end;
-		/* no break */
-	case end:
-	case error:
-		if(client->isClosed()) {
-			usleep(50000);
-		} else {
-			client->close();
-		}
-		break;
-	}
-	if ( oldstate != state ) {
-		Logger::log(LOG_INFO, "New web server redirector state %d => %d", oldstate, state);
-	}
+	} while ( oldstate != state );
 }
