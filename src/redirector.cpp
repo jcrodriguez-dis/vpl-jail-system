@@ -118,6 +118,7 @@ void RedirectorTerminalBatch::advance() {
 					break;
 				}
 				Util::fdblock(fdps, false);
+				state = connected;
 				break;
 			case connecting:
 				state = connected;
@@ -182,14 +183,15 @@ void RedirectorTerminal::advance() {
 	do {
 		oldstate = state;
 		switch(state) {
-			case connecting:
-				break;
 			case begin:
 				if(fdps<0) {
 					state=error; //fd pseudo terminal error
 					break;
 				}
 				Util::fdblock(fdps,false);
+				state=connected;
+				break;
+			case connecting:
 				state=connected;
 				break;
 			case connected:
@@ -253,8 +255,8 @@ void RedirectorTerminal::advance() {
 						ws->send(messageBuf);
 						messageBuf="";
 					}
-					state=end;
 				}
+				state=end;
 				break;
 			case end:
 			case error:
@@ -293,8 +295,8 @@ void RedirectorVNC::advance() {
 					}
 					#endif
 					//fdblock(sock,false);
-					state=connecting;
 				}
+				state=connecting;
 				break;
 			case connecting:
 				{
@@ -419,8 +421,8 @@ void RedirectorWebServer::advance() {
 						Logger::log(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
 					}
 					#endif
-					state = connecting;
 				}
+				state = connecting;
 				break;
 			case connecting:
 				{
