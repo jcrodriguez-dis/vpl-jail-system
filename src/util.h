@@ -406,7 +406,7 @@ public:
 			Logger::log(LOG_DEBUG, "incorrectFile size > %d", JAIL_FILENAME_SIZE_LIMIT);
 			return false;
 		}
-		for (int i = 0; i < fn.size(); i++) {
+		for (size_t i = 0; i < fn.size(); i++) {
 			if (fn[i] == '\0') {
 				Logger::log(LOG_DEBUG, "incorrectFile containing 0 char code '%s'",
 							fn.c_str());
@@ -639,7 +639,7 @@ public:
 			return;
 		}
 		string dirPath = getDirectory(fileNamePath);
-		if (pathChanged(dirPath, 1)) {
+		if (pathChanged(dirPath, pos)) {
 			Logger::log(LOG_ERR,"Can't unlink \"%s\": is under symlink directory?", fileNamePath.c_str());
 			return;
 		}
