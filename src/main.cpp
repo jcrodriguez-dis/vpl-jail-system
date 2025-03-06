@@ -15,7 +15,7 @@ using namespace std;
 /**
  * main accept command line "foreground" to go non-daemon run.
  */
-int main(int const argc, const char ** const argv, char * const * const env) {
+int main(int const argc, const char ** const argv) {
 	bool foreground = false;
 	bool inContaier = false;
 	for (int i = 1; i < argc; i++) {

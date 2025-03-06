@@ -54,7 +54,7 @@ class Daemon {
 	};
 	map<pid_t,Child> children;
 	static bool finishRequested;
-	static void SIGTERMHandler(int n) {
+	static void SIGTERMHandler(int) {
 		Daemon::finishRequested = true;
 	}
 

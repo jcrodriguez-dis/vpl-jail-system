@@ -46,7 +46,7 @@ class processMonitor{
 	void readState();
 	void selectPrisoner();
 	void removePrisonerHome();
-	static void catchSIGTERM(int n){}
+	static void catchSIGTERM(int){}
 	void limitResultSize(string &);
 	void setPrisonerID(uid_t  prisoner) {
 		this->prisoner = prisoner;
