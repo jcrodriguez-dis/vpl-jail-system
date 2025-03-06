@@ -310,7 +310,7 @@ processMonitor::processMonitor(string ticket) {
 			data["SECURITY"] = "5"; //none
 			data = ConfigurationFile::readConfiguration(fileName, data);
 			if (data["USER_ID"] == "0" || data["SECURITY"] == "5") {
-				throw "Ticket invalid";
+				throw "Ticket invalid: task configuration lost";
 			}
 			setPrisonerID(atoi(data["USER_ID"].c_str()));
 			security = (securityLevel) atoi(data["SECURITY"].c_str());
@@ -325,10 +325,15 @@ processMonitor::processMonitor(string ticket) {
 			if (security == monitor) {
 				monitorize();
 			}
+		} else {
+			// Ticket not found: ignored
+			error = false;
 		}
+	} else {
+		throw "Ticket invalid format";
 	}
 	if (error) {
-		throw "Ticket invalid format";
+		throw "Ticket unknown error";
 	}
 }
 
@@ -620,21 +625,24 @@ void processMonitor::removeTicketFile(string ticket) {
  */
 void processMonitor::cleanTask() {
 	Logger::log(LOG_INFO, "Cleaning task");
-	stopPrisonerProcess(false);
-	removePrisonerHome();
-	string controlPath = configuration->getControlPath();
-	Lock lock(controlPath);
-
-	Util::removeDir(getProcessControlPath(), getPrisonerID(), true);
-	Util::removeDir(configuration->getJailPath() + "/tmp", getPrisonerID(), false);
-	removeTicketFile(adminticket);
-	removeTicketFile(monitorticket);
-	removeTicketFile(executionticket);
-	removeTicketFile(httpPassthroughticket);
-
-	usleep(100000);
 	stopPrisonerProcess(true);
-	removePrisonerHome();
+	usleep(100000);
+	stopPrisonerProcess(false);
+	string controlPath = configuration->getControlPath();
+	{
+		Lock lock(controlPath);
+		removePrisonerHome();
+		removeTicketFile(adminticket);
+		removeTicketFile(monitorticket);
+		removeTicketFile(executionticket);
+		removeTicketFile(httpPassthroughticket);
+	}
+	usleep(100000);
+	stopPrisonerProcess(false);
+	{
+		Lock lock(controlPath);
+		removePrisonerHome();
+	}
 }
 
 bool processMonitor::isOutOfMemory() {
