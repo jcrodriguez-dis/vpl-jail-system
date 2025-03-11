@@ -181,17 +181,25 @@ public:
 	}
 
 	/**
-	 * Returns a random int taken from /dev/urandom
+	 * Returns a random int taken from /dev/urandom + std::rand()
 	 */
 	static int random() {
 		static int randomFile = -1;
 		if (randomFile == -1) {
 			randomFile = open("/dev/urandom", O_RDONLY); // May need a close?
 		}
-		int ret;
-		ssize_t r = read(randomFile, ((void*) (&ret)), (sizeof(int)));
-		return abs(ret + r);
+		int ret = 13131313;
+		if (randomFile > 0) {
+			size_t r = read(randomFile, ((void*) (&ret)), (sizeof(int)));
+			if (r != sizeof(int)) {
+				ret = std::rand();
+			}
+		} else {
+			ret = std::rand();
+		}
+		return abs(ret + std::rand());
 	}
+
 	/**
 	 * Cleans the string removing spaces from end and start
 	 * remove a 'text'=>text and "text"=>text
@@ -208,6 +216,26 @@ public:
 			s.erase(s.size()-1,1);
 			s.erase(0,1);
 		}
+	}
+
+	/**
+	 * Get process name and executable path from pid
+	 * @param pid process id
+	 * @param pname process name
+	 * @param exe_path executable path
+	 */
+	static void getProcessName(pid_t pid, string &pname, string &exe_path){
+		char path[PATH_MAX] = "";
+		string p = "/proc/" + itos(pid) + "/exe";
+		ssize_t len = readlink(p.c_str(), path, sizeof(path) - 1);
+		if (len != -1) {
+			path[len] = '\0';
+		} else {
+			path[0] = '\0';
+		}
+		exe_path = path;
+		string fname = "/proc/" + itos(pid) + "/comm";
+		pname = readFile(fname, false);
 	}
 
 	/**
