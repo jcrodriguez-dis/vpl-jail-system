@@ -117,13 +117,13 @@ void Configuration::readConfigFile() {
 
 	readEnvironmentConfigVars(data);
 	minPrisoner = atoi(data["MIN_PRISONER_UGID"].c_str());
-	if(minPrisoner < JAIL_MIN_PRISONER_UID)
+	if(minPrisoner < JAIL_MIN_PRISONER_UID || minPrisoner > JAIL_MAX_PRISONER_UID)
 		throw "Incorrect MIN_PRISONER_UGID config value" + data["MIN_PRISONER_UGID"];
 	maxPrisoner = atoi(data["MAX_PRISONER_UGID"].c_str());
-	if(maxPrisoner > JAIL_MAX_PRISONER_UID)
+	if(maxPrisoner > JAIL_MAX_PRISONER_UID || maxPrisoner < JAIL_MIN_PRISONER_UID)
 		throw "Incorrect MAX_PRISONER_UGID config value" + data["MAX_PRISONER_UGID"];
-	if(minPrisoner>maxPrisoner || minPrisoner<JAIL_MIN_PRISONER_UID || maxPrisoner>JAIL_MAX_PRISONER_UID)
-		throw "Incorrect config file, prisoner uid inconsistency";
+	if(minPrisoner >= maxPrisoner || maxPrisoner - minPrisoner < 100)
+		throw "Incorrect config file, prisoner uid inconsistency, min range 100";
 	
 	jailPath = data["JAILPATH"];
 	jailPath = jailPath[0] == '/' ? jailPath : "/" + jailPath; //Add absolute path
