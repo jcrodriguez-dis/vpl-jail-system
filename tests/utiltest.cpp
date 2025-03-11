@@ -252,17 +252,13 @@ class UtilTest: public BaseTest {
 			Util::writeFile(symDir, "mi texto único", getuid(), 1);
 			assert(false);
 		}
-		catch (HttpException e) {
-			cout << e.getMessage() << endl;
-		}
+		catch (HttpException) {}
 		// Check that symlink is not followed
 		try {
 			Util::writeFile(fileName, "mi texto único", getuid(), 1);
 			assert(false);
 		}
-		catch (HttpException e) {
-			cout << e.getMessage() << endl;
-		}
+		catch (HttpException) {}
 		// Check that symlink is not followed and create file
 		assert(! Util::fileExists(fileName));
 		Util::deleteFile("/tmp/nada");
