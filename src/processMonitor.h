@@ -42,13 +42,14 @@ class processMonitor{
 	string homePath;
 	void writeInfo(ConfigData data = ConfigData());
 	ConfigData readInfo();
-	void writeState();
-	void readState();
 	void selectPrisoner();
-	void removePrisonerHome();
 	static void catchSIGTERM(int){}
 	void limitResultSize(string &);
 	void setPrisonerID(uid_t  prisoner) {
+		if (prisoner < configuration->getMinPrisoner() || prisoner > configuration->getMaxPrisoner()) {
+			Logger::log(LOG_ERR, "Try to set invalid prisoner id %d", prisoner);
+			throw HttpException(internalServerErrorCode, "Invalid prisoner id");
+		}
 		this->prisoner = prisoner;
 		setProcessControlPath();
 	}
@@ -60,6 +61,9 @@ class processMonitor{
 	}
 	string getProcessControlPath(string name){
 		return processControlPath + "/" + name;
+	}
+	string getProcessConfigFile(){
+		return getProcessControlPath("config");
 	}
 	static string getPartialTicket() {
 		const int salt = 127;
@@ -101,8 +105,10 @@ public:
 	void becomePrisoner();
 	void becomePrisoner(int);
 	bool isRunnig();
-	void stopPrisonerProcess(bool);
-	void stopPrisonerProcess(int, bool);
+	vector<pid_t> getPrisonerProcesses(int prisoner);
+	int getProcessUID(pid_t pid);
+	int stopPrisonerProcess(bool);
+	int stopPrisonerProcess(int, bool);
 	void cleanTask();
 	processState getState();
 	void setCompiler();

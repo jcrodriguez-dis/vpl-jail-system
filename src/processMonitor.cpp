@@ -62,12 +62,56 @@ void processMonitor::becomePrisoner() {
 	becomePrisoner(prisoner);
 }
 
-void processMonitor::stopPrisonerProcess(bool soft) {
-	stopPrisonerProcess(prisoner, soft);
+int processMonitor::stopPrisonerProcess(bool soft) {
+	return stopPrisonerProcess(prisoner, soft);
 }
 
-void processMonitor::stopPrisonerProcess(int prisoner, bool soft) {
+vector<pid_t> processMonitor::getPrisonerProcesses(int prisoner) {
+	vector<pid_t> pids;
+	DIR *dir = opendir("/proc");
+	if (dir) {
+		struct dirent *entry;
+		while ((entry = readdir(dir))) {
+			if (entry->d_type == DT_DIR) {
+				pid_t pid = atoi(entry->d_name);
+				if (pid > 0 && getProcessUID(pid) == prisoner) {
+					pids.push_back(pid);
+				}
+			}
+		}
+		closedir(dir);
+	}
+	return pids;
+}
+/**
+ * Stop prisoner process
+ * @param prisoner Prisoner id
+ * @param soft If true send SIGTERM else SIGKILL
+ * @return number of processes killed or 0 if /proc not found
+ */
+int processMonitor::stopPrisonerProcess(int prisoner, bool soft) {
+	if (prisoner > JAIL_MAX_PRISONER_UID || prisoner < JAIL_MIN_PRISONER_UID) {
+		Logger::log(LOG_ERR, "Try to stop prisoner process with invalid prisoner id %d. Ignoring", prisoner);
+		return 0;
+	}
+	const int sleepTime = 100000;
 	Logger::log(LOG_INFO, "Sttoping prisoner process");
+	vector<pid_t> pids = getPrisonerProcesses(prisoner);
+	// Kill all process of prisoner
+	for (size_t i = 0; i < pids.size(); i++) {
+		if (getProcessUID(pids[i]) != prisoner) continue;
+		if (soft) {
+			kill(pids[i], SIGTERM);
+		} else {
+			kill(pids[i], SIGKILL);
+		}
+	}
+	// Wait for process end
+	usleep(sleepTime);
+	for (size_t i = 0; i < pids.size(); i++) {
+		waitpid(pids[i], NULL, WNOHANG);
+	}
+	// Kill using plan B
 	pid_t pid = fork();
 	if (pid == 0) { //new process
 		becomePrisoner(prisoner);
@@ -75,17 +119,18 @@ void processMonitor::stopPrisonerProcess(int prisoner, bool soft) {
 			//To not stop at first signal
 			signal(SIGTERM, catchSIGTERM);
 			kill(-1, SIGTERM);
-			usleep(100000);
+		} else {
+			kill(-1, SIGKILL);
 		}
-		kill(-1, SIGKILL);
 		_exit(EXIT_SUCCESS);
 	} else {
-		for (int i = 0;i <50 ; i++) {
+		for (int i = 0; i < 50 ; i++) {
 			usleep(100000);
 			if (pid == waitpid(pid, NULL, WNOHANG)) //Wait for pid end
 				break;
 		}
 	}
+	return pids.size();
 }
 
 /**
@@ -118,14 +163,25 @@ void processMonitor::selectPrisoner() {
 	int const range = configuration->getMaxPrisoner() - configuration->getMinPrisoner() + 1;
 	int const ntry = range;
 	int const umask = 0700;
+	if (range < 100) {
+		throw HttpException(internalServerErrorCode,
+				"Prisoner range too small, minPrisoner + 100 < maxPrisoner");
+	}
+	if (configuration->getMinPrisoner() < JAIL_MIN_PRISONER_UID ||
+		configuration->getMaxPrisoner() > JAIL_MAX_PRISONER_UID) {
+		throw HttpException(internalServerErrorCode,
+				"Prisoner range out of limits, minPrisoner");
+	}
 	Lock lock(configuration->getControlPath());
+
 	for (int i = 0; i < ntry; i++) {
-		setPrisonerID(configuration->getMinPrisoner() + (Util::random() + i) % range);
+		setPrisonerID(configuration->getMinPrisoner() + abs(Util::random() + i) % range);
 		string controlPath = getProcessControlPath();
 		if ( mkdir(controlPath.c_str(), umask) == 0 ) {
 			homePath = prisonerHomePath();
 			if ( mkdir(homePath.c_str(), umask) == 0 ) {
 				if ( chown(homePath.c_str(), prisoner, prisoner) ) {
+					Util::removeDir(homePath, 0, true);
 					throw HttpException(internalServerErrorCode
 							, "I can't change prisoner home dir \"" + homePath +
 							  "\" to proper owner: " + strerror(errno));
@@ -153,7 +209,7 @@ void processMonitor::selectPrisoner() {
 }
 
 void processMonitor::writeInfo(ConfigData data) {
-	string configFile = getProcessControlPath() + "/config";
+	string configFile = getProcessConfigFile();
 	//Read current config and don't lost data not set now
 	if (Util::fileExists(configFile)) {
 		data = ConfigurationFile::readConfiguration(configFile, data);
@@ -180,7 +236,7 @@ void processMonitor::writeInfo(ConfigData data) {
 
 ConfigData processMonitor::readInfo() {
 	ConfigData data;
-	data = ConfigurationFile::readConfiguration(getProcessControlPath("config"), data);
+	data = ConfigurationFile::readConfiguration(getProcessConfigFile(), data);
 	executionLimits.maxtime = atoi(data["MAXTIME"].c_str());
 	executionLimits.maxfilesize = atoll(data["MAXFILESIZE"].c_str());
 	executionLimits.maxmemory = atoll(data["MAXMEMORY"].c_str());
@@ -202,7 +258,7 @@ ConfigData processMonitor::readInfo() {
 }
 
 processMonitor::processMonitor(string & adminticket, string & monitorticket, string & executionticket) {
-	
+	prisoner = -1; // Not selected
 	configuration = Configuration::getConfiguration();
 	security = admin;
 	string cp = configuration->getControlPath();
@@ -251,6 +307,7 @@ processMonitor::processMonitor(string & adminticket, string & monitorticket, str
 	}
 }
 processMonitor::processMonitor(string & adminticket, string & executionticket) {
+	prisoner = -1; // Not selected
 	configuration = Configuration::getConfiguration();
 	security = admin;
 	string cp = configuration->getControlPath();
@@ -293,8 +350,8 @@ processMonitor::processMonitor(string & adminticket, string & executionticket) {
 }
 
 processMonitor::processMonitor(string ticket) {
+	prisoner = -1; // Not selected
 	configuration = Configuration::getConfiguration();
-	bool error = true;
 	Util::trimAndRemoveQuotes(ticket);
 	regex_t reg;
 	regcomp(&reg, "^[0-9]+$", REG_EXTENDED);
@@ -317,23 +374,21 @@ processMonitor::processMonitor(string ticket) {
 			if (security == monitor || security == execute) {
 				Util::deleteFile(fileName); // Remove tikect
 			}
-			string configFile = getProcessControlPath("config");
+			string configFile = getProcessConfigFile();
 			if (Util::fileExists(configFile)) {
 				readInfo();
-				error = false;
-			}
-			if (security == monitor) {
-				monitorize();
+				if (security == monitor) {
+					monitorize();
+				}
+				return;
+			} else {
+				throw "Ticket invalid: task configuration lost";
 			}
 		} else {
-			// Ticket not found: ignored
-			error = false;
+			throw "Ticket not found";
 		}
 	} else {
 		throw "Ticket invalid format";
-	}
-	if (error) {
-		throw "Ticket unknown error";
 	}
 }
 
@@ -389,10 +444,12 @@ bool processMonitor::isRunnig() {
 
 processState processMonitor::getState() {
 	if ( ! Util::dirExists(getProcessControlPath())) return stopped;
-	Lock lock(getProcessControlPath());
-	string fileName = getProcessControlPath("config");
-	if ( ! Util::fileExists(fileName))	return stopped;
-	readInfo();
+	string fileName = getProcessConfigFile();
+	{
+		Lock lock(getProcessControlPath());
+		if ( ! Util::fileExists(fileName))	return stopped;
+		readInfo();
+	}
 	if (compiler_pid == 0) return starting;
 	time_t currentTime = time(NULL);
 	if (startTime > currentTime || startTime == 0 ) {
@@ -594,19 +651,6 @@ int processMonitor::removeDir(string dir, bool force) {
 }
 
 /**
- * remove prisoner home directory and /tmp prisoner files
- */
-void processMonitor::removePrisonerHome() {
-	if ( configuration->getLogLevel() != 8 ) {
-		Logger::log(LOG_INFO, "Remove prisoner home (%d)", prisoner);
-		Util::removeDir(configuration->getJailPath() + "/tmp", getPrisonerID(), false); //Only prisoner files and dirs
-		Util::removeDir(prisonerHomePath(), getPrisonerID(), true); //All files and dir
-	} else {
-		Logger::log(LOG_INFO, "Loglevel = 8 => do not remove prisoner home (%d)", prisoner);
-	}
-}
-
-/**
  * Remove prisoner files and stop prisoner process
  */
 
@@ -624,25 +668,33 @@ void processMonitor::removeTicketFile(string ticket) {
  * Remove task home dir and monitor control files
  */
 void processMonitor::cleanTask() {
+	const int maxretry = 100;
+	const int sleepTime = 100000;
+	const int userid = getPrisonerID();
+	if (userid == -1) {
+		return; //No prisoner to clean
+	}
 	Logger::log(LOG_INFO, "Cleaning task");
-	stopPrisonerProcess(true);
-	usleep(100000);
-	stopPrisonerProcess(false);
-	string controlPath = configuration->getControlPath();
-	{
-		Lock lock(controlPath);
-		removePrisonerHome();
-		removeTicketFile(adminticket);
-		removeTicketFile(monitorticket);
-		removeTicketFile(executionticket);
-		removeTicketFile(httpPassthroughticket);
+	stopPrisonerProcess(userid, true);
+	usleep(sleepTime);
+	int retry = 0;
+	int processes = 0;
+	while( (processes = stopPrisonerProcess(userid, false)) > 0
+	        && retry < maxretry) {
+		retry++;
+		usleep(sleepTime);
 	}
-	usleep(100000);
-	stopPrisonerProcess(false);
-	{
-		Lock lock(controlPath);
-		removePrisonerHome();
+	if (processes > 0) {
+		vector<pid_t> pids = getPrisonerProcesses(userid);
+		for (size_t i = 0; i < pids.size(); i++) {
+			string processName;
+			string processPath;
+			Util::getProcessName(pids[i], processName, processPath);
+			Logger::log(LOG_ERR, "Can't stop prisoner UID = %d process = %d '%s' '%s'",
+				        userid, pids[i], processName.c_str(), processPath.c_str());
+		}
 	}
+	cleanPrisonerFiles("p" + Util::itos(userid));
 }
 
 bool processMonitor::isOutOfMemory() {
@@ -653,6 +705,30 @@ bool processMonitor::isOutOfMemory() {
 string processMonitor::getMemoryLimit() {
 	if (executionLimits.maxmemory == 0) return "unlimited";
 	return Util::itos(executionLimits.maxmemory/(1024*1024)) + "MiB";
+}
+
+/**
+ * Get process UID from /proc
+ * @param pid Process id
+ * @return UID or -1 if not found
+ */
+int processMonitor::getProcessUID(pid_t  pid) {
+	static bool init = false;
+	static regex_t reg_uid;
+	if (!init) {
+		regcomp(&reg_uid, ".*^Uid:[ \t]+([0-9]+)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
+		init = true;
+	}
+	const int matchSize = 2;
+	regmatch_t match[matchSize];
+	const string statusFile = "/proc/" + Util::itos(pid) + "/status";
+	string status = Util::readFile(statusFile, false);
+	int nomatch = regexec(&reg_uid, status.c_str(), matchSize, match, 0);
+	if (nomatch == 0) {
+		string UIDF = status.substr(match[1].rm_so, match[1].rm_eo - match[1].rm_so);
+		return Util::atoi(UIDF);
+	}
+	return -1;
 }
 
 long long processMonitor::getMemoryUsed() {
@@ -706,8 +782,8 @@ void processMonitor::freeWatchDog() {
 }
 
 vector<string> processMonitor::getPrisonersFromDir(string dir) {
-	size_t minUid = Configuration::getConfiguration()->getMinPrisoner();
-	size_t maxUid = Configuration::getConfiguration()->getMaxPrisoner();
+	static const vplregex reguserdir("^p[0-9]+$");
+	vplregmatch match;
 	vector<string> prisoners;
 	dirent *ent;
 	DIR *dirfd = opendir(dir.c_str());
@@ -715,14 +791,11 @@ vector<string> processMonitor::getPrisonersFromDir(string dir) {
 		Logger::log(LOG_ERR, "Can't open dir \"%s\": %m", dir.c_str());
 		return prisoners;
 	}
-	while((ent = readdir(dirfd))!=NULL) {
+	while((ent = readdir(dirfd)) != NULL) {
 		if (ent->d_type == DT_DIR) {
 			const string name(ent->d_name);
-			if (name.at(0) == 'p') {
-				size_t uid = (size_t) Util::atoi(name.substr(1));
-				if (uid >= minUid && uid <= maxUid) {
-					prisoners.push_back(name);
-				}
+			if (reguserdir.search(name, match)) {
+				prisoners.push_back(name);
 			}
 		}
 	}
@@ -733,22 +806,23 @@ vector<string> processMonitor::getPrisonersFromDir(string dir) {
 void processMonitor::cleanPrisonerFiles(string pdir) {
 	Logger::log(LOG_INFO, "Cleaning prisoner files");
 	const string controlDir = Configuration::getConfiguration()->getControlPath();
-	const string jailPath = Configuration::getConfiguration()->getControlPath();
-	const string phome = jailPath + "/home" + "/" + pdir;
+	const string jailPath = Configuration::getConfiguration()->getJailPath();
+	const string phome = jailPath + "/home/" + pdir;
 	const string tmpDir = jailPath + "/tmp";
 	const string configDir = controlDir + "/" + pdir;
 	const string configFile = configDir + "/" + "config";
 	ConfigData data;
-
-	try {
-		data = ConfigurationFile::readConfiguration(configFile, data);
-	} catch(...) {}
-	removeTicketFile( data["ADMINTICKET"] );
-	removeTicketFile( data["EXECUTIONTICKET"] );
-	removeTicketFile( data["MONITORTICKET"] );
-	removeTicketFile( data["HTTPPASSTHROUGHTTICKET"] );
-
 	int uid = Util::atoi(pdir.substr(1));
+	Lock lock(controlDir);
+	if (Util::fileExists(configFile)) {
+		try {
+			data = ConfigurationFile::readConfiguration(configFile, data);
+			removeTicketFile( data["ADMINTICKET"] );
+			removeTicketFile( data["EXECUTIONTICKET"] );
+			removeTicketFile( data["MONITORTICKET"] );
+			removeTicketFile( data["HTTPPASSTHROUGHTTICKET"] );
+		} catch(...) {}
+	}
 	try {
 		Util::removeDir(phome, uid, true);
 	} catch(...) {}
@@ -756,7 +830,7 @@ void processMonitor::cleanPrisonerFiles(string pdir) {
 		Util::removeDir(tmpDir, uid, false);
 	}catch(...) {}
 	try {
-		Util::removeDir(configDir, uid, true);
+		Util::removeDir(configDir, 0, true);
 	}catch(...) {}
 }
 
@@ -775,9 +849,13 @@ void processMonitor::cleanZombieTasks() {
 		try {
 			stat(configDir.c_str(), &statbuf);
 			if ( statbuf.st_mtime + JAIL_MONITORSTART_TIMEOUT < time(NULL) ) {
-				data = ConfigurationFile::readConfiguration(configFile, data);
-				processMonitor pm(data["ADMINTICKET"]);
-				pm.getState();
+				if ( ! Util::dirExists(homeDir + "/" + tasks[i]) ) {
+					cleanPrisonerFiles(tasks[i]);
+				} else {
+					data = ConfigurationFile::readConfiguration(configFile, data);
+					processMonitor pm(data["ADMINTICKET"]);
+					pm.getState();	
+				}
 			}
 		}catch(...) {
 			time_t tlimit = statbuf.st_mtime;
@@ -788,7 +866,6 @@ void processMonitor::cleanZombieTasks() {
 			}
 		}
 	}
-	Lock lock(controlDir);
 	for (size_t i = 0; i < homes.size(); i++) {
 		Logger::log(LOG_INFO, "Cleaning zombie tasks: checking(2) %s", homes[i].c_str());
 		string configFile = controlDir + "/" + homes[i] + "/" + "config";
