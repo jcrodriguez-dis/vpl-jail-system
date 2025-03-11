@@ -18,10 +18,17 @@ using namespace std;
 
 typedef vector<string> vplregmatch;
 
-
+/**
+ * Class to manage regex in C++ using C regex functions.
+ * It is a wrapper to regex_t and regmatch_t
+ */
 class vplregex {
 	regex_t creg;
 public:
+	/**
+	 * Constructor, compile the regular expression
+	 * @param reg regular expression
+	 */
 	vplregex(const string &reg) {
 		int res = regcomp(& creg, reg.c_str(), REG_EXTENDED);
 		if (res) {
@@ -30,9 +37,18 @@ public:
 			throw buf;
 		}
 	}
+	/**
+	 * Destructor, free the regular expression
+	 */
 	~vplregex() {
 		regfree(& creg);
 	}
+	/**
+	 * Search the regular expression in the input string
+	 * @param input string to search
+	 * @param found vector with the found strings
+	 * @return true if found
+	 */
 	bool search(const string &input, vplregmatch &found) const {
 		const int maxmatch = 10;
 		int limit = (int) found.size();
