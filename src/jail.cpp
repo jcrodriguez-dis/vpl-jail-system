@@ -697,6 +697,7 @@ void Jail::process(Socket *socket){
 						jailLimits.maxprocesses,
 						configuration->getSecurePort()));
 			} else if(request == "request") {
+				Logger::log(LOG_NOTICE, "Executing Task from Server: '%s'", IP.c_str());
 				string adminticket, monitorticket, executionticket;
 				commandRequest(rpc, adminticket, monitorticket, executionticket);
 				server.send200(rpc.requestResponse(adminticket,
