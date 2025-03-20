@@ -4,6 +4,8 @@
  * @license:   GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 
+#include <limits.h>
+
 #ifndef JAIL_LIMITS_H_
 #define JAIL_LIMITS_H_
 
