@@ -150,6 +150,9 @@ void Configuration::readConfigFile() {
 	port = atoi(data["PORT"].c_str());
 	sport = atoi(data["SECURE_PORT"].c_str());
 	URLPath = data["URLPATH"];
+	if (URLPath.size() > 0 && URLPath[0] != '/') {
+		URLPath = "/" + URLPath;
+	}
 	cleanPATH = data["ENVPATH"];
 	logLevel = atoi(data["LOGLEVEL"].c_str());
 	fail2ban = atoi(data["FAIL2BAN"].c_str());
