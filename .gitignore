@@ -8,7 +8,7 @@
 /.project
 /config.h
 /configure
-/Makefile
+Makefile
 *.h.in?
 *.log
 vpl-jail-system-*
