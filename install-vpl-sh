@@ -299,6 +299,8 @@ function vpl_install_letsencrypt {
 	local HNAME=""
 	if [ "$(command -pv dnsdomainname)" != "" ] ; then
 		DETECTEDFQDN=$(dnsdomainname -A)
+		# Trim FQDN name
+		DETECTEDFQDN=$(echo $DETECTEDFQDN)
 	fi
 	echo "Please, enter the domain name (FQDN) of this machine in order to install the configure Certbot."
 	echo -n "($DETECTEDFQDN): "
@@ -307,11 +309,13 @@ function vpl_install_letsencrypt {
 		HNAME=$DETECTEDFQDN
 	fi
 	certbot certonly --standalone --preferred-challenges http -d $HNAME
-	systemctl enable --now certbot-renew.timer
+	systemctl enable --now certbot.timer
 	echo "pre_hook = systemctl stop vpl-jail-system" >> /etc/letsencrypt/renewal/$HNAME.conf
 	echo "post_hook = systemctl start vpl-jail-system" >> /etc/letsencrypt/renewal/$HNAME.conf
 	ln -s /etc/letsencrypt/live/$HNAME/fullchain.pem /etc/vpl/cert.pem 2> /dev/null 
 	ln -s /etc/letsencrypt/live/$HNAME/privkey.pem /etc/vpl/key.pem 2> /dev/null
+	echo "Note: commonly the renewal of the certificate is checked twince a day,"
+	echo "      this action require stop and start the vpl-jail-service."
 }
 
 function vpl_install_jgrasp {
