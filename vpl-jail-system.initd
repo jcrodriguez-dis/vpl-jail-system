@@ -242,45 +242,79 @@ function set_firewall {
 #2: VPL service+DNS+ Limit internet to port 80 and 443 (super user unlimited)
 #3: VPL service+No internet to normal users (super user unlimited)
 #4: VPL service+No internet to all users (No graphics, only console execution)
-	local OWN="127.0.0.0/8,$(hostname -I)"
-	if [ "$FIREWALL" \> "0" ] ; then
-		iptables -N VPL_LOG
-		iptables -N VPL_IN 
-		iptables -N VPL_OUT
+	# Validate required variables
+	if [ -z "$FIREWALL" ] || [ -z "$PORT" ] || [ -z "$SECURE_PORT" ]; then
+		log_failure_msg "Missing required variables: FIREWALL, PORT, or SECURE_PORT"
+		return 1
+	fi
+	
+	# Get first IP address from hostname
+	local FIRST_IP=$(hostname -I | awk '{print $1}')
+	if [ -z "$FIRST_IP" ]; then
+		log_failure_msg "Cannot determine host IP address"
+		return 1
+	fi
+	local OWN="127.0.0.0/8,$FIRST_IP"
+	
+	if [ "$FIREWALL" -gt 0 ] 2>/dev/null; then
+		# Check if chains already exist and remove them first
+		if iptables -L VPL_IN -n &>/dev/null; then
+			unset_firewall
+		fi
+		
+		# Create chains
+		iptables -N VPL_LOG || { log_failure_msg "Failed to create VPL_LOG chain"; return 1; }
+		iptables -N VPL_IN || { log_failure_msg "Failed to create VPL_IN chain"; return 1; }
+		iptables -N VPL_OUT || { log_failure_msg "Failed to create VPL_OUT chain"; return 1; }
+		
 		#Logs
-		[ "$1" != "" ] && (iptables -A VPL_LOG -m limit --limit 20/minute -j LOG --log-prefix "VPL packet dropped: " --log-level 7)
+		[ -n "$1" ] && (iptables -A VPL_LOG -m limit --limit 20/minute -j LOG --log-prefix "VPL packet dropped: " --log-level 7)
 		iptables -A VPL_LOG -j DROP
-		#input
-		iptables -A VPL_IN -p tcp -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-		#Avoid auto request to vpl service
-		iptables -A VPL_IN -p tcp -m multiport -s $OWN -d $OWN --dports $PORT,$SECURE_PORT -j VPL_LOG
+		
+		#Input rules
+		#Accept established and related connections
+		iptables -A VPL_IN -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+		#Accept essential ICMP types (echo-reply, dest-unreachable, time-exceeded, fragmentation-needed)
+		iptables -A VPL_IN -p icmp --icmp-type echo-reply -j ACCEPT
+		iptables -A VPL_IN -p icmp --icmp-type destination-unreachable -j ACCEPT
+		iptables -A VPL_IN -p icmp --icmp-type time-exceeded -j ACCEPT
+		#Avoid auto request to vpl service (must be before local accept)
+		iptables -A VPL_IN -p tcp -m conntrack --ctstate NEW -m multiport -s "$OWN" -d "$OWN" --dports "$PORT,$SECURE_PORT" -j VPL_LOG
 		#Accept connection to vpl service
-		iptables -A VPL_IN -p tcp -m multiport --dports $PORT,$SECURE_PORT -j ACCEPT
-		#Accept local conections
-		iptables -A VPL_IN -p tcp -s $OWN -j ACCEPT
-		#DNS query
-		[ "$FIREWALL" \< "3" ] && (iptables -A VPL_IN -p udp --sport 53 -j ACCEPT)
-		[ "$FIREWALL" \< "3" ] && (iptables -A VPL_IN -p tcp --sport 53 -j ACCEPT)
+		iptables -A VPL_IN -p tcp -m multiport --dports "$PORT,$SECURE_PORT" -j ACCEPT
+		#Accept local connections (only established, or new from localhost loopback)
+		iptables -A VPL_IN -s 127.0.0.0/8 -d 127.0.0.0/8 -j ACCEPT
+		#DNS responses
+		[ "$FIREWALL" -lt 4 ] && (iptables -A VPL_IN -p udp --sport 53 -j ACCEPT)
+		[ "$FIREWALL" -lt 4 ] && (iptables -A VPL_IN -p tcp --sport 53 -j ACCEPT)
 		iptables -A VPL_IN -j VPL_LOG
-		#Output
-		#Accept established connections
-		iptables -A VPL_OUT -p tcp -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-		#Accept all from super user
-		[ "$FIREWALL" \< "4" ] && (iptables -A VPL_OUT -m owner --uid-owner 0 -j ACCEPT)
-		#Drop auto connections to VPL service
-		iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -m multiport -s $OWN -d $OWN --dports $PORT,$SECURE_PORT -j VPL_LOG
-		#Accept request to internet
-		[ "$FIREWALL" == "1" ] && (iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -j ACCEPT)
-		#Accept request to internet only 80,443
-		[ "$FIREWALL" == "2" ] && (iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -m multiport --dports 80,443 -j ACCEPT)
-		#Accept DNS requests
-		[ "$FIREWALL" \< "3" ] && (iptables -A VPL_OUT -p udp --dport 53 -j ACCEPT)
-		[ "$FIREWALL" \< "3" ] && (iptables -A VPL_OUT -p tcp --dport 53 -j ACCEPT)
-		#Accept Auto conections (php builtin server, etc)
-		[ "$FIREWALL" \< "4" ] && (iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -s $OWN -d $OWN -j ACCEPT)
+		
+		#Output rules
+		#Accept established and related connections
+		iptables -A VPL_OUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+		#Accept essential ICMP types with rate limiting (prevent ping flood)
+		iptables -A VPL_OUT -p icmp --icmp-type echo-request -m limit --limit 10/sec -j ACCEPT
+		iptables -A VPL_OUT -p icmp --icmp-type destination-unreachable -j ACCEPT
+		iptables -A VPL_OUT -p icmp --icmp-type time-exceeded -j ACCEPT
+		#Accept all from super user (must be before VPL service block)
+		[ "$FIREWALL" -lt 4 ] && (iptables -A VPL_OUT -m owner --uid-owner 0 -j ACCEPT)
+		#Drop auto connections to VPL service from non-root users
+		iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -m multiport -s "$OWN" -d "$OWN" --dports "$PORT,$SECURE_PORT" -j VPL_LOG
+		#Accept local loopback connections (php builtin server, etc)
+		[ "$FIREWALL" -lt 4 ] && (iptables -A VPL_OUT -s 127.0.0.0/8 -d 127.0.0.0/8 -j ACCEPT)
+		#Level 1: Full internet access (TCP + UDP)
+		[ "$FIREWALL" -eq 1 ] && (iptables -A VPL_OUT -m conntrack --ctstate NEW -j ACCEPT)
+		#Level 2: Limited internet (HTTP/HTTPS + DNS)
+		[ "$FIREWALL" -eq 2 ] && (iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -m multiport --dports 80,443 -j ACCEPT)
+		[ "$FIREWALL" -eq 2 ] && (iptables -A VPL_OUT -p udp --dport 53 -j ACCEPT)
+		[ "$FIREWALL" -eq 2 ] && (iptables -A VPL_OUT -p tcp --dport 53 -j ACCEPT)
+		#Level 3: No internet for normal users, DNS for root only (already allowed via uid-owner 0 rule above)
+		#Level 4: No internet at all
 		iptables -A VPL_OUT -j VPL_LOG
-		iptables -A INPUT -j VPL_IN
-		iptables -A OUTPUT -j VPL_OUT
+		
+		# Apply chains to INPUT and OUTPUT
+		iptables -A INPUT -j VPL_IN || { log_failure_msg "Failed to apply VPL_IN chain"; return 1; }
+		iptables -A OUTPUT -j VPL_OUT || { log_failure_msg "Failed to apply VPL_OUT chain"; return 1; }
 	fi
 }
 
@@ -288,14 +322,24 @@ function unset_firewall {
 	#try to remove the VPL config in any case
 	{
 		iptables -D INPUT -j VPL_IN
-		iptables -F VPL_IN
-		iptables -X VPL_IN
 		iptables -D OUTPUT -j VPL_OUT
+		
+		iptables -F VPL_IN
 		iptables -F VPL_OUT
-		iptables -X VPL_OUT
 		iptables -F VPL_LOG
+		
+		iptables -X VPL_IN
+		iptables -X VPL_OUT
 		iptables -X VPL_LOG
-	} &> /dev/null
+	} &>/dev/null
+	
+	# Verify cleanup was successful
+	if iptables -L VPL_IN -n &>/dev/null || iptables -L VPL_OUT -n &>/dev/null || iptables -L VPL_LOG -n &>/dev/null; then
+		log_failure_msg "Warning: Failed to completely remove VPL firewall chains"
+		return 1
+	fi
+	
+	return 0
 }
 
 function read_config {
