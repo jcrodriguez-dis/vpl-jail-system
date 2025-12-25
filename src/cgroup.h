@@ -41,6 +41,25 @@ private:
 	static vplregex regUnder;
 	static vplregex regKill;
 	static vplregex regTrim;
+	static const char* FILE_CPU_ACCT_STAT;
+	static const char* FILE_CPU_USAGE;
+	static const char* FILE_CPU_NOTIFY;
+	static const char* FILE_CPU_RELEASE_AGENT;
+	static const char* FILE_CPU_TASKS;
+	static const char* FILE_CPU_STAT;
+	static const char* FILE_NET_PRIOIDX;
+	static const char* FILE_NET_IFPRIOMAP;
+	static const char* FILE_NET_NOTIFY;
+	static const char* FILE_NET_RELEASE_AGENT;
+	static const char* FILE_NET_TASKS;
+	static const char* FILE_PIDS_PROCS;
+	static const char* FILE_MEM_TASKS;
+	static const char* FILE_MEM_LIMIT;
+	static const char* FILE_MEM_STAT;
+	static const char* FILE_MEM_USAGE;
+	static const char* FILE_MEM_NOTIFY;
+	static const char* FILE_MEM_RELEASE_AGENT;
+	static const char* FILE_MEM_OOM_CONTROL;
 	string regFound(vplregex &reg, string input);
 
 public:

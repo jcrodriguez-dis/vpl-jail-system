@@ -13,6 +13,8 @@
 #include <limits>
 #include <map>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #ifdef HAVE_WEAKLY_CANONICAL
 #include <filesystem>
 #endif
@@ -807,7 +809,7 @@ public:
 		return decoded;
 	}
 
-	static int get_utf8_nbytes_char(const std::string& text, size_t pos) {
+	static int get_utf8_nbytes_char(const string& text, size_t pos) {
 		int num_bytes = -1;
 		if (pos < text.size()) {
 			unsigned char c = text[pos];
@@ -826,8 +828,8 @@ public:
 		return num_bytes;
 	}
 
-	static std::string get_clean_utf8(const std::string& text) {
-		std::string clean;
+	static string get_clean_utf8(const string& text) {
+		string clean;
 		clean.reserve(text.size());
 		size_t pos = 0;
 		while (pos < text.size()) {
@@ -843,6 +845,40 @@ public:
 		}
 		return clean;
     }
+	/**
+	 * Detect cgroup path from /proc/mounts
+	 */
+	static string detectCgroupPath() {
+		ifstream mounts("/proc/mounts");
+		string line;
+		string bestCandidate = "/sys/fs/cgroup"; // Default fallback
+
+		while (getline(mounts, line)) {
+			stringstream ss(line);
+			string device, path, type;
+			ss >> device >> path >> type;
+
+			// Check for cgroup (v1) or cgroup2 (v2)
+			if (type == "cgroup" || type == "cgroup2") {
+				// If we find the standard systemd path, it is the preferred root
+				if (path.find("/sys/fs/cgroup") == 0) {
+					return "/sys/fs/cgroup";
+				}
+				// Keep the first valid cgroup path found as a backup
+				if (bestCandidate == "/sys/fs/cgroup") {
+					// Extract the parent directory if it's a specific controller mount
+					// e.g., /cgroup/cpu -> /cgroup
+					size_t lastSlash = path.find_last_of('/');
+					if (lastSlash != string::npos && lastSlash > 0) {
+						bestCandidate = path.substr(0, lastSlash);
+					} else {
+						bestCandidate = path;
+					}
+				}
+			}
+		}
+		return bestCandidate;
+	}
 };
 
 #endif

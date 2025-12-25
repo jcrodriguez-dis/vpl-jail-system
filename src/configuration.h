@@ -38,6 +38,7 @@ private:
 	string SSLKeyFile;
 	string certbotWebrootPath;
 	bool useCgroup;
+	bool useNamespace;
 	int requestMaxSize;
 	int resultMaxSize;
 	regex_t reg;
@@ -74,6 +75,7 @@ public:
 	const string & getCertbotWebrootPath() const { return certbotWebrootPath; }
 	int getHSTSMaxAge() const { return HSTSMaxAge;};
 	bool getUseCGroup() const { return useCgroup;};
+	bool getUseNamespace() const { return useNamespace;};
 	int getRequestMaxSize() const { return requestMaxSize;};
 	int getResultMaxSize() const { return resultMaxSize;};
 };

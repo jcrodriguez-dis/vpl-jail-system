@@ -105,6 +105,7 @@ void Configuration::readConfigFile() {
 	configDefault["MAX_PRISONER_UGID"] = "20000";
 	configDefault["ENVPATH"] = Util::getEnv("PATH");
 	configDefault["USE_CGROUP"] = "false";
+	configDefault["USE_NAMESPACE"] = "true";
 
 	ConfigData data = ConfigurationFile::readConfiguration(configPath, configDefault);
 	// Check unkown parameters
@@ -165,6 +166,7 @@ void Configuration::readConfigFile() {
 	SSLCertFile = data["SSL_CERT_FILE"];
 	SSLKeyFile = data["SSL_KEY_FILE"];
 	useCgroup = Util::toUppercase(data["USE_CGROUP"]) == "TRUE";
+	useNamespace = Util::toUppercase(data["USE_NAMESPACE"]) == "TRUE";
 	requestMaxSize = Util::memSizeToBytesi(data["REQUEST_MAX_SIZE"]);
 	resultMaxSize = Util::memSizeToBytesi(data["RESULT_MAX_SIZE"]);
 	certbotWebrootPath = data["CERTBOT_WEBROOT_PATH"];

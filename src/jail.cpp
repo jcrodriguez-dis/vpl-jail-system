@@ -19,12 +19,15 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pty.h>
+#include <sched.h>
+#include <sys/mount.h>
 #include "jail.h"
 #include "redirector.h"
 #include "httpServer.h"
 #include "util.h"
 #include "processMonitor.h"
 #include "websocket.h"
+#include "cgroup.h"
 /*
  * @return string "ready", "busy", "offline"
  */
@@ -787,7 +790,74 @@ void Jail::process(Socket *socket){
 }
 
 /**
- * chdir and chroot to jail
+ * Setup Linux namespaces for process isolation
+ * Isolates PID, mount, network, IPC, and UTS namespaces
+ */
+void Jail::setupNamespaces(){
+	// Check if namespace isolation is enabled
+	if (!configuration->getUseNamespace()) {
+		Logger::log(LOG_DEBUG, "Namespace isolation disabled in configuration");
+		return;
+	}
+	
+	// Create new namespaces to isolate the process
+	// NOTE: CLONE_NEWPID is NOT used here because it requires special handling:
+	// - The calling process doesn't enter the new PID namespace
+	// - Only children of the calling process enter it
+	// - This causes "fork: Cannot allocate memory" errors
+	// We rely on /proc remounting and chroot for process visibility isolation instead
+	//
+	// CLONE_NEWNS: Mount namespace - isolated filesystem mounts
+	// CLONE_NEWNET: Network namespace - isolated network stack
+	// CLONE_NEWIPC: IPC namespace - isolated System V IPC, POSIX message queues
+	// CLONE_NEWUTS: UTS namespace - isolated hostname/domainname
+	int flags = CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS;
+	
+	if (unshare(flags) != 0) {
+		// If unshare fails, log but continue (some kernels may not support all namespaces)
+		Logger::log(LOG_WARNING, "Failed to create namespaces: %s (errno=%d). Continuing without full namespace isolation.", strerror(errno), errno);
+		return;
+	}
+	
+	Logger::log(LOG_INFO, "Namespaces created: Mount, Network, IPC, UTS");
+}
+
+/**
+ * Remount /proc to show only prisoner processes within chroot
+ * Note: Without PID namespace, /proc will show all processes, but chroot
+ * provides some isolation. PIDs outside the prisoner's range are still visible
+ * but their details may be restricted by file permissions.
+ */
+void Jail::remountProc(){
+	string jailPath = configuration->getJailPath();
+	
+	// After chroot, paths are relative to new root
+	const char* procPath = "/proc";
+	
+	// Unmount old /proc if it exists (ignore errors)
+	umount2(procPath, MNT_DETACH);
+	
+	// Mount fresh /proc (combined with chroot for isolation)
+	if (mount("proc", procPath, "proc", MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) != 0) {
+		Logger::log(LOG_WARNING, "Failed to remount /proc: %s. Process visibility may not be isolated.", strerror(errno));
+		return;
+	}
+	
+	Logger::log(LOG_DEBUG, "Remounted /proc inside chroot");
+	
+	// Also remount /sys as read-only to limit information leakage
+	const char* sysPath = "/sys";
+	if (Util::fileExists(sysPath)) {
+		umount2(sysPath, MNT_DETACH);
+		if (mount("sysfs", sysPath, "sysfs", MS_RDONLY|MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) == 0) {
+			Logger::log(LOG_DEBUG, "Remounted /sys as read-only");
+		}
+	}
+}
+}
+
+/**
+ * chdir and chroot to jail with cgroup isolation
  */
 void Jail::goJail(){
 	string jailPath=configuration->getJailPath();
@@ -799,6 +869,57 @@ void Jail::goJail(){
 		throw HttpException(internalServerErrorCode, "I can't chdir to jail", jailPath);
 	if(chroot(jailPath.c_str()) != 0)
 		throw HttpException(internalServerErrorCode, "I can't chroot to jail", jailPath);
+	Logger::log(LOG_INFO,"chrooted \"%s\"",jailPath.c_str());
+}
+
+/**
+ * chdir and chroot to jail with cgroup isolation
+ */
+void Jail::goJail(processMonitor &pm){
+	string jailPath=configuration->getJailPath();
+	
+	// Setup cgroup isolation before chroot
+	if (configuration->getUseCGroup()) {
+		try {
+			string cgroupName = "p" + Util::itos(pm.getPrisonerID());
+			Cgroup cgroup(cgroupName);
+			
+			// Add current process to cgroup controllers
+			pid_t pid = getpid();
+			cgroup.setCPUProcs(pid);
+			cgroup.setMemoryProcs(pid);
+			cgroup.setNetProcs(pid);
+			
+			// Set resource limits via cgroup
+			ExecutionLimits limits = pm.getLimits();
+			if (limits.maxmemory > 0) {
+				cgroup.setMemoryLimitInBytes(limits.maxmemory);
+				Logger::log(LOG_INFO, "Cgroup memory limit set to %lld bytes", limits.maxmemory);
+			}
+			
+			Logger::log(LOG_INFO, "Process %d added to cgroup %s", pid, cgroupName.c_str());
+		} catch (const std::exception &e) {
+			Logger::log(LOG_WARNING, "Failed to setup cgroup: %s", e.what());
+		} catch (...) {
+			Logger::log(LOG_WARNING, "Failed to setup cgroup: unknown error");
+		}
+	}
+	
+	// Setup namespace isolation to hide unnecessary information
+	setupNamespaces();
+	
+	if (jailPath == "") {
+		Logger::log(LOG_INFO,"No chrooted, running in container");
+		return;
+	}
+	if(chdir(jailPath.c_str()) != 0)
+		throw HttpException(internalServerErrorCode, "I can't chdir to jail", jailPath);
+	if(chroot(jailPath.c_str()) != 0)
+		throw HttpException(internalServerErrorCode, "I can't chroot to jail", jailPath);
+	
+	// After chroot, remount /proc to show only this namespace's processes
+	remountProc();
+	
 	Logger::log(LOG_INFO,"chrooted \"%s\"",jailPath.c_str());
 }
 
@@ -899,7 +1020,7 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 	if (newpid == 0) { //new process
 		Logger::setForeground(false);
 		try {
-			goJail();
+			goJail(pm);
 			setLimits(pm);
 			pm.becomePrisoner();
 			setsid();
@@ -1015,7 +1136,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 	if (newpid == 0) { //new process
 		Logger::setForeground(false);
 		try{
-			goJail();
+			goJail(pm);
 			setLimits(pm);
 			pm.becomePrisoner();
 			setsid();

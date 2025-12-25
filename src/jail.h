@@ -39,6 +39,9 @@ protected:
 	Configuration *configuration;
 	static void catchSIGTERM(int n);
 	void goJail();
+	void goJail(processMonitor &pm);
+	void setupNamespaces();
+	void remountProc();
 	void changeUser(processMonitor &pm);
 	void setLimits(processMonitor &pm);
 	void transferExecution(processMonitor &pm,string fileName);

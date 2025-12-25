@@ -14,6 +14,7 @@ using namespace std;
 #include "lock.h"
 #include "processMonitor.h"
 #include "vpl-jail-server.h"
+#include "cgroup.h"
 /**
  * Return the number of prisoners in jail
  */
@@ -699,6 +700,32 @@ void processMonitor::cleanTask() {
 
 bool processMonitor::isOutOfMemory() {
 	if (executionLimits.maxmemory <= 0) return false;
+	
+	// Use cgroup-based monitoring if enabled
+	if (configuration->getUseCGroup()) {
+		try {
+			string cgroupName = "p" + Util::itos(prisoner);
+			Cgroup cgroup(cgroupName);
+			
+			// Check OOM status directly from cgroup
+			map<string, int> oomControl = cgroup.getMemoryOOMControl();
+			if (oomControl["under_oom"] > 0) {
+				Logger::log(LOG_DEBUG, "Cgroup reports under_oom condition");
+				return true;
+			}
+			
+			// Check current memory usage vs limit
+			long int usage = cgroup.getMemoryUsageInBytes();
+			Logger::log(LOG_DEBUG, "Cgroup memory usage: %ld / %lld", usage, executionLimits.maxmemory);
+			return usage >= executionLimits.maxmemory;
+		} catch (const std::exception &e) {
+			Logger::log(LOG_DEBUG, "Failed to read cgroup memory status: %s, falling back to /proc", e.what());
+		} catch (...) {
+			Logger::log(LOG_DEBUG, "Failed to read cgroup memory status, falling back to /proc");
+		}
+	}
+	
+	// Fallback to /proc-based monitoring
 	return executionLimits.maxmemory < getMemoryUsed();
 }
 
@@ -732,6 +759,22 @@ int processMonitor::getProcessUID(pid_t  pid) {
 }
 
 long long processMonitor::getMemoryUsed() {
+	// Use cgroup-based monitoring if enabled
+	if (configuration->getUseCGroup()) {
+		try {
+			string cgroupName = "p" + Util::itos(prisoner);
+			Cgroup cgroup(cgroupName);
+			long int usage = cgroup.getMemoryUsageInBytes();
+			Logger::log(LOG_DEBUG, "Cgroup memory usage: %ld bytes", usage);
+			return usage;
+		} catch (const std::exception &e) {
+			Logger::log(LOG_DEBUG, "Failed to read cgroup memory usage: %s, falling back to /proc", e.what());
+		} catch (...) {
+			Logger::log(LOG_DEBUG, "Failed to read cgroup memory usage, falling back to /proc");
+		}
+	}
+	
+	// Fallback to /proc scanning
 	string dir = "/proc";
 	dirent *ent;
 	DIR *dirfd = opendir(dir.c_str());
