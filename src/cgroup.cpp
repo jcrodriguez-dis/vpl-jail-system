@@ -9,7 +9,7 @@
 
 using namespace std;
 
-string Cgroup::baseCgroupFileSystem= Util::detectCgroupPath();
+string Cgroup::baseCgroupFileSystem= Util::findCgroupFilesystem();
 vplregex Cgroup::regUser("(^|\n)user ([0-9]+)(\n|$)");
 vplregex Cgroup::regSystem("(^|\n)system ([0-9]+)(\n|$)");
 vplregex Cgroup::regPeriods("(^|\n)nr_periods ([0-9]+)(\n|$)");
@@ -300,6 +300,7 @@ void Cgroup::setNetProcs(int pid){
 }
 /**
  * Insert a process' PID to allow it to be in the CPU controllers
+ * @param pid Process ID
  */
 void Cgroup::setCPUProcs(int pid){
     string path = cgroupDirectory + FILE_CPU_TASKS;
@@ -382,4 +383,53 @@ void Cgroup::setMemReleaseAgentPath(string agentPath){
     Logger::log(LOG_DEBUG,"Writing to the file '%s'", path.c_str());
     Util::writeFile(path, agentPath);
     Logger::log(LOG_DEBUG,"'%s' has been successfully written", path.c_str());
+}
+
+/**
+ * Remove this cgroup from all controllers
+ * Removes the cgroup directories from cpu, memory, and network controllers
+ * All processes must be moved out before calling this
+ */
+void Cgroup::clean(){
+    // List of controller subdirectories to remove
+    const char* controllers[] = {
+        "cpu,cpuacct",
+        "memory",
+        "net_cls,net_prio",
+        "pids"
+    };
+    
+    bool anyRemoved = false;
+    bool anyFailed = false;
+    
+    for (int i = 0; i < 4; i++) {
+        string controllerPath = cgroupDirectory + controllers[i];
+        
+        // Check if directory exists
+        DIR* dir = opendir(controllerPath.c_str());
+        if (dir == NULL) {
+            continue;
+        }
+        closedir(dir);
+        
+        // Try to remove the directory
+        Logger::log(LOG_DEBUG, "Removing cgroup directory: %s", controllerPath.c_str());
+        if (rmdir(controllerPath.c_str()) == 0) {
+            Logger::log(LOG_INFO, "Successfully removed cgroup directory: %s", controllerPath.c_str());
+            anyRemoved = true;
+        } else {
+            Logger::log(LOG_WARNING, "Failed to remove cgroup directory %s: %s (errno=%d)", 
+                       controllerPath.c_str(), strerror(errno), errno);
+            anyFailed = true;
+        }
+    }
+    
+    if (anyRemoved) {
+        Logger::log(LOG_INFO, "Cgroup removal completed for: %s", cgroupDirectory.c_str());
+    }
+    
+    if (anyFailed) {
+        Logger::log(LOG_WARNING, "Some cgroup directories could not be removed. "
+                   "This may be because processes are still in the cgroup or permission issues.");
+    }
 }

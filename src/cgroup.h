@@ -99,7 +99,6 @@ public:
 	int getMemNotify();
 	string getMemReleaseAgent();
 	map<string, int> getMemoryOOMControl();
-
 	void setNetPrioMap(string interface);
 	void setNetNotify(bool flag);
 	void setNetReleaseAgent(string path);
@@ -111,5 +110,11 @@ public:
 	void setMemoryLimitInBytes(long int bytes);
 	void setMemNotify(bool flag);
 	void setMemReleaseAgentPath(string path);
-
+	
+	/**
+	 * Remove this cgroup from all controllers
+	 * Note: All processes must be moved out of the cgroup before removal
+	 * @throws exception if cgroup cannot be removed (e.g., processes still in it)
+	 */
+	void clean();
 };
