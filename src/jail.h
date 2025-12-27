@@ -38,12 +38,13 @@ protected:
 	string IP; //Client IP
 	Configuration *configuration;
 	static void catchSIGTERM(int n);
-	void goJail();
 	void goJail(processMonitor &pm);
 	void setupNamespaces();
+	void pivotRoot(string jailPath, int prisonerID);
 	void remountProc();
 	void changeUser(processMonitor &pm);
 	void setLimits(processMonitor &pm);
+	void executeInJail(processMonitor &pm, string name, const char *detail);
 	void transferExecution(processMonitor &pm,string fileName);
 	void saveParseFiles(processMonitor &pm, RPC &rpc);
 	ExecutionLimits getParseExecutionLimits(RPC &rpc);

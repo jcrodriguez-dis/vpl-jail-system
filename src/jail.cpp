@@ -21,7 +21,13 @@
 #include <pty.h>
 #include <sched.h>
 #include <sys/mount.h>
+#include <sys/syscall.h>
 #include "jail.h"
+
+// pivot_root syscall wrapper (not in glibc)
+static int pivot_root(const char *new_root, const char *put_old) {
+	return syscall(SYS_pivot_root, new_root, put_old);
+}
 #include "redirector.h"
 #include "httpServer.h"
 #include "util.h"
@@ -791,7 +797,7 @@ void Jail::process(Socket *socket){
 
 /**
  * Setup Linux namespaces for process isolation
- * Isolates PID, mount, network, IPC, and UTS namespaces
+ * Isolates PID, mounts and IPC namespaces
  */
 void Jail::setupNamespaces(){
 	// Check if namespace isolation is enabled
@@ -801,25 +807,92 @@ void Jail::setupNamespaces(){
 	}
 	
 	// Create new namespaces to isolate the process
-	// NOTE: CLONE_NEWPID is NOT used here because it requires special handling:
-	// - The calling process doesn't enter the new PID namespace
-	// - Only children of the calling process enter it
-	// - This causes "fork: Cannot allocate memory" errors
-	// We rely on /proc remounting and chroot for process visibility isolation instead
-	//
-	// CLONE_NEWNS: Mount namespace - isolated filesystem mounts
-	// CLONE_NEWNET: Network namespace - isolated network stack
+	// Using only PID and IPC namespaces
+	// CLONE_NEWPID: PID namespace - isolated process IDs
+	// CLONE_NEWNS: Mount namespace - isolated mount points
 	// CLONE_NEWIPC: IPC namespace - isolated System V IPC, POSIX message queues
-	// CLONE_NEWUTS: UTS namespace - isolated hostname/domainname
-	int flags = CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS;
+	int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC;
 	
 	if (unshare(flags) != 0) {
 		// If unshare fails, log but continue (some kernels may not support all namespaces)
 		Logger::log(LOG_WARNING, "Failed to create namespaces: %s (errno=%d). Continuing without full namespace isolation.", strerror(errno), errno);
 		return;
 	}
+	// Fork to apply the new PID namespace
+	pid_t pid = fork();
+	if (pid < 0) {
+		Logger::log(LOG_ERR, "Failed to fork after unshare: %s (errno=%d)", strerror(errno), errno);
+		throw HttpException(internalServerErrorCode, "I can't fork after unshare");
+	}
+	if (pid > 0) {
+		// Parent process - exit to allow child to run in new PID namespace
+		waitpid(pid, NULL, 0);
+		_exit(EXIT_SUCCESS);
+	}
+	Logger::log(LOG_INFO, "Namespaces created: PID, IPC");
+}
+
+/**
+ * Use pivot_root to change the root filesystem
+ * This is more secure than chroot as it actually changes the root mount
+ */
+void Jail::pivotRoot(string jailPath, int prisonerID){
+	if (jailPath == "") {
+		Logger::log(LOG_INFO,"No pivot_root, running in container");
+		return;
+	}
+	// Ensure we're in a mount namespace (should be from setupNamespaces)
+	// Make the jail path a mount point by bind mounting private it to itself
+	if (mount(jailPath.c_str(), jailPath.c_str(), NULL, MS_BIND | MS_REC | MS_PRIVATE, NULL) != 0) {
+		Logger::log(LOG_WARNING, "Failed to bind mount jail path: %s. Falling back to chroot.", strerror(errno));
+		// Fallback to chroot
+		if(chdir(jailPath.c_str()) != 0)
+			throw HttpException(internalServerErrorCode, "I can't chdir to jail", jailPath);
+		if(chroot(jailPath.c_str()) != 0)
+			throw HttpException(internalServerErrorCode, "I can't chroot to jail", jailPath);
+		Logger::log(LOG_INFO,"chrooted (fallback) \"%s\"",jailPath.c_str());
+		return;
+	}
 	
-	Logger::log(LOG_INFO, "Namespaces created: Mount, Network, IPC, UTS");
+	// Create a unique directory for the old root using prisoner ID
+	string oldroot = jailPath + "/.oldroot_p" + Util::itos(prisonerID);
+	mkdir(oldroot.c_str(), 0755); // Ignore errors if it exists
+	
+	// Change to the new root
+	if(chdir(jailPath.c_str()) != 0) {
+		Logger::log(LOG_ERR, "Failed to chdir to jail: %s", strerror(errno));
+		throw HttpException(internalServerErrorCode, "I can't chdir to jail", jailPath);
+	}
+	
+	// Pivot the root
+	string oldrootRelative = ".oldroot_p" + Util::itos(prisonerID);
+	if (pivot_root(".", oldrootRelative.c_str()) != 0) {
+		Logger::log(LOG_WARNING, "Failed to pivot_root: %s (errno=%d). Falling back to chroot.", strerror(errno), errno);
+		// Fallback to chroot
+		if(chroot(jailPath.c_str()) != 0)
+			throw HttpException(internalServerErrorCode, "I can't chroot to jail", jailPath);
+		Logger::log(LOG_INFO,"chrooted (fallback) \"%s\"",jailPath.c_str());
+		return;
+	}
+	
+	// Change to the new root
+	if(chdir("/") != 0) {
+		Logger::log(LOG_ERR, "Failed to chdir to new root: %s", strerror(errno));
+		throw HttpException(internalServerErrorCode, "I can't chdir to new root");
+	}
+	
+	// Unmount the old root immediately - CRITICAL for security
+	// Use regular umount (not lazy MNT_DETACH) to fail fast if references exist
+	string oldrootAbsolute = "/" + oldrootRelative;
+	if (umount(oldrootAbsolute.c_str()) != 0) {
+		Logger::log(LOG_ERR, "SECURITY: Failed to unmount old root: %s (errno=%d)", strerror(errno), errno);
+		// This is a critical security failure - old root would be accessible
+		throw HttpException(internalServerErrorCode, "Failed to unmount old root - security breach prevented");
+	}
+	
+	// Remove the old root directory
+	rmdir(oldrootAbsolute.c_str());
+	Logger::log(LOG_INFO,"pivot_root completed to \"%s\"",jailPath.c_str());
 }
 
 /**
@@ -854,23 +927,6 @@ void Jail::remountProc(){
 		}
 	}
 }
-}
-
-/**
- * chdir and chroot to jail with cgroup isolation
- */
-void Jail::goJail(){
-	string jailPath=configuration->getJailPath();
-	if (jailPath == "") {
-		Logger::log(LOG_INFO,"No chrooted, running in container");
-		return;
-	}
-	if(chdir(jailPath.c_str()) != 0)
-		throw HttpException(internalServerErrorCode, "I can't chdir to jail", jailPath);
-	if(chroot(jailPath.c_str()) != 0)
-		throw HttpException(internalServerErrorCode, "I can't chroot to jail", jailPath);
-	Logger::log(LOG_INFO,"chrooted \"%s\"",jailPath.c_str());
-}
 
 /**
  * chdir and chroot to jail with cgroup isolation
@@ -883,12 +939,12 @@ void Jail::goJail(processMonitor &pm){
 		try {
 			string cgroupName = "p" + Util::itos(pm.getPrisonerID());
 			Cgroup cgroup(cgroupName);
-			
+			cgroup.clean(); // Clean previous cgroups if exist
 			// Add current process to cgroup controllers
 			pid_t pid = getpid();
-			cgroup.setCPUProcs(pid);
+			// cgroup.setCPUProcs(pid);
 			cgroup.setMemoryProcs(pid);
-			cgroup.setNetProcs(pid);
+			// cgroup.setNetProcs(pid);
 			
 			// Set resource limits via cgroup
 			ExecutionLimits limits = pm.getLimits();
@@ -909,18 +965,15 @@ void Jail::goJail(processMonitor &pm){
 	setupNamespaces();
 	
 	if (jailPath == "") {
-		Logger::log(LOG_INFO,"No chrooted, running in container");
+		Logger::log(LOG_INFO,"No pivot_root, running in container");
 		return;
 	}
-	if(chdir(jailPath.c_str()) != 0)
-		throw HttpException(internalServerErrorCode, "I can't chdir to jail", jailPath);
-	if(chroot(jailPath.c_str()) != 0)
-		throw HttpException(internalServerErrorCode, "I can't chroot to jail", jailPath);
 	
-	// After chroot, remount /proc to show only this namespace's processes
+	// Use pivot_root for stronger isolation than chroot
+	pivotRoot(jailPath, pm.getPrisonerID());
+	
+	// After pivot_root, remount /proc to show only this namespace's processes
 	remountProc();
-	
-	Logger::log(LOG_INFO,"chrooted \"%s\"",jailPath.c_str());
 }
 
 /**
@@ -976,27 +1029,51 @@ void Jail::setLimits(processMonitor &pm){
 	ExecutionLimits executionLimits = pm.getLimits();
 	executionLimits.log("setLimits");
 	struct rlimit limit;
-	limit.rlim_cur=0;
-	limit.rlim_max=0;
-	setrlimit(RLIMIT_CORE,&limit);
-	limit.rlim_cur=executionLimits.maxtime;
-	limit.rlim_max=executionLimits.maxtime;
-	setrlimit(RLIMIT_CPU,&limit);
-	if(executionLimits.maxfilesize>0){ //0 equals no limit
-		limit.rlim_cur=executionLimits.maxfilesize;
-		limit.rlim_max=executionLimits.maxfilesize;
-		setrlimit(RLIMIT_FSIZE,&limit);
+	limit.rlim_cur = 0;
+	limit.rlim_max = 0;
+	setrlimit(RLIMIT_CORE, &limit);
+	limit.rlim_cur = executionLimits.maxtime;
+	limit.rlim_max = executionLimits.maxtime;
+	setrlimit(RLIMIT_CPU, &limit);
+	if(executionLimits.maxfilesize > 0){ //0 equals no limit
+		limit.rlim_cur = executionLimits.maxfilesize;
+		limit.rlim_max = executionLimits.maxfilesize;
+		setrlimit(RLIMIT_FSIZE, &limit);
 	}
-	if(executionLimits.maxprocesses>0){ //0 equals no change
-		limit.rlim_cur=executionLimits.maxprocesses;
-		limit.rlim_max=executionLimits.maxprocesses;
-		setrlimit(RLIMIT_NPROC,&limit);
+	if(executionLimits.maxprocesses > 0){ //0 equals no change
+		limit.rlim_cur = executionLimits.maxprocesses;
+		limit.rlim_max = executionLimits.maxprocesses;
+		setrlimit(RLIMIT_NPROC, &limit);
 	}
-	//RLIMIT_MEMLOCK
-	//RLIMIT_MSGQUEUE
-	//RLIMIT_NICERLIMIT_NOFILE
-	//RLIMIT_RTPRIO
-	//RLIMIT_SIGPENDING
+}
+
+/**
+ * Execute program inside jail with proper isolation and error handling
+ * This method is called in the child process after fork and never returns
+ * @param pm process monitor with prisoner information
+ * @param name program to execute
+ * @param detail detail string for error messages
+ */
+void Jail::executeInJail(processMonitor &pm, string name, const char *detail){
+	Logger::setForeground(false);
+	try {
+		// All privileged operations first (require root)
+		goJail(pm); // cgroup, namespace, pivot_root isolation
+		// Drop privileges before setting limits and executing
+		pm.becomePrisoner(); // setuid to prisoner (drops root)
+		setLimits(pm); // set resource limits (as prisoner)
+		transferExecution(pm, name); // exec program (never returns)
+	} catch(const char *s) {
+		Logger::log(LOG_ERR, "Error running %s: %s", detail, s);
+		printf("\nJail error: %s\n",s);
+	} catch(const string &s) {
+		Logger::log(LOG_ERR, "Error running %s: %s", detail, s.c_str());
+		printf("\nJail error: %s\n", s.c_str());
+	} catch(...) {
+		Logger::log(LOG_ERR, "Error running %s", detail);
+		printf("\nJail error: at execution stage\n");
+	}
+	_exit(EXIT_SUCCESS);
 }
 
 /**
@@ -1015,27 +1092,12 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 	signal(SIGTERM, SIG_IGN);
 	signal(SIGKILL, SIG_IGN);
 	newpid = forkpty(&fdmaster, NULL, NULL, NULL);
-	if (newpid == -1) //fork error
-		return "Jail: fork error";
+	if (newpid == -1) { //forkpty error
+		Logger::log(LOG_INFO, "Jail: forkpty error %m");
+		return "Jail: forkpty error";
+	}
 	if (newpid == 0) { //new process
-		Logger::setForeground(false);
-		try {
-			goJail(pm);
-			setLimits(pm);
-			pm.becomePrisoner();
-			setsid();
-			transferExecution(pm, name);
-		} catch(const char *s) {
-			Logger::log(LOG_ERR, "Error running: %s",s);
-			printf("\nJail error: %s\n",s);
-		} catch(const string &s) {
-			Logger::log(LOG_ERR,"Error running: %s",s.c_str());
-			printf("\nJail error: %s\n",s.c_str());
-		} catch(...) {
-			Logger::log(LOG_ERR,"Error running");
-			printf("\nJail error: at execution stage\n");
-		}
-		_exit(EXIT_SUCCESS);
+		executeInJail(pm, name, (VNCLaunch ? "VNCLaunch" : "run")); // Never returns
 	}
 	Logger::log(LOG_INFO, "child pid %d",newpid);
 	RedirectorTerminalBatch redirector(fdmaster);
@@ -1134,20 +1196,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 		return;
 	}
 	if (newpid == 0) { //new process
-		Logger::setForeground(false);
-		try{
-			goJail(pm);
-			setLimits(pm);
-			pm.becomePrisoner();
-			setsid();
-			transferExecution(pm,name);
-		}catch(const char *s){
-			Logger::log(LOG_ERR,"Error running terminal: %s",s);
-		}
-		catch(...){
-			Logger::log(LOG_ERR,"Error running terminal");
-		}
-		_exit(EXIT_SUCCESS);
+		executeInJail(pm, name, "terminal"); // Never returns
 	}
 	Logger::log(LOG_INFO, "child pid %d",newpid);
 	RedirectorTerminal redirector(fdmaster,&ws);
