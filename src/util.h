@@ -846,38 +846,72 @@ public:
 		return clean;
     }
 	/**
-	 * Detect cgroup path from /proc/mounts
+	 * Find cgroup filesystem mount point by reading /proc/mounts
+	 * Returns the base path where cgroup controllers are mounted
+	 * 
+	 * @return string path to cgroup filesystem root (e.g., "/sys/fs/cgroup")
 	 */
-	static string detectCgroupPath() {
+	static string findCgroupFilesystem() {
+		const string DEFAULT_PATH = "/sys/fs/cgroup";
 		ifstream mounts("/proc/mounts");
+		
+		if (!mounts.is_open()) {
+			Logger::log(LOG_WARNING, "Cannot open /proc/mounts, using default cgroup path: %s", DEFAULT_PATH.c_str());
+			return DEFAULT_PATH;
+		}
+		
 		string line;
-		string bestCandidate = "/sys/fs/cgroup"; // Default fallback
-
+		string cgroupv2Path;
+		string cgroupv1BasePath;
+		map<string, string> controllerPaths;
+		
 		while (getline(mounts, line)) {
 			stringstream ss(line);
-			string device, path, type;
-			ss >> device >> path >> type;
-
-			// Check for cgroup (v1) or cgroup2 (v2)
-			if (type == "cgroup" || type == "cgroup2") {
-				// If we find the standard systemd path, it is the preferred root
-				if (path.find("/sys/fs/cgroup") == 0) {
-					return "/sys/fs/cgroup";
-				}
-				// Keep the first valid cgroup path found as a backup
-				if (bestCandidate == "/sys/fs/cgroup") {
-					// Extract the parent directory if it's a specific controller mount
-					// e.g., /cgroup/cpu -> /cgroup
-					size_t lastSlash = path.find_last_of('/');
-					if (lastSlash != string::npos && lastSlash > 0) {
-						bestCandidate = path.substr(0, lastSlash);
-					} else {
-						bestCandidate = path;
+			string device, mountpoint, fstype, options;
+			ss >> device >> mountpoint >> fstype >> options;
+			
+			if (fstype == "cgroup2") {
+				// cgroup v2 - unified hierarchy (preferred)
+				cgroupv2Path = mountpoint;
+				Logger::log(LOG_DEBUG, "Found cgroup v2 at: %s", mountpoint.c_str());
+			} else if (fstype == "cgroup") {
+				// cgroup v1 - per-controller hierarchies
+				Logger::log(LOG_DEBUG, "Found cgroup v1 controller at: %s", mountpoint.c_str());
+				controllerPaths[mountpoint] = mountpoint;
+				
+				// Extract base path (parent directory of controller mounts)
+				size_t lastSlash = mountpoint.find_last_of('/');
+				if (lastSlash != string::npos && lastSlash > 0) {
+					string basePath = mountpoint.substr(0, lastSlash);
+					if (cgroupv1BasePath.empty() || basePath.length() < cgroupv1BasePath.length()) {
+						cgroupv1BasePath = basePath;
 					}
 				}
 			}
 		}
-		return bestCandidate;
+		
+		mounts.close();
+		
+		// Prefer cgroup v2 if available
+		if (!cgroupv2Path.empty()) {
+			Logger::log(LOG_INFO, "Using cgroup v2 filesystem at: %s", cgroupv2Path.c_str());
+			return cgroupv2Path;
+		}
+		
+		// Use cgroup v1 base path
+		if (!cgroupv1BasePath.empty()) {
+			Logger::log(LOG_INFO, "Using cgroup v1 filesystem at: %s", cgroupv1BasePath.c_str());
+			return cgroupv1BasePath;
+		}
+		
+		// Check if standard path exists
+		if (fileExists(DEFAULT_PATH)) {
+			Logger::log(LOG_INFO, "Using default cgroup path: %s", DEFAULT_PATH.c_str());
+			return DEFAULT_PATH;
+		}
+		
+		Logger::log(LOG_WARNING, "No cgroup filesystem found, using default: %s", DEFAULT_PATH.c_str());
+		return DEFAULT_PATH;
 	}
 };
 
