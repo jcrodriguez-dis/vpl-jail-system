@@ -8,6 +8,7 @@ using namespace std;
 #include <limits.h>
 #include <syslog.h>
 #include <sys/types.h>
+#include <sys/prctl.h>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -52,8 +53,23 @@ void processMonitor::becomePrisoner(int prisoner) {
 	if (getuid() == 0 || geteuid() == 0)
 		throw HttpException(internalServerErrorCode,
 				"I can't change to prisoner user 2", Util::itos(prisoner));
+	
+	// Reject all unnecessary privileges and prevent privilege escalation
+	// Set NO_NEW_PRIVS to prevent gaining privileges through execve
+	if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0) {
+		Logger::log(LOG_WARNING, "Failed to set NO_NEW_PRIVS: %m");
+	}
+	// Set dumpable to 0 for additional security (prevents ptrace attach)
+	if (prctl(PR_SET_DUMPABLE, 0, 0, 0, 0) != 0) {
+		Logger::log(LOG_WARNING, "Failed to set DUMPABLE to 0: %m");
+	}
+	// Prevent other processes from ptracing this one
+	if (prctl(PR_SET_PTRACER, 0, 0, 0, 0) != 0) {
+		Logger::log(LOG_WARNING, "Failed to set PTRACER to 0: %m");
+	}
+	
 	Daemon::closeSockets();
-	Logger::log(LOG_INFO, "change user to %d", prisoner);
+	Logger::log(LOG_INFO, "change user to %d (privileges rejected)", prisoner);
 }
 
 /**
