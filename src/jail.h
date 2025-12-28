@@ -38,7 +38,8 @@ protected:
 	string IP; //Client IP
 	Configuration *configuration;
 	static void catchSIGTERM(int n);
-	void goJail(processMonitor &pm);
+	void setupFilesystemIsolation(processMonitor &pm);
+	void setupCgroup(processMonitor &pm);
 	void setupNamespaces();
 	void pivotRoot(string jailPath, int prisonerID);
 	void remountProc();

@@ -15,6 +15,7 @@
 #include <exception>
 #include <sys/types.h>
 #include <dirent.h>
+#include <sys/prctl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -812,7 +813,6 @@ void Jail::setupNamespaces(){
 	// CLONE_NEWNS: Mount namespace - isolated mount points
 	// CLONE_NEWIPC: IPC namespace - isolated System V IPC, POSIX message queues
 	int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC;
-	
 	if (unshare(flags) != 0) {
 		// If unshare fails, log but continue (some kernels may not support all namespaces)
 		Logger::log(LOG_WARNING, "Failed to create namespaces: %s (errno=%d). Continuing without full namespace isolation.", strerror(errno), errno);
@@ -825,7 +825,15 @@ void Jail::setupNamespaces(){
 		throw HttpException(internalServerErrorCode, "I can't fork after unshare");
 	}
 	if (pid > 0) {
-		// Parent process - exit to allow child to run in new PID namespace
+		// Parent process - exit when child finishes
+		// Set dumpable to 0 for additional security (prevents ptrace attach)
+		if (prctl(PR_SET_DUMPABLE, 0, 0, 0, 0) != 0) {
+			Logger::log(LOG_WARNING, "Failed to set DUMPABLE to 0: %m");
+		}
+		// Prevent other processes from ptracing this one
+		if (prctl(PR_SET_PTRACER, 0, 0, 0, 0) != 0) {
+			Logger::log(LOG_WARNING, "Failed to set PTRACER to 0: %m");
+		}
 		waitpid(pid, NULL, 0);
 		_exit(EXIT_SUCCESS);
 	}
@@ -929,40 +937,43 @@ void Jail::remountProc(){
 }
 
 /**
- * chdir and chroot to jail with cgroup isolation
+ * Setup cgroup isolation for resource control
  */
-void Jail::goJail(processMonitor &pm){
-	string jailPath=configuration->getJailPath();
-	
-	// Setup cgroup isolation before chroot
-	if (configuration->getUseCGroup()) {
-		try {
-			string cgroupName = "p" + Util::itos(pm.getPrisonerID());
-			Cgroup cgroup(cgroupName);
-			cgroup.clean(); // Clean previous cgroups if exist
-			// Add current process to cgroup controllers
-			pid_t pid = getpid();
-			// cgroup.setCPUProcs(pid);
-			cgroup.setMemoryProcs(pid);
-			// cgroup.setNetProcs(pid);
-			
-			// Set resource limits via cgroup
-			ExecutionLimits limits = pm.getLimits();
-			if (limits.maxmemory > 0) {
-				cgroup.setMemoryLimitInBytes(limits.maxmemory);
-				Logger::log(LOG_INFO, "Cgroup memory limit set to %lld bytes", limits.maxmemory);
-			}
-			
-			Logger::log(LOG_INFO, "Process %d added to cgroup %s", pid, cgroupName.c_str());
-		} catch (const std::exception &e) {
-			Logger::log(LOG_WARNING, "Failed to setup cgroup: %s", e.what());
-		} catch (...) {
-			Logger::log(LOG_WARNING, "Failed to setup cgroup: unknown error");
-		}
+void Jail::setupCgroup(processMonitor &pm){
+	if (!configuration->getUseCGroup()) {
+		return;
 	}
 	
-	// Setup namespace isolation to hide unnecessary information
-	setupNamespaces();
+	try {
+		string cgroupName = "p" + Util::itos(pm.getPrisonerID());
+		Cgroup cgroup(cgroupName);
+		cgroup.clean(); // Clean previous cgroups if exist
+		// Add current process to cgroup controllers
+		pid_t pid = getpid();
+		// cgroup.setCPUProcs(pid);
+		cgroup.setMemoryProcs(pid);
+		// cgroup.setNetProcs(pid);
+		
+		// Set resource limits via cgroup
+		ExecutionLimits limits = pm.getLimits();
+		if (limits.maxmemory > 0) {
+			cgroup.setMemoryLimitInBytes(limits.maxmemory);
+			Logger::log(LOG_INFO, "Cgroup memory limit set to %lld bytes", limits.maxmemory);
+		}
+		
+		Logger::log(LOG_INFO, "Process %d added to cgroup %s", pid, cgroupName.c_str());
+	} catch (const std::exception &e) {
+		Logger::log(LOG_WARNING, "Failed to setup cgroup: %s", e.what());
+	} catch (...) {
+		Logger::log(LOG_WARNING, "Failed to setup cgroup: unknown error");
+	}
+}
+
+/**
+ * chdir and chroot to jail with cgroup isolation
+ */
+void Jail::setupFilesystemIsolation(processMonitor &pm){
+	string jailPath=configuration->getJailPath();
 	
 	if (jailPath == "") {
 		Logger::log(LOG_INFO,"No pivot_root, running in container");
@@ -1058,11 +1069,18 @@ void Jail::executeInJail(processMonitor &pm, string name, const char *detail){
 	Logger::setForeground(false);
 	try {
 		// All privileged operations first (require root)
-		goJail(pm); // cgroup, namespace, pivot_root isolation
-		// Drop privileges before setting limits and executing
-		pm.becomePrisoner(); // setuid to prisoner (drops root)
-		setLimits(pm); // set resource limits (as prisoner)
-		transferExecution(pm, name); // exec program (never returns)
+		// Setup cgroup isolation before chroot
+		setupCgroup(pm);	
+		// Setup namespace isolation to hide unnecessary information
+		setupNamespaces();
+		 // pivot_root isolation or chroot
+		setupFilesystemIsolation(pm);
+		// setuid to prisoner (drops root)
+		pm.becomePrisoner(); 
+		// set resource limits (as prisoner)
+		setLimits(pm);
+		// exec program (never returns)
+		transferExecution(pm, name);
 	} catch(const char *s) {
 		Logger::log(LOG_ERR, "Error running %s: %s", detail, s);
 		printf("\nJail error: %s\n",s);
