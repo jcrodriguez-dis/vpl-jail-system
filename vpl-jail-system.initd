@@ -145,16 +145,20 @@ function set_etc {
 	local GROUPFILE="$JAILPATH/etc/group"
 	local SHADOWFILE="$JAILPATH/etc/shadow"
 	local I
+	local RESERVED_USER="vplhome"
 	if [ -z "$IN_CONTAINER" ] ; then
 		#passwd file
 		echo "root:*:0:0:root:/root:/bin/bash" > "$PASSWORDFILE"
-		for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
+		# Reserve MIN_PRISONER_UGID as home directory owner (not a real prisoner)
+		echo "$RESERVED_USER:*:$MIN_PRISONER_UGID:$MIN_PRISONER_UGID:VPL home owner:/nonexistent:/bin/false" >> "$PASSWORDFILE"
+		for (( I=$MIN_PRISONER_UGID+1 ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
 			echo "p$I:*:$I:$I:prisoner $I:/home/p$I:/bin/bash" >> "$PASSWORDFILE"
 		done
 		chmod 644 "$PASSWORDFILE"
 		#group file
 		echo "root:*:0:root" > "$GROUPFILE"
-		for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
+		echo "$RESERVED_USER:*:$MIN_PRISONER_UGID:$RESERVED_USER" >> "$GROUPFILE"
+		for (( I=$MIN_PRISONER_UGID+1 ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
 			echo "p$I:*:$I:p$I" >> "$GROUPFILE"
 		done
 		chmod 644 "$GROUPFILE"
@@ -163,8 +167,9 @@ function set_etc {
 	else
 		#passwd file
 		local TMPFILE=/tmp/.nothing
-		grep -v "^p[0-9][0-9][0-9]+:" "$PASSWORDFILE" > $TMPFILE
-		for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
+		grep -v -e "^p[0-9][0-9][0-9]+:" -e "^$RESERVED_USER:" "$PASSWORDFILE" > $TMPFILE
+		echo "$RESERVED_USER:*:$MIN_PRISONER_UGID:$MIN_PRISONER_UGID:VPL home owner:/nonexistent:/bin/false" >> $TMPFILE
+		for (( I=$MIN_PRISONER_UGID+1 ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
 			echo "p$I:*:$I:$I:prisoner $I:/home/p$I:/bin/bash" >> $TMPFILE
 		done
 		cp $TMPFILE "$PASSWORDFILE"
@@ -172,8 +177,9 @@ function set_etc {
 		chmod 644 "$PASSWORDFILE"
 
 		#group file
-		grep -v "^p[0-9][0-9][0-9]+:" "$GROUPFILE" > $TMPFILE
-		for (( I=$MIN_PRISONER_UGID ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
+		grep -v -e "^p[0-9][0-9][0-9]+:" -e "^$RESERVED_USER:" "$GROUPFILE" > $TMPFILE
+		echo "$RESERVED_USER:*:$MIN_PRISONER_UGID:$RESERVED_USER" >> $TMPFILE
+		for (( I=$MIN_PRISONER_UGID+1 ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
 			echo "p$I:*:$I:p$I" >> $TMPFILE
 		done
 		cp $TMPFILE "$GROUPFILE"
