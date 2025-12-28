@@ -43,6 +43,7 @@ protected:
 	void setupNamespaces();
 	void pivotRoot(string jailPath, int prisonerID);
 	void remountProc();
+	void setupPrivateTmp(processMonitor &pm);
 	void changeUser(processMonitor &pm);
 	void setLimits(processMonitor &pm);
 	void executeInJail(processMonitor &pm, string name, const char *detail);

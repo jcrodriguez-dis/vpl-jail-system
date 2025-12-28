@@ -937,6 +937,46 @@ void Jail::remountProc(){
 }
 
 /**
+ * Make /tmp private per prisoner to avoid information sharing.
+ *
+ * When mount namespaces are enabled, bind-mount /home/p<uid>/tmp onto /tmp.
+ * This ensures programs using the hardcoded /tmp path cannot see other prisoners' temp files.
+ */
+void Jail::setupPrivateTmp(processMonitor &pm){
+	if (!configuration->getUseNamespace()) {
+		return;
+	}
+
+	string tmpSource = pm.getRelativeHomePath() + "/tmp"; // /home/p<uid>/tmp inside jail
+	if (mkdir(tmpSource.c_str(), 0700) != 0 && errno != EEXIST) {
+		Logger::log(LOG_WARNING, "Failed to create private tmp source %s: %s", tmpSource.c_str(), strerror(errno));
+		return;
+	}
+	// Best-effort ownership; not critical if already exists
+	if (chown(tmpSource.c_str(), pm.getPrisonerID(), pm.getPrisonerID()) != 0) {
+		Logger::log(LOG_DEBUG, "Failed to chown %s: %s", tmpSource.c_str(), strerror(errno));
+	}
+	chmod(tmpSource.c_str(), 0700);
+
+	// Ensure mount point exists
+	if (mkdir("/tmp", 01777) != 0 && errno != EEXIST) {
+		Logger::log(LOG_WARNING, "Failed to ensure /tmp exists: %s", strerror(errno));
+		return;
+	}
+
+	// Bind mount private tmp onto /tmp
+	if (mount(tmpSource.c_str(), "/tmp", NULL, MS_BIND, NULL) != 0) {
+		Logger::log(LOG_WARNING, "Failed to bind-mount %s to /tmp: %s", tmpSource.c_str(), strerror(errno));
+		return;
+	}
+	// Make mount private (best-effort)
+	mount(NULL, "/tmp", NULL, MS_PRIVATE, NULL);
+	// Best-effort hardening flags on the bind mount (ignore failures)
+	mount(NULL, "/tmp", NULL, MS_BIND | MS_REMOUNT | MS_NODEV | MS_NOSUID, NULL);
+	Logger::log(LOG_DEBUG, "Private /tmp set to %s", tmpSource.c_str());
+}
+
+/**
  * Setup cgroup isolation for resource control
  */
 void Jail::setupCgroup(processMonitor &pm){
@@ -985,6 +1025,8 @@ void Jail::setupFilesystemIsolation(processMonitor &pm){
 	
 	// After pivot_root, remount /proc to show only this namespace's processes
 	remountProc();
+	// Isolate /tmp per prisoner (requires mount namespace)
+	setupPrivateTmp(pm);
 }
 
 /**
@@ -1008,10 +1050,12 @@ void Jail::transferExecution(processMonitor &pm, string fileName){
 	arg[narg++] = command;
 	arg[narg++] = NULL;
 	int nenv = 0;
-	char *env[10];
+	char *env[12];
 	string uid = Util::itos(pm.getPrisonerID());
 	string HOME = "HOME=/home/p" + uid;
 	env[nenv++] = (char *)HOME.c_str();
+	string TMPDIR = "TMPDIR=/tmp";
+	env[nenv++] = (char *)TMPDIR.c_str();
 	string PATH = "PATH=" + configuration->getCleanPATH();
 	env[nenv++] = (char *)PATH.c_str();
 	env[nenv++] = (char *)"TERM=dumb";

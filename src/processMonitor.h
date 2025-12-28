@@ -46,6 +46,10 @@ class processMonitor{
 	static void catchSIGTERM(int){}
 	void limitResultSize(string &);
 	void setPrisonerID(uid_t  prisoner) {
+		if (prisoner == configuration->getHomeDirOwnerUid()) {
+			Logger::log(LOG_ERR, "Try to set reserved prisoner id %d", prisoner);
+			throw HttpException(internalServerErrorCode, "Reserved prisoner id");
+		}
 		if (prisoner < configuration->getMinPrisoner() || prisoner > configuration->getMaxPrisoner()) {
 			Logger::log(LOG_ERR, "Try to set invalid prisoner id %d", prisoner);
 			throw HttpException(internalServerErrorCode, "Invalid prisoner id");

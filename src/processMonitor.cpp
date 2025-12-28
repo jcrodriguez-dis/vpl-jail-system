@@ -177,9 +177,11 @@ string processMonitor::prisonerHomePath() {
  * Create prisoner home dir
  */
 void processMonitor::selectPrisoner() {
-	int const range = configuration->getMaxPrisoner() - configuration->getMinPrisoner() + 1;
+	uid_t firstPrisoner = configuration->getMinPrisoner();
+	int const range = configuration->getMaxPrisoner() - firstPrisoner + 1;
 	int const ntry = range;
-	int const umask = 0700;
+	mode_t const controlDirMode = 0700;
+	mode_t const homeDirMode = 0770; // non-prisoner owned; prisoner group access
 	if (range < 100) {
 		throw HttpException(internalServerErrorCode,
 				"Prisoner range too small, minPrisoner + 100 < maxPrisoner");
@@ -192,16 +194,22 @@ void processMonitor::selectPrisoner() {
 	Lock lock(configuration->getControlPath());
 
 	for (int i = 0; i < ntry; i++) {
-		setPrisonerID(configuration->getMinPrisoner() + abs(Util::random() + i) % range);
+		setPrisonerID(firstPrisoner + abs(Util::random() + i) % range);
 		string controlPath = getProcessControlPath();
-		if ( mkdir(controlPath.c_str(), umask) == 0 ) {
+		if ( mkdir(controlPath.c_str(), controlDirMode) == 0 ) {
 			homePath = prisonerHomePath();
-			if ( mkdir(homePath.c_str(), umask) == 0 ) {
-				if ( chown(homePath.c_str(), prisoner, prisoner) ) {
+			if ( mkdir(homePath.c_str(), homeDirMode) == 0 ) {
+				if ( chown(homePath.c_str(), configuration->getHomeDirOwnerUid(), prisoner) ) {
 					Util::removeDir(homePath, 0, true);
 					throw HttpException(internalServerErrorCode
 							, "I can't change prisoner home dir \"" + homePath +
 							  "\" to proper owner: " + strerror(errno));
+				}
+				if ( chmod(homePath.c_str(), homeDirMode) ) {
+					Util::removeDir(homePath, 0, true);
+					throw HttpException(internalServerErrorCode
+							, "I can't change prisoner home dir \"" + homePath +
+							  "\" to proper permissions: " + strerror(errno));
 				}
 				return;
 			} else if ( errno == EEXIST) {
