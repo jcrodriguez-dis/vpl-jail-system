@@ -59,8 +59,9 @@ public:
 	const string & getJailPath() const { return jailPath;}
 	const string &  getCleanPATH() const { return cleanPATH;}
 	const string &  getControlPath() const { return controlPath;}
-	size_t getMinPrisoner() const { return minPrisoner;}
-	size_t getMaxPrisoner() const { return maxPrisoner;}
+	uid_t getHomeDirOwnerUid() const { return minPrisoner; }
+	uid_t getMinPrisoner() const { return minPrisoner + 1;}
+	uid_t getMaxPrisoner() const { return maxPrisoner;}
 	const vector<string> & getTaskOnlyFrom() const { return taskOnlyFrom;}
 	const string &  getInterface() const { return interface;}
 	const string &  getURLPath() const { return URLPath;}
