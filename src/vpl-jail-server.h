@@ -5,8 +5,38 @@
  **/
 
 /**
- * Deamon vpl-jail-system. jail for vpl using xmlrpc
- **/
+ * @file vpl-jail-server.h
+ * @brief Main server/daemon accept loop for vpl-jail-system.
+ *
+ * This header contains the `Daemon` class that:
+ * - Opens one or two listening sockets (plain HTTP and/or HTTPS).
+ * - Accepts incoming connections and `fork()`s a child process per request.
+ * - Tracks active children and harvests exit status to maintain statistics.
+ * - Enforces basic integrity checks on the jail filesystem and control directory.
+ *
+ * Request handling model
+ * - The parent process remains privileged and only performs: accept/poll, book-keeping,
+ *   and periodic maintenance.
+ * - Each accepted connection is handled in a forked child which constructs a `Jail`
+ *   instance and calls `Jail::process(Socket*)`. The child then `_exit()`s.
+ * - Children communicate success/failure back to the parent exclusively via their
+ *   process exit code (`ExitStatus`). This is consumed by `harvest()`.
+ *
+ * Security invariants checked at startup
+ * - Jail `/etc` directory and critical account files must be owned by root and must not
+ *   be writable by group/others.
+ * - The control directory (from configuration) must be owned by root and not writable
+ *   by group/others.
+ *
+ * Fail2ban-style throttling
+ * - The server keeps an in-memory per-IP log of request/error counts.
+ * - If enabled by configuration, an IP may be rejected when its error rate exceeds
+ *   a threshold (see `isBanned`). Logs are periodically cleared to keep memory bounded.
+ *
+ * Notes
+ * - Despite being a header, this file contains full implementation for historical reasons.
+ * - No threading is used; concurrency is achieved via `fork()`.
+ */
 
 #if HAVE_CONFIG_H
 #include <config.h>
@@ -20,6 +50,14 @@ using namespace std;
 #include "jail.h"
 #include "util.h"
 
+/**
+ * @brief Singleton server acceptor and child-process supervisor.
+ *
+ * Typical lifecycle:
+ * 1) `getRunner()` constructs the singleton and performs startup checks.
+ * 2) `daemonize()` or `foreground()` optionally detaches and writes a PID file.
+ * 3) `loop()` runs the accept/poll loop until SIGTERM requests a graceful shutdown.
+ */
 class Daemon {
 	Configuration *configuration;
 	static Daemon* singlenton;
@@ -54,12 +92,24 @@ class Daemon {
 	};
 	map<pid_t,Child> children;
 	static bool finishRequested;
+	/**
+	 * SIGTERM handler: request termination of the main loop.
+	 *
+	 * The handler is intentionally minimal and async-signal-safe: it only sets a flag
+	 * checked by `loop()`.
+	 */
 	static void SIGTERMHandler(int) {
 		Daemon::finishRequested = true;
 	}
 
 	/**
-	 * Check jail security (/etc, paswords files, /home, etc)
+	 * Validate jail filesystem integrity.
+	 *
+	 * When `JAILPATH` is configured (not running in a container), this checks that
+	 * the jail's `/etc` and key account files are owned by root and are not writable
+	 * by group/others.
+	 *
+	 * @throws const char* on failure (historical style used across the codebase).
 	 */
 	void checkJail(){
 		string jailPath = configuration->getJailPath();
@@ -102,7 +152,12 @@ class Daemon {
 	}
 
 	/**
-	 * Check control directory
+	 * Validate the control directory integrity.
+	 *
+	 * The control directory stores per-task control/status data and must not be writable
+	 * by group/others.
+	 *
+	 * @throws string on failure.
 	 */
 	void checkControlDir(){
 		string cd=configuration->getControlPath();
@@ -115,7 +170,12 @@ class Daemon {
 			throw "control path with insecure permissions (must be 0x44)";
 	}
 
-	//Return if the IP is banned
+	/**
+	 * @brief Return whether a client IP should be rejected.
+	 *
+	 * This is a lightweight, in-memory heuristic to reduce abusive traffic. It is
+	 * not a persistent firewall and resets periodically.
+	 */
 	bool isBanned(string IP){
 		cleanOld(); /* Fixes by Guilherme Gomes */
 		if ( configuration->getFail2Ban() == 0 || logs.find(IP) == logs.end()) {
@@ -126,6 +186,11 @@ class Daemon {
 				   log.errors > log.requests / 2;
 		}
 	}
+	/**
+	 * @brief Update per-IP and global request/error counters.
+	 * @param IP Client IP address as a string.
+	 * @param es Exit status reported by the child.
+	 */
 	void countRequest(string IP, ExitStatus es){
 		if(es == neutral){
 			return;
@@ -140,6 +205,11 @@ class Daemon {
 		}
 		logs[IP]=log;
 	}
+	/**
+	 * @brief Finalize accounting for a finished child.
+	 * @param pid Child PID.
+	 * @param es Exit status reported by the child.
+	 */
 	void processChildEnd(pid_t pid, ExitStatus es){
 		if(children.find(pid) == children.end())
 			Logger::log(LOG_ERR,"Child end, but pid not found");
@@ -147,7 +217,12 @@ class Daemon {
 		children.erase(pid);
 		countRequest(c.IP,es);
 	}
-	//Check children finish and retrieve exit code
+	/**
+	 * @brief Harvest finished children (non-blocking).
+	 *
+	 * Uses `waitpid(-1, ..., WNOHANG)` to reap any dead children and records their
+	 * exit status for statistics and fail2ban heuristics.
+	 */
 	void harvest(){
 		while(true){
 			if(children.size()==0) return;
@@ -166,7 +241,9 @@ class Daemon {
 			}
 		}
 	}
-	//Reduce and/or remove log by time
+	/**
+	 * @brief Periodically clear per-IP logs to bound memory usage.
+	 */
 	void cleanOld(){
 		//Simple algorithm remove old every 5 minutes
 		static time_t nextClear=0;
@@ -182,6 +259,18 @@ class Daemon {
 		}
 		 */
 	}
+	/**
+	 * @brief Accept a client connection and fork a handler process.
+	 *
+	 * The parent process:
+	 * - Performs IP-based rejection (optional).
+	 * - Stores child bookkeeping (IP + start time).
+	 *
+	 * The child process:
+	 * - Wraps the accepted FD into either `Socket` or `SSLSocket`.
+	 * - Calls `Jail::process()`.
+	 * - Exits with an `ExitStatus` code.
+	 */
 	void launch(int listen, bool sec){
 		struct sockaddr_in client;
 		socklen_t slen = sizeof(client);
@@ -223,7 +312,12 @@ class Daemon {
 		c.start=time(NULL);
 		children[pid]=c;	
 	}
-	//Accept and launch son
+
+	/**
+	 * @brief Poll listening sockets and fork handlers for ready connections.
+	 *
+	 * Uses `poll()` with timeout `JAIL_ACCEPT_WAIT`.
+	 */
 	void accept(){
 		int res=poll(sockets, nSockets, JAIL_ACCEPT_WAIT);
 		if ( res == -1 ) {
@@ -239,6 +333,13 @@ class Daemon {
 			}
 		}
 	}
+	/**
+	 * @brief Create/bind/listen a TCP socket.
+	 * @param port Port to bind.
+	 * @param type Human readable label used for logging.
+	 * @param timeout Retry window in seconds for bind() (useful during restarts).
+	 * @return Listening socket fd, or -1 when port <= 0.
+	 */
 	int initSocket(int port, const char *type, int timeout=10) {
 		if (port <= 0) {
 			Logger::log(LOG_INFO,"No %s used", type);
@@ -277,6 +378,11 @@ class Daemon {
 		return socketfd;
 	}
 
+	/**
+	 * @brief Initialize configured listening sockets.
+	 *
+	 * Creates up to two sockets: HTTP (`PORT`) and HTTPS (`SECURE_PORT`).
+	 */
 	void initSocketServer(){
 		this->port = configuration->getPort();
 		this->sport = configuration->getSecurePort();
@@ -304,6 +410,11 @@ class Daemon {
 		actualSocket = -1;
 	}
 
+	/**
+	 * @brief Construct and initialize the server singleton.
+	 *
+	 * Performs integrity checks, initializes SSL, and binds sockets.
+	 */
 	Daemon(){
 		signal(SIGPIPE, SIG_IGN);
 		signal(SIGTERM, SIGTERMHandler);
@@ -321,6 +432,11 @@ public:
 		return singlenton;
 	}
 
+	/**
+	 * @brief Detach from controlling terminal (classic double-fork).
+	 *
+	 * Writes a PID file to `/run/vpl-jail-server.pid`.
+	 */
 	void daemonize(){
 		pid_t child_pid = fork();
 		if(child_pid < 0) {
@@ -343,6 +459,11 @@ public:
 		fclose(fd);
 	}
 
+	/**
+	 * @brief Run in the foreground but still create a PID file.
+	 *
+	 * In some environments (e.g., Docker) `setsid()` may fail; this is tolerated.
+	 */
 	void foreground(){
 		setsid(); // NOTE: fail in Docker.
 		FILE *fd=fopen("/run/vpl-jail-server.pid", "w");
@@ -350,6 +471,11 @@ public:
 		fclose(fd);
 	}
 
+	/**
+	 * @brief Close all server sockets
+	 *
+	 * Called at shutdown and when forking a child prisoner
+	 */
 	static void closeSockets(){
 		Daemon* runner = getRunner();
 		runner->nSockets = 0;
@@ -366,6 +492,14 @@ public:
 			runner->actualSocket = -1;
 		}
 	}
+
+	/**
+	 * @brief Periodic maintenance tasks.
+	 *
+	 * Currently:
+	 * - Refresh SSL context (best-effort)
+	 * - Fork a helper to clean zombie tasks (best-effort)
+	 */
 	void periodicTasks() {
 		static int checkPoint = 5 * 60 * 1000 / JAIL_ACCEPT_WAIT; // 5 minutes.
 		static int loops = 0;
@@ -390,7 +524,16 @@ public:
 			children[pid]=c;
 		}
 	}
-	//Main loop: receive requests/dispatch and control child
+	/**
+	 * @brief Main server loop.
+	 *
+	 * Repeats:
+	 * - accept new connections (with a short timeout)
+	 * - harvest finished children
+	 * - run periodic maintenance
+	 *
+	 * Exits when SIGTERM sets `finishRequested`.
+	 */
 	void loop() {
 		while(!finishRequested) {
 			accept(); //Accept one request waiting JAIL_ACCEPT_WAIT msec
