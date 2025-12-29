@@ -49,6 +49,7 @@ protected:
 	void executeInJail(processMonitor &pm, string name, const char *detail);
 	void transferExecution(processMonitor &pm,string fileName);
 	void saveParseFiles(processMonitor &pm, RPC &rpc);
+	void deleteFilesMarkedForDeletion(processMonitor &pm, RPC &rpc);
 	ExecutionLimits getParseExecutionLimits(RPC &rpc);
 	//Action commands
 	string commandAvailable(long long memRequested);

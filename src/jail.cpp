@@ -102,6 +102,33 @@ void Jail::saveParseFiles(processMonitor &pm, RPC &rpc) {
 	}
 }
 
+void Jail::deleteFilesMarkedForDeletion(processMonitor &pm, RPC &rpc) {
+	pid_t pid=fork();
+	if(pid==0) { //new process
+		pm.becomePrisoner();
+		mapstruct filestodelete = rpc.getFileToDelete();
+		mapstruct files = rpc.getFiles();
+		for (mapstruct::iterator i = filestodelete.begin(); i != filestodelete.end(); i++) {
+			string name = i->first;
+			if (files.find(name) == files.end()) {
+				Logger::log(LOG_INFO, "File '%s' not in upload list then not deleted", name.c_str());
+				continue; // File not in the upload list so skip
+			}
+			Logger::log(LOG_INFO, "Delete file %s", name.c_str());
+			pm.deleteFile(name);
+		}
+		_exit(EXIT_SUCCESS);
+	} else {
+		int status;
+		if (waitpid(pid, &status, 0) < 0) {
+			throw HttpException(internalServerErrorCode, "Error deleting files");
+		}
+		if (!WIFEXITED(status) || WEXITSTATUS(status) != EXIT_SUCCESS) {
+			throw HttpException(internalServerErrorCode, "Error deleting files");
+		}
+	}
+}
+
 ExecutionLimits Jail::getParseExecutionLimits(RPC &rpc) {
 	mapstruct parsedata = rpc.getData();
 	ExecutionLimits executionLimits = Configuration::getConfiguration()->getLimits();
@@ -142,7 +169,7 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 			Logger::log(LOG_INFO,"Parse data %lu", (long unsigned int)parsedata.size());
 			saveParseFiles(pm, rpc);
 			Logger::log(LOG_INFO,"Reading parms");
-			ExecutionLimits executionLimits = getParseExecutionLimits(rpc);
+			ExecutionLimits executionLimits = configuration->getLimits();
 			string vpl_lang = parsedata["lang"]->getString();
 			Logger::log(LOG_DEBUG, "VPL_LANG %s", vpl_lang.c_str());
 			bool interactive = parsedata["interactive"]->getInt() > 0;
@@ -155,13 +182,7 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 			pm.setCompilationOutput(compilationOutput);
 			bool compiled = pm.FileExists(VPL_EXECUTION) || pm.FileExists(VPL_WEXECUTION) || pm.FileExists(VPL_WEBEXECUTION);
 			if (compiled) {
-				//Delete files
-				mapstruct filestodelete = rpc.getFileToDelete();
-				for (mapstruct::iterator i = filestodelete.begin(); i != filestodelete.end(); i++) {
-					string name = i->first;
-					Logger::log(LOG_INFO, "Delete file %s", name.c_str());
-					pm.deleteFile(name);
-				}
+				deleteFilesMarkedForDeletion(pm, rpc);
 				if (!interactive && pm.FileExists(VPL_EXECUTION)) {
 					pm.setRunner();
 					Logger::log(LOG_INFO, "Non interactive execution");
@@ -175,6 +196,8 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 					Logger::log(LOG_INFO, "Write execution result");
 					pm.setExecutionOutput(executionOutput, true);
 				}
+				executionLimits = getParseExecutionLimits(rpc);
+				pm.setExtraInfo(executionLimits, interactive, vpl_lang);
 			}else{
 				Logger::log(LOG_INFO, "Compilation fail");
 			}
@@ -216,7 +239,7 @@ void Jail::commandDirectRun(RPC &rpc, string &homepath, string &adminticket, str
 			Logger::log(LOG_INFO,"Parse data %lu", (long unsigned int)parsedata.size());
 			saveParseFiles(pm, rpc);
 			Logger::log(LOG_INFO,"Reading parms");
-			ExecutionLimits executionLimits = getParseExecutionLimits(rpc);
+			ExecutionLimits executionLimits = configuration->getLimits();
 			string vpl_lang = parsedata["lang"]->getString();
 			Logger::log(LOG_DEBUG, "VPL_LANG %s", vpl_lang.c_str());
 			bool interactive = true;
@@ -228,13 +251,9 @@ void Jail::commandDirectRun(RPC &rpc, string &homepath, string &adminticket, str
 			pm.setCompilationOutput(compilationOutput);
 			bool compiled = pm.FileExists(VPL_EXECUTION);
 			if (compiled) {
-				//Delete files
-				mapstruct filestodelete = rpc.getFileToDelete();
-				for (mapstruct::iterator i = filestodelete.begin(); i != filestodelete.end(); i++) {
-					string name = i->first;
-					Logger::log(LOG_INFO, "Delete file %s", name.c_str());
-					pm.deleteFile(name);
-				}
+				deleteFilesMarkedForDeletion(pm, rpc);
+				executionLimits = getParseExecutionLimits(rpc);
+				pm.setExtraInfo(executionLimits, interactive, vpl_lang);
 			}else{
 				Logger::log(LOG_INFO, "Compilation fail");
 			}
