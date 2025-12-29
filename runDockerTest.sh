@@ -133,12 +133,15 @@ function checkDockerRunContainer() {
     docker stop -t 3 $CONTAINER_NAME &>> $ERRORS_LOG_FILE
     showMessageIfError $? "Error stopping '$CONTAINER_NAME'"
     [[ $? -ne 0 ]] && return 5
-
-    # Remove container
-    docker container rm -f $CONTAINER_NAME &>> $ERRORS_LOG_FILE
-    showMessageIfError $? "Error removing container '$CONTAINER_NAME'"
-    [[ $? -ne 0 ]] && return 6
-    writeInfo "Container '$CONTAINER_NAME' removed"
+    if [ "$3" == "" ] ; then
+        # Remove container
+        docker container rm -f $CONTAINER_NAME &>> $ERRORS_LOG_FILE
+        showMessageIfError $? "Error removing container '$CONTAINER_NAME'"
+        [[ $? -ne 0 ]] && return 6
+        writeInfo "Container '$CONTAINER_NAME' removed"
+    else
+        writeInfo "Container '$CONTAINER_NAME' was kept at user request"
+    fi
 }
 
 function checkDockerBuild() { 
@@ -163,8 +166,8 @@ function checkDockerBuild() {
     writeCorrect "Image '$IMAGE_NAME' created" "$CHECK_MARK"
 
     # Run container in privileged and non-privileged mode
-    checkDockerRunContainer "$CONTAINER_NAME" "noprivileged"
-    checkDockerRunContainer "$CONTAINER_NAME-privileged" "privileged"
+    checkDockerRunContainer "$CONTAINER_NAME" "noprivileged" $3
+    checkDockerRunContainer "$CONTAINER_NAME-privileged" "privileged" $3
 
     # Remove image
     if [ "$3" == "" ] ; then
@@ -185,25 +188,25 @@ function runTests() {
     # Parameters:
     #    $1 Ditro name [Optional] default [alpine ubuntu debian fedora]
     #    $2 Install level [Optional] [minimum basic standard full]
-    #    $3 keep [Optional] Indicate do not delete the image after the test.
+    #    $3 keep [Optional] Indicate do not delete the image and container after the test.
     local n=0
 	local DISTROS=( alpine ubuntu debian fedora )
     local INSTALL_LEVELS=( minimum basic standard full )
     local param=
-    local keepimage=
+    local keep=
     for param in "$@"; do
         if printf '%s\n' "${INSTALL_LEVELS[@]}" | grep -q -x "$param" ; then
             INSTALL_LEVELS=( $param )
             continue
         fi
         if [[ $param == "keep" ]] ; then
-            keepimage=$param
+            keep=$param
             continue
         fi
         DISTROS=( $param )
     done
     rm vpl-jail-system-*.tar.gz &> /dev/null
-    local matrix="[ ${DISTROS[@]} ] X [ ${INSTALL_LEVELS[@]} ] $keepimage"
+    local matrix="[ ${DISTROS[@]} ] X [ ${INSTALL_LEVELS[@]} ] $keep"
     writeHeading "$matrix" "Test Matrix "
     writeHeading "Building distribution package"
     (
@@ -234,7 +237,7 @@ function runTests() {
             SECONDS=0
             ((n=n+1))
             writeHeading "Testing vpl-jail-system in $VPL_BASE_DISTRO install $VPL_INSTALL_LEVEL" "Test $n: "
-            checkDockerBuild $VPL_BASE_DISTRO $VPL_INSTALL_LEVEL $keepimage
+            checkDockerBuild $VPL_BASE_DISTRO $VPL_INSTALL_LEVEL $keep
             [ $? -ne 0 ] && ((nfails++))
             ELT=$SECONDS
             writeHeading "Test took $(($ELT / 60)) minutes and $(($ELT % 60)) seconds"
