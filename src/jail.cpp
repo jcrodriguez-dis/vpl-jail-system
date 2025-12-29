@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <exception>
 #include <sys/types.h>
+#include <unistd.h>
 #include <dirent.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
@@ -22,6 +23,7 @@
 #include <pty.h>
 #include <sched.h>
 #include <sys/mount.h>
+#include <sys/wait.h>
 #include <sys/syscall.h>
 #include "jail.h"
 
@@ -63,22 +65,40 @@ void Jail::checkFilesNameCorrectness(mapstruct files) {
 }
 
 void Jail::saveParseFiles(processMonitor &pm, RPC &rpc) {
-	mapstruct files = rpc.getFiles();
-	mapstruct fileencoding = rpc.getFileEncoding();
-	//Save files to execution dir, decode data if needed
-	for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
-		string name = i->first;
-		string data = i->second->getString();
-		if ( fileencoding.find(name) != fileencoding.end()
-				&& fileencoding[name]->getInt() == 1 ) {
-			Logger::log(LOG_INFO, "Decoding file %s from b64", name.c_str());
-			data = Base64::decode(data);
-			if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
-				name = name.substr(0, name.length() - 4);
+	pid_t pid=fork();
+	if(pid==0){ //new process
+		try {
+			pm.becomePrisoner();
+			mapstruct files = rpc.getFiles();
+			mapstruct fileencoding = rpc.getFileEncoding();
+			//Save files to execution dir, decode data if needed
+			for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
+				string name = i->first;
+				string data = i->second->getString();
+				if ( fileencoding.find(name) != fileencoding.end()
+						&& fileencoding[name]->getInt() == 1 ) {
+					Logger::log(LOG_INFO, "Decoding file %s from b64", name.c_str());
+					data = Base64::decode(data);
+					if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
+						name = name.substr(0, name.length() - 4);
+					}
+				}
+				Logger::log(LOG_INFO, "Write file %s data size %lu", name.c_str(), (long unsigned int)data.size());
+				pm.writeFile(name, data);
 			}
 		}
-		Logger::log(LOG_INFO, "Write file %s data size %lu", name.c_str(), (long unsigned int)data.size());
-		pm.writeFile(name, data);
+		catch(...) {
+			_exit(EXIT_FAILURE);
+		}
+		_exit(EXIT_SUCCESS);
+	} else {
+		int status;
+		if (waitpid(pid, &status, 0) < 0) {
+			throw HttpException(internalServerErrorCode, "Error saving files");
+		}
+		if (!WIFEXITED(status) || WEXITSTATUS(status) != EXIT_SUCCESS) {
+			throw HttpException(internalServerErrorCode, "Error saving files");
+		}
 	}
 }
 
@@ -256,42 +276,11 @@ bool Jail::commandUpdate(string adminticket, RPC &rpc){
 	checkFilesNameCorrectness(rpc.getFiles());
 	processMonitor pm(adminticket);
 	try {
-		mapstruct files = rpc.getFiles();
-		Logger::log(LOG_INFO,"parse files %lu", (long unsigned int)files.size());
-		mapstruct fileencoding = rpc.getFileEncoding();
-		//Save files to execution dir and options, decode data if needed
-		for(mapstruct::iterator i = files.begin(); i != files.end(); i++){
-			string name = i->first;
-			string data = i->second->getString();
-			if ( fileencoding.find(name) != fileencoding.end()
-					&& fileencoding[name]->getInt() == 1 ) {
-				Logger::log(LOG_INFO, "Decoding file %s from b64", name.c_str());
-				data = Base64::decode(data);
-				if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
-					name = name.substr(0, name.length() - 4);
-				}
-			}
-			Logger::log(LOG_INFO, "Write file %s data size %lu", name.c_str(), (long unsigned int)data.size());
-			pm.writeFile(name, data);
-		}
+		saveParseFiles(pm, rpc);
 		return true;
+	} catch(...) {
+		return false;
 	}
-	catch(std::exception &e){
-		Logger::log(LOG_ERR, "unexpected exception: %s %s:%d", e.what(), __FILE__, __LINE__);
-	}
-	catch(string &e){
-		Logger::log(LOG_ERR, "unexpected exception: %s %s:%d", e.c_str(), __FILE__, __LINE__);
-	}
-	catch(HttpException &e){
-		Logger::log(LOG_ERR, "unexpected exception: %s %s:%d", e.getLog().c_str(), __FILE__, __LINE__);
-	}
-	catch(const char *e){
-		Logger::log(LOG_ERR, "unexpected exception: %s %s:%d", e,__FILE__, __LINE__);
-	}
-	catch(...){
-		Logger::log(LOG_ERR, "unexpected exception %s:%d", __FILE__, __LINE__);
-	}
-	return false;
 }
 
 bool Jail::commandRunning(string adminticket){

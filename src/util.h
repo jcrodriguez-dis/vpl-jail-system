@@ -511,10 +511,12 @@ public:
 					Logger::log(LOG_DEBUG, "Can't create dir '%s'", curDir.c_str());
 					return false;
 				}
-				Logger::log(LOG_DEBUG, "Change owner to %d", user);
-				if(lchown(curDir.c_str(), user, user)) {
-					Logger::log(LOG_DEBUG, "Can't lchown dir '%s'", curDir.c_str());
-					return false;
+				if (user) {
+					Logger::log(LOG_DEBUG, "Change owner to %d", user);
+					if(lchown(curDir.c_str(), user, user)) {
+						Logger::log(LOG_DEBUG, "Can't lchown dir '%s'", curDir.c_str());
+						return false;
+					}
 				}
 			}
 		}
@@ -525,10 +527,12 @@ public:
 				Logger::log(LOG_DEBUG, "Can't create dir '%s' %m", path.c_str());
 				return false;
 			}
-			Logger::log(LOG_DEBUG, "Change owner to %d", user);
-			if(lchown(path.c_str(),user,user)) {
-				Logger::log(LOG_DEBUG, "Can't lchown dir '%s' %m", path.c_str());
-				return false;
+			if (user) {
+				Logger::log(LOG_DEBUG, "Change owner to %d", user);
+				if(lchown(path.c_str(),user,user)) {
+					Logger::log(LOG_DEBUG, "Can't lchown dir '%s' %m", path.c_str());
+					return false;
+				}
 			}
 		}
 		return true;
