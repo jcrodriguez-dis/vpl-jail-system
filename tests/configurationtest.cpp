@@ -13,7 +13,8 @@ protected:
 	ConfigurationTestFull(): Configuration("./configfiles/full.txt") {}
 public:
 	static Configuration* getConfiguration(){
-		singlenton = new ConfigurationTestFull();
+		static ConfigurationTestFull instance;
+		singlenton = &instance;
 		return singlenton;
 	}
 };
@@ -23,7 +24,8 @@ protected:
 	ConfigurationTestEmpty(): Configuration("./configfiles/empty.txt") {}
 public:
 	static Configuration* getConfiguration(){
-		singlenton = new ConfigurationTestEmpty();
+		static ConfigurationTestEmpty instance;
+		singlenton = &instance;
 		return singlenton;
 	}
 };

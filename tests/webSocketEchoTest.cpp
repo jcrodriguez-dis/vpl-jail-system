@@ -19,7 +19,8 @@ protected:
 	ConfigurationTestFull(): Configuration("./configfiles/full.txt") {}
 public:
 	static Configuration* getConfiguration(){
-		singlenton = new ConfigurationTestFull();
+		static ConfigurationTestFull instance;
+		singlenton = &instance;
 		return singlenton;
 	}
 };

@@ -13,7 +13,8 @@ protected:
 	ConfigurationTestJail(): Configuration("./configfiles/full.txt") {}
 public:
 	static Configuration* getConfiguration(){
-		singlenton = new ConfigurationTestJail();
+		static ConfigurationTestJail instance;
+		singlenton = &instance;
 		return singlenton;
 	}
 };
