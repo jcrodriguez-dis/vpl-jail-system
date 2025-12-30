@@ -121,5 +121,5 @@ public:
 	 * Note: All processes must be moved out of the cgroup before removal
 	 * @throws exception if cgroup cannot be removed (e.g., processes still in it)
 	 */
-	void clean();
+	void removeCgroup();
 };

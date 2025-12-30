@@ -1085,7 +1085,7 @@ void Jail::setupCgroup(processMonitor &pm){
 	try {
 		string cgroupName = "p" + Util::itos(pm.getPrisonerID());
 		Cgroup cgroup(cgroupName);
-		cgroup.clean(); // Clean previous cgroups if exist
+		cgroup.removeCgroup(); // Clean previous cgroups if exist
 		// Add current process to cgroup controllers
 		pid_t pid = getpid();
 		// cgroup.setCPUProcs(pid);

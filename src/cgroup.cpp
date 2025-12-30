@@ -452,7 +452,7 @@ void Cgroup::setMemoryLimitInBytes(long int bytes){
  * Removes the cgroup directories from cpu, memory, and network controllers
  * All processes must be moved out before calling this
  */
-void Cgroup::clean(){
+void Cgroup::removeCgroup(){
     if (isV2) {
         // v2 has a single directory per cgroup.
         Logger::log(LOG_DEBUG, "Removing cgroup v2 directory: %s", cgroupDirectory.c_str());

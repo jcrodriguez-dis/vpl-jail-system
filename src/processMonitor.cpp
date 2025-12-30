@@ -742,6 +742,19 @@ void processMonitor::cleanTask() {
 		}
 	}
 	cleanPrisonerFiles("p" + Util::itos(userid));
+	if( configuration->getUseCGroup()) {
+		try {
+			string cgroupName = "p" + Util::itos(userid);
+			Cgroup cgroup(cgroupName);
+			cgroup.removeCgroup();
+		} catch (const std::exception &e) {
+			Logger::log(LOG_DEBUG, "Failed to remove cgroup for prisoner %d: %s", userid, e.what());
+		} catch (...) {
+			Logger::log(LOG_DEBUG, "Failed to remove cgroup for prisoner %d", userid);
+		}
+	}
+	removeTicketFile(adminticket);
+	removeTicketFile(monitorticket);
 }
 
 bool processMonitor::isOutOfMemory() {
