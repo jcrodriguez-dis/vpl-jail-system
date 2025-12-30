@@ -111,8 +111,8 @@ public:
 	bool isRunnig();
 	vector<pid_t> getPrisonerProcesses(int prisoner);
 	int getProcessUID(pid_t pid);
-	int stopPrisonerProcess(bool);
-	int stopPrisonerProcess(int, bool);
+	size_t stopPrisonerProcess(bool);
+	size_t stopPrisonerProcess(int, bool);
 	void cleanTask();
 	processState getState();
 	void setCompiler();

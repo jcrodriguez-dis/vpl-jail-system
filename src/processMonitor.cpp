@@ -22,7 +22,7 @@ using namespace std;
 int processMonitor::requestsInProgress() {
 	const string homeDir = Configuration::getConfiguration()->getJailPath() + "/home";
 	const string pre = "p";
-	int nprisoner;
+	int nprisoner = 0;
 	dirent *ent;
 	DIR *dirfd = opendir(homeDir.c_str());
 	if (dirfd == NULL) {
@@ -79,7 +79,7 @@ void processMonitor::becomePrisoner() {
 	becomePrisoner(prisoner);
 }
 
-int processMonitor::stopPrisonerProcess(bool soft) {
+size_t processMonitor::stopPrisonerProcess(bool soft) {
 	return stopPrisonerProcess(prisoner, soft);
 }
 
@@ -89,7 +89,7 @@ vector<pid_t> processMonitor::getPrisonerProcesses(int prisoner) {
 	if (dir) {
 		struct dirent *entry;
 		while ((entry = readdir(dir))) {
-			if (entry->d_type == DT_DIR) {
+			if (entry->d_type == DT_DIR || entry->d_type == DT_UNKNOWN) {
 				pid_t pid = atoi(entry->d_name);
 				if (pid > 0 && getProcessUID(pid) == prisoner) {
 					pids.push_back(pid);
@@ -106,45 +106,67 @@ vector<pid_t> processMonitor::getPrisonerProcesses(int prisoner) {
  * @param soft If true send SIGTERM else SIGKILL
  * @return number of processes killed or 0 if /proc not found
  */
-int processMonitor::stopPrisonerProcess(int prisoner, bool soft) {
-	if (prisoner > JAIL_MAX_PRISONER_UID || prisoner < JAIL_MIN_PRISONER_UID) {
+size_t processMonitor::stopPrisonerProcess(int prisoner, bool soft) {
+	if (configuration->isPrisonerUID(prisoner) == false) {
 		Logger::log(LOG_ERR, "Try to stop prisoner process with invalid prisoner id %d. Ignoring", prisoner);
 		return 0;
 	}
 	const int sleepTime = 100000;
-	Logger::log(LOG_INFO, "Sttoping prisoner process");
+	Logger::log(LOG_INFO, "Stopping prisoner process (uid=%d, soft=%d)", prisoner, soft ? 1 : 0);
 	vector<pid_t> pids = getPrisonerProcesses(prisoner);
+	vector<pid_t> pidsKilled;
 	// Kill all process of prisoner
 	for (size_t i = 0; i < pids.size(); i++) {
-		if (getProcessUID(pids[i]) != prisoner) continue;
+		pid_t pid = pids[i];
+		if (getProcessUID(pid) != prisoner) continue;
 		if (soft) {
-			kill(pids[i], SIGTERM);
+			kill(pid, SIGTERM);
 		} else {
-			kill(pids[i], SIGKILL);
+			kill(pid, SIGKILL);
 		}
+		pidsKilled.push_back(pid);
 	}
 	// Wait for process end
+	size_t nkilled = 0;
 	usleep(sleepTime);
-	for (size_t i = 0; i < pids.size(); i++) {
-		waitpid(pids[i], NULL, WNOHANG);
+	for (size_t i = 0; i < pidsKilled.size(); i++) {
+		pid_t pid = pidsKilled[i];
+		pid_t wret = waitpid(pid, NULL, WNOHANG);
+		if (wret == pid) {
+			nkilled++;
+		}
+	}
+	if (nkilled > 0 && nkilled == pidsKilled.size()) {
+		return nkilled;
 	}
 	// Kill using plan B
 	pid_t pid = fork();
+	if (pid < 0) {
+		Logger::log(LOG_ERR, "fork() failed while stopping prisoner process uid=%d: %m", prisoner);
+		return pids.size();
+	}
 	if (pid == 0) { //new process
-		becomePrisoner(prisoner);
-		if (soft) {
-			//To not stop at first signal
-			signal(SIGTERM, catchSIGTERM);
-			kill(-1, SIGTERM);
-		} else {
-			kill(-1, SIGKILL);
+		try{
+			becomePrisoner(prisoner);
+			if (soft) {
+				//To not stop at first signal
+				signal(SIGTERM, catchSIGTERM);
+				kill(-1, SIGTERM);
+			} else {
+				kill(-1, SIGKILL);
+			}
+			_exit(EXIT_SUCCESS);
+		} catch(...) {
+			_exit(EXIT_FAILURE);
 		}
-		_exit(EXIT_SUCCESS);
 	} else {
-		for (int i = 0; i < 50 ; i++) {
-			usleep(100000);
-			if (pid == waitpid(pid, NULL, WNOHANG)) //Wait for pid end
+		const int maxWaits = 20;
+		const int waitIntervalUs = 100000; // 0.1s
+		for(int waits = 0; waits < maxWaits; waits++) {
+			if (pid == waitpid(pid, NULL, WNOHANG)) {
 				break;
+			}
+			usleep(waitIntervalUs);
 		}
 	}
 	return pids.size();
@@ -693,8 +715,8 @@ void processMonitor::removeTicketFile(string ticket) {
  * Remove task home dir and monitor control files
  */
 void processMonitor::cleanTask() {
-	const int maxretry = 100;
-	const int sleepTime = 100000;
+	const int maxretry = 10;
+	const int sleepTime = 1000000;
 	const int userid = getPrisonerID();
 	if (userid == -1) {
 		return; //No prisoner to clean
