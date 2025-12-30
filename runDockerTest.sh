@@ -95,6 +95,7 @@ function checkDockerRunContainer() {
     local result=
 
     [ "$PRIVILEGED" = "privileged" ] && RUNOPTION="-e VPL_JAIL_JAILPATH=/jail --privileged"
+    [ "$VPL_DEBUG" != "" ] && RUNOPTION="$RUNOPTION -e VPL_JAIL_LOGLEVEL=8"
     chekPortInUse $PLAIN_PORT
     chekPortInUse $SECURE_PORT
     writeInfo "Starting container '$CONTAINER_NAME'"
