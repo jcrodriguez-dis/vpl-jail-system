@@ -38,7 +38,8 @@ class ConfigurationTest: public BaseTest {
 		assert(limits.maxtime == 1200);
 		assert(config->getJailPath() == "/jail");
 		assert(config->getControlPath() == "/var/vpl-jail-system");
-		assert(config->getMinPrisoner() == 10000);
+		assert(config->getHomeDirOwnerUid() == 10000);
+		assert(config->getMinPrisoner() == 10001);
 		assert(config->getMaxPrisoner() == 20000);
 		vector<string> taskOnly = config->getTaskOnlyFrom();
 		assert(taskOnly.size() == 0);
@@ -67,7 +68,8 @@ class ConfigurationTest: public BaseTest {
 		assert(limits.maxtime == 88888);
 		assert(config->getJailPath() == "/rejail/algo");
 		assert(config->getControlPath() == "/mnt/opt/var/vpl-jail-system");
-		assert(config->getMinPrisoner() == 11111);
+		assert(config->getHomeDirOwnerUid() == 11111);
+		assert(config->getMinPrisoner() == 11112);
 		assert(config->getMaxPrisoner() == 11222);
 		vector<string> taskOnly = config->getTaskOnlyFrom();
 		assert(taskOnly.size() == 6);
