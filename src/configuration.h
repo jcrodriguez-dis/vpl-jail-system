@@ -62,6 +62,9 @@ public:
 	uid_t getHomeDirOwnerUid() const { return minPrisoner; }
 	uid_t getMinPrisoner() const { return minPrisoner + 1;}
 	uid_t getMaxPrisoner() const { return maxPrisoner;}
+	bool isPrisonerUID(uid_t uid) const {
+		return (uid >= getMinPrisoner() && uid <= getMaxPrisoner());
+	}
 	const vector<string> & getTaskOnlyFrom() const { return taskOnlyFrom;}
 	const string &  getInterface() const { return interface;}
 	const string &  getURLPath() const { return URLPath;}
