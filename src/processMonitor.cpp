@@ -714,7 +714,7 @@ void processMonitor::removeTicketFile(string ticket) {
  */
 void processMonitor::cleanTask() {
 	const int maxretry = 10;
-	const int sleepTime = 1000000;
+	const int sleepTime = 100000;
 	const int userid = getPrisonerID();
 	if (userid == -1) {
 		return; //No prisoner to clean
@@ -751,8 +751,10 @@ void processMonitor::cleanTask() {
 			Logger::log(LOG_DEBUG, "Failed to remove cgroup for prisoner %d", userid);
 		}
 	}
-	removeTicketFile(adminticket);
-	removeTicketFile(monitorticket);
+	if (processes == 0) {
+		removeTicketFile(adminticket);
+		removeTicketFile(monitorticket);
+	}
 }
 
 bool processMonitor::isOutOfMemory() {
