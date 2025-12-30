@@ -24,6 +24,26 @@ class Cgroup {
 private:
 	static string baseCgroupFileSystem;
 	string cgroupDirectory;
+	bool isV2;
+	string groupName;
+	string joinPath(const string &a, const string &b) const {
+		if (a.empty()) return b;
+		if (b.empty()) return a;
+		if (a[a.size() - 1] == '/') return a + b;
+		return a + "/" + b;
+	}
+	bool isCgroupV2Base(const string &base) const {
+		// cgroup v2 has a unified hierarchy and always exposes cgroup.controllers at the mount root.
+		return Util::fileExists(joinPath(base, "cgroup.controllers"), true);
+	}
+	string v1Path(const char *relative) const {
+		return cgroupDirectory + relative;
+	}
+	string v2Path(const string &relative) const {
+		return joinPath(cgroupDirectory, relative);
+	}
+	void ensureV2CgroupExists();
+	void attachPidV2(int pid);
 	static vplregex regUser;
 	static vplregex regSystem;
 	static vplregex regPeriods;
@@ -43,22 +63,14 @@ private:
 	static vplregex regTrim;
 	static const char* FILE_CPU_ACCT_STAT;
 	static const char* FILE_CPU_USAGE;
-	static const char* FILE_CPU_NOTIFY;
-	static const char* FILE_CPU_RELEASE_AGENT;
 	static const char* FILE_CPU_TASKS;
 	static const char* FILE_CPU_STAT;
-	static const char* FILE_NET_PRIOIDX;
-	static const char* FILE_NET_IFPRIOMAP;
-	static const char* FILE_NET_NOTIFY;
-	static const char* FILE_NET_RELEASE_AGENT;
 	static const char* FILE_NET_TASKS;
 	static const char* FILE_PIDS_PROCS;
 	static const char* FILE_MEM_TASKS;
 	static const char* FILE_MEM_LIMIT;
 	static const char* FILE_MEM_STAT;
 	static const char* FILE_MEM_USAGE;
-	static const char* FILE_MEM_NOTIFY;
-	static const char* FILE_MEM_RELEASE_AGENT;
 	static const char* FILE_MEM_OOM_CONTROL;
 	string regFound(vplregex &reg, string input);
 
@@ -72,8 +84,16 @@ public:
 	}
 
 	Cgroup(string name){
-		cgroupDirectory =  Cgroup::getBaseCgroupFileSystem() + "/" + name + "/";
-
+		groupName = name;
+		string base = Cgroup::getBaseCgroupFileSystem();
+		isV2 = isCgroupV2Base(base);
+		if (isV2) {
+			// v2: /sys/fs/cgroup/<name>
+			cgroupDirectory = joinPath(base, name);
+		} else {
+			// v1 (legacy layout used by fixtures and existing code)
+			cgroupDirectory = joinPath(base, name) + "/";
+		}
 	}
 
 	~Cgroup(){
@@ -83,33 +103,18 @@ public:
 	map<string, int> getCPUAcctStat();
 	long int getCPUUsage();
 	map<string, int> getCPUStat();
-	int getCPUNotify();
-	string getCPUReleaseAgent();
 	vector<int> getCPUProcs();
-	int getNetPrioID();
 	vector<int> getPIDs();
-	map<string, int> getNetPrioMap();
-	int getNetNotify();
-	string getNetReleaseAgent();
 	vector<int> getNetProcs();
 	vector<int> getMemoryProcs();
 	long int getMemoryLimitInBytes();
 	map<string, long int> getMemoryStat();
 	long int getMemoryUsageInBytes();
-	int getMemNotify();
-	string getMemReleaseAgent();
 	map<string, int> getMemoryOOMControl();
-	void setNetPrioMap(string interface);
-	void setNetNotify(bool flag);
-	void setNetReleaseAgent(string path);
 	void setNetProcs(int pid);
 	void setCPUProcs(int pid);
-	void setCPUNotify(bool flag);
-	void setCPUReleaseAgentPath(string path);
 	void setMemoryProcs(int pid);
 	void setMemoryLimitInBytes(long int bytes);
-	void setMemNotify(bool flag);
-	void setMemReleaseAgentPath(string path);
 	
 	/**
 	 * Remove this cgroup from all controllers
