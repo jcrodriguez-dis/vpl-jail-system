@@ -3,27 +3,20 @@
  * copyright:	Copyright (C) 2009 Juan Carlos Rodríguez-del-Pino. All rights reserved.
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
-#include <regex.h>
 #include "util.h"
+#include "vplregex.h"
 #include "configurationFile.h"
 #include "httpServer.h"
 #include <fstream>
 using namespace std;
 void ConfigurationFile::parseConfigLine(ConfigData &data,const string &line){
-	static bool init = false;
-	static regex_t reg, comment;
-	if(!init){
-		regcomp(&reg, "^[ \t]*([^ \t]+)[ \t]*=[ \t]*([^#]*)", REG_EXTENDED);
-		regcomp(&comment, "^[ \t]*(#.*)?$", REG_EXTENDED);
-		init=true;
-	}
-	regmatch_t match[3];
-	int nomatch = regexec(&comment, line.c_str(), 3, match, 0);
-	if(nomatch != 0){
-		nomatch=regexec(&reg, line.c_str(),3, match, 0);
-		if (nomatch == 0) {
-			string param = line.substr(match[1].rm_so,match[1].rm_eo-match[1].rm_so);
-			string value = line.substr(match[2].rm_so,match[2].rm_eo-match[2].rm_so);
+	static const vplregex reg("^[ \t]*([^ \t]+)[ \t]*=[ \t]*([^#]*)");
+	static const vplregex comment("^[ \t]*(#.*)?$");
+	vplregmatch found(3);
+	if(!comment.search(line, found)){
+		if (reg.search(line, found)) {
+			string param = found[1];
+			string value = found[2];
 			param = Util::toUppercase(param);
 			Util::trimAndRemoveQuotes(value);
 			if (data.find(param) != data.end()) {

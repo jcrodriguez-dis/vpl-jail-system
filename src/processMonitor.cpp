@@ -16,6 +16,7 @@ using namespace std;
 #include "processMonitor.h"
 #include "vpl-jail-server.h"
 #include "cgroup.h"
+#include "vplregex.h"
 /**
  * Return the number of prisoners in jail
  */
@@ -400,12 +401,9 @@ processMonitor::processMonitor(string ticket) {
 	prisoner = -1; // Not selected
 	configuration = Configuration::getConfiguration();
 	Util::trimAndRemoveQuotes(ticket);
-	regex_t reg;
-	regcomp(&reg, "^[0-9]+$", REG_EXTENDED);
-	regmatch_t match[1];
-	int nomatch = regexec(&reg, ticket.c_str(), 1, match, 0);
-	regfree(&reg);
-	if (nomatch == 0) {
+	static const vplregex reg("^[0-9]+$");
+	vplregmatch match(1);
+	if (reg.search(ticket, match)) {
 		Lock lock(configuration->getControlPath());
 		string fileName = configuration->getControlPath() + "/" + ticket;
 		if (Util::fileExists(fileName)) {
@@ -799,20 +797,12 @@ string processMonitor::getMemoryLimit() {
  * @return UID or -1 if not found
  */
 int processMonitor::getProcessUID(pid_t  pid) {
-	static bool init = false;
-	static regex_t reg_uid;
-	if (!init) {
-		regcomp(&reg_uid, ".*^Uid:[ \t]+([0-9]+)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
-		init = true;
-	}
-	const int matchSize = 2;
-	regmatch_t match[matchSize];
+	static const vplregex reg_uid(".*^Uid:[ \t]+([0-9]+)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
+	vplregmatch match(2);
 	const string statusFile = "/proc/" + Util::itos(pid) + "/status";
 	string status = Util::readFile(statusFile, false);
-	int nomatch = regexec(&reg_uid, status.c_str(), matchSize, match, 0);
-	if (nomatch == 0) {
-		string UIDF = status.substr(match[1].rm_so, match[1].rm_eo - match[1].rm_so);
-		return Util::atoi(UIDF);
+	if (reg_uid.search(status, match)) {
+		return Util::atoi(match[1]);
 	}
 	return -1;
 }
@@ -841,16 +831,10 @@ long long processMonitor::getMemoryUsed() {
 		Logger::log(LOG_ERR, "Can't open \"/proc\" dir: %m");
 		return INT_MAX; //
 	}
-	static bool init = false;
-	static regex_t reg_uid;
-	static regex_t reg_mem;
-	if (!init) {
-		regcomp(&reg_uid, ".*^Uid:[ \t]+([0-9]+)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
-		regcomp(&reg_mem, ".*^VmHWM:[ \t]+([0-9]+)[ \t]+(.*)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
-		init = true;
-	}
-	const int matchSize = 3;
-	regmatch_t match[matchSize];
+	static const vplregex reg_uid(".*^Uid:[ \t]+([0-9]+)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
+	static const vplregex reg_mem(".*^VmHWM:[ \t]+([0-9]+)[ \t]+(.*)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
+	vplregmatch uidMatch(2);
+	vplregmatch memMatch(3);
 	long long s = 0;
 	while ((ent = readdir(dirfd)) != NULL) {
 		const string name(ent->d_name);
@@ -858,19 +842,14 @@ long long processMonitor::getMemoryUsed() {
 		if (Util::itos(PID) != name ) continue;
 		const string statusFile = dir + "/" + name + "/status";
 		string status = Util::readFile(statusFile, false);
-		int nomatch = regexec(&reg_uid, status.c_str(), matchSize, match, 0);
-		if (nomatch == 0) {
-			string UIDF = status.substr(match[1].rm_so, match[1].rm_eo - match[1].rm_so);
-			if (Util::atoi(UIDF) == (int) prisoner) {
-				nomatch = regexec(&reg_mem, status.c_str(), matchSize, match, 0);
-				if (nomatch == 0) {
-					string MEM = status.substr(match[1].rm_so, match[1].rm_eo - match[1].rm_so);
-					string MUL = status.substr(match[2].rm_so, match[2].rm_eo - match[2].rm_so);
-					const int onek = 1024;
-					int mul = onek; //Default kB 1024
-					if (MUL == "mB") mul *= onek;
-					s += Util::atol(MEM) * mul;
-				}
+		if (reg_uid.search(status, uidMatch) && Util::atoi(uidMatch[1]) == (int) prisoner) {
+			if (reg_mem.search(status, memMatch)) {
+				string MEM = memMatch[1];
+				string MUL = memMatch[2];
+				const int onek = 1024;
+				int mul = onek; //Default kB 1024
+				if (MUL == "mB") mul *= onek;
+				s += Util::atol(MEM) * mul;
 			}
 		}
 	}

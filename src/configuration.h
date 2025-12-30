@@ -7,7 +7,6 @@
 #define CONFIGURATION_INC_H
 
 #include <stdlib.h>
-#include <regex.h>
 #include <string>
 #include <vector>
 #include "util.h"
@@ -41,7 +40,6 @@ private:
 	bool useNamespace;
 	int requestMaxSize;
 	int resultMaxSize;
-	regex_t reg;
 protected:
 	static Configuration* singlenton;
 	void checkConfigFile(string fileName, string men);

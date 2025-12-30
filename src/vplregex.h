@@ -38,6 +38,19 @@ public:
 		}
 	}
 	/**
+	 * Constructor, compile the regular expression with custom flags
+	 * @param reg regular expression
+	 * @param cflags flags for regcomp (e.g. REG_EXTENDED|REG_ICASE|REG_NEWLINE)
+	 */
+	vplregex(const string &reg, int cflags) {
+		int res = regcomp(& creg, reg.c_str(), cflags);
+		if (res) {
+			static char buf[100];
+			regerror(res, &creg, buf, 100);
+			throw buf;
+		}
+	}
+	/**
 	 * Destructor, free the regular expression
 	 */
 	~vplregex() {

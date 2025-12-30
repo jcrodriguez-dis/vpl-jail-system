@@ -10,6 +10,7 @@
 using namespace std;
 
 string Cgroup::baseCgroupFileSystem= Util::findCgroupFilesystem();
+bool Cgroup::baseCgroupFileSystemOverridden = false;
 vplregex Cgroup::regUser("(^|\n)user ([0-9]+)(\n|$)");
 vplregex Cgroup::regSystem("(^|\n)system ([0-9]+)(\n|$)");
 vplregex Cgroup::regPeriods("(^|\n)nr_periods ([0-9]+)(\n|$)");
@@ -41,6 +42,24 @@ const char* Cgroup::FILE_MEM_LIMIT = "memory/memory.limit_in_bytes";
 const char* Cgroup::FILE_MEM_STAT = "memory/memory.stat";
 const char* Cgroup::FILE_MEM_USAGE = "memory/memory.usage_in_bytes";
 const char* Cgroup::FILE_MEM_OOM_CONTROL = "memory/memory.oom_control";
+bool Cgroup::isV2 = false;
+
+void Cgroup::init() {
+    static bool initialized = false;
+    if (!initialized) {
+        if (!Cgroup::baseCgroupFileSystemOverridden) {
+            Cgroup::baseCgroupFileSystem = Util::findCgroupFilesystem();
+        }
+        Cgroup::isV2 = Cgroup::isCgroupV2Base(Cgroup::baseCgroupFileSystem);
+        Cgroup::enableV2Controllers();
+        initialized = true;
+    }
+}   
+
+bool Cgroup::isCgroupV2Base(string base) {
+    // cgroup v2 has a unified hierarchy and always exposes cgroup.controllers at the mount root.
+    return Util::fileExists(joinPath(base, "cgroup.controllers"), true);
+}
 
 static long long parseCpuStatValue(const string &stat, const string &key) {
     std::istringstream iss(stat);
@@ -54,7 +73,7 @@ static long long parseCpuStatValue(const string &stat, const string &key) {
     return 0;
 }
 
-void Cgroup::ensureV2CgroupExists() {
+void Cgroup::createV2Cgroup() {
     if (!isV2) {
         return;
     }
@@ -63,6 +82,12 @@ void Cgroup::ensureV2CgroupExists() {
             Logger::log(LOG_WARNING, "Failed to create cgroup v2 directory %s: %s (errno=%d)",
                     cgroupDirectory.c_str(), strerror(errno), errno);
         }
+    }
+}
+
+void Cgroup::enableV2Controllers() {
+    if (!isV2) {
+        return;
     }
     // Best-effort: try to enable controllers in the parent so files exist for children.
     // This can legitimately fail on systemd-managed or busy hierarchies; we continue anyway.
@@ -93,7 +118,6 @@ void Cgroup::ensureV2CgroupExists() {
 }
 
 void Cgroup::attachPidV2(int pid) {
-    ensureV2CgroupExists();
     const string path = v2Path("cgroup.procs");
     Logger::log(LOG_DEBUG, "Writing to the file '%s'", path.c_str());
     // Overwrite is fine; kernel interprets the number and moves the process.
@@ -437,7 +461,6 @@ void Cgroup::setMemoryProcs(int pid){
 void Cgroup::setMemoryLimitInBytes(long int bytes){
     string path;
     if (isV2) {
-        ensureV2CgroupExists();
         path = v2Path("memory.max");
     } else {
         path = v1Path(FILE_MEM_LIMIT);

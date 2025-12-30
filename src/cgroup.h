@@ -22,27 +22,27 @@ using namespace std;
  */
 class Cgroup {
 private:
+	static void init();
 	static string baseCgroupFileSystem;
+	static bool baseCgroupFileSystemOverridden;
+	static bool isV2;
 	string cgroupDirectory;
-	bool isV2;
 	string groupName;
-	string joinPath(const string &a, const string &b) const {
+	static string joinPath(const string &a, const string &b) {
 		if (a.empty()) return b;
 		if (b.empty()) return a;
 		if (a[a.size() - 1] == '/') return a + b;
 		return a + "/" + b;
 	}
-	bool isCgroupV2Base(const string &base) const {
-		// cgroup v2 has a unified hierarchy and always exposes cgroup.controllers at the mount root.
-		return Util::fileExists(joinPath(base, "cgroup.controllers"), true);
-	}
+	static bool isCgroupV2Base(string base);
 	string v1Path(const char *relative) const {
 		return cgroupDirectory + relative;
 	}
 	string v2Path(const string &relative) const {
 		return joinPath(cgroupDirectory, relative);
 	}
-	void ensureV2CgroupExists();
+	void createV2Cgroup();
+	static void enableV2Controllers();
 	void attachPidV2(int pid);
 	static vplregex regUser;
 	static vplregex regSystem;
@@ -76,6 +76,7 @@ private:
 
 public:
 	static void setBaseCgroupFileSystem(string _baseCgroupFileSystem){
+		baseCgroupFileSystemOverridden = true;
 		baseCgroupFileSystem = _baseCgroupFileSystem;
 	}
 
@@ -84,9 +85,9 @@ public:
 	}
 
 	Cgroup(string name){
+		init();
 		groupName = name;
 		string base = Cgroup::getBaseCgroupFileSystem();
-		isV2 = isCgroupV2Base(base);
 		if (isV2) {
 			// v2: /sys/fs/cgroup/<name>
 			cgroupDirectory = joinPath(base, name);
@@ -94,6 +95,7 @@ public:
 			// v1 (legacy layout used by fixtures and existing code)
 			cgroupDirectory = joinPath(base, name) + "/";
 		}
+		createV2Cgroup();
 	}
 
 	~Cgroup(){
