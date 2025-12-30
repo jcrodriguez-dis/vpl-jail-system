@@ -12,6 +12,8 @@
 #include <limits>
 #include <cstring>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
 #include <exception>
 #include <sys/types.h>
 #include <unistd.h>
@@ -21,6 +23,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pty.h>
+#include <termios.h>
 #include <sched.h>
 #include <sys/mount.h>
 #include <sys/wait.h>
@@ -30,6 +33,84 @@
 // pivot_root syscall wrapper (not in glibc)
 static int pivot_root(const char *new_root, const char *put_old) {
 	return syscall(SYS_pivot_root, new_root, put_old);
+}
+
+namespace {
+	static bool isOctalDigit(char c) {
+		return c >= '0' && c <= '7';
+	}
+
+	// mountinfo escapes spaces, tabs, newlines as octal (e.g. "\\040")
+	static std::string unescapeMountInfoPath(const std::string &in) {
+		std::string out;
+		out.reserve(in.size());
+		for (size_t i = 0; i < in.size(); ++i) {
+			if (in[i] == '\\' && i + 3 < in.size() && isOctalDigit(in[i + 1]) && isOctalDigit(in[i + 2]) && isOctalDigit(in[i + 3])) {
+				int v = (in[i + 1] - '0') * 64 + (in[i + 2] - '0') * 8 + (in[i + 3] - '0');
+				out.push_back(static_cast<char>(v));
+				i += 3;
+				continue;
+			}
+			out.push_back(in[i]);
+		}
+		return out;
+	}
+
+	static std::vector<std::string> listMountPoints() {
+		std::vector<std::string> mountPoints;
+		std::ifstream in("/proc/self/mountinfo");
+		std::string line;
+		while (std::getline(in, line)) {
+			// Fields: id parent major:minor root mount_point ...
+			std::istringstream iss(line);
+			std::string id, parent, majmin, root, mountPoint;
+			if (!(iss >> id >> parent >> majmin >> root >> mountPoint)) {
+				continue;
+			}
+			mountPoints.push_back(unescapeMountInfoPath(mountPoint));
+		}
+		return mountPoints;
+	}
+
+	static bool isPathUnderPrefix(const std::string &path, const std::string &prefix) {
+		if (path == prefix) {
+			return true;
+		}
+		if (path.size() <= prefix.size()) {
+			return false;
+		}
+		return (path.compare(0, prefix.size(), prefix) == 0 && path[prefix.size()] == '/');
+	}
+
+	static void unmountMountTreeOrThrow(const std::string &prefixMountPoint) {
+		std::vector<std::string> mountPoints = listMountPoints();
+		std::vector<std::string> targets;
+		targets.reserve(mountPoints.size());
+		for (const std::string &mp : mountPoints) {
+			if (isPathUnderPrefix(mp, prefixMountPoint)) {
+				targets.push_back(mp);
+			}
+		}
+		// Unmount deepest paths first so parent mount is not busy due to submounts.
+		std::sort(targets.begin(), targets.end(), [](const std::string &a, const std::string &b) {
+			return a.size() > b.size();
+		});
+
+		for (const std::string &mp : targets) {
+			// We'll also hit prefixMountPoint itself in this loop due to sorting; that's fine.
+			if (umount2(mp.c_str(), 0) != 0) {
+				// If the mount disappeared meanwhile, treat as success.
+				if (errno == EINVAL || errno == ENOENT) {
+					continue;
+				}
+				Logger::log(LOG_ERR,
+						"SECURITY: Failed to unmount mount under old root '%s': %s (errno=%d)",
+						mp.c_str(), strerror(errno), errno);
+				throw HttpException(internalServerErrorCode,
+						"Failed to unmount old root mounts - security breach prevented");
+			}
+		}
+	}
 }
 #include "redirector.h"
 #include "httpServer.h"
@@ -826,6 +907,10 @@ void Jail::setupNamespaces(){
 		Logger::log(LOG_WARNING, "Failed to create namespaces: %s (errno=%d). Continuing without full namespace isolation.", strerror(errno), errno);
 		return;
 	}
+	// Prevent mount events from propagating back to the host (best-effort)
+	if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL) != 0) {
+		Logger::log(LOG_WARNING, "Failed to make mount tree private: %s (errno=%d)", strerror(errno), errno);
+	}
 	// Fork to apply the new PID namespace
 	pid_t pid = fork();
 	if (pid < 0) {
@@ -845,7 +930,7 @@ void Jail::setupNamespaces(){
 		waitpid(pid, NULL, 0);
 		_exit(EXIT_SUCCESS);
 	}
-	Logger::log(LOG_INFO, "Namespaces created: PID, IPC");
+	Logger::log(LOG_INFO, "Namespaces created: PID, NS, IPC");
 }
 
 /**
@@ -857,9 +942,12 @@ void Jail::pivotRoot(string jailPath, int prisonerID){
 		Logger::log(LOG_INFO,"No pivot_root, running in container");
 		return;
 	}
-	// Ensure we're in a mount namespace (should be from setupNamespaces)
-	// Make the jail path a mount point by bind mounting private it to itself
-	if (mount(jailPath.c_str(), jailPath.c_str(), NULL, MS_BIND | MS_REC | MS_PRIVATE, NULL) != 0) {
+	// Ensure mount propagation doesn't leak to the host (best-effort).
+	// Doing it here too helps when setupNamespaces() is disabled.
+	mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL);
+
+	// Make the jail path a mount point by bind mounting it to itself.
+	if (mount(jailPath.c_str(), jailPath.c_str(), NULL, MS_BIND | MS_REC, NULL) != 0) {
 		Logger::log(LOG_WARNING, "Failed to bind mount jail path: %s. Falling back to chroot.", strerror(errno));
 		// Fallback to chroot
 		if(chdir(jailPath.c_str()) != 0)
@@ -868,6 +956,10 @@ void Jail::pivotRoot(string jailPath, int prisonerID){
 			throw HttpException(internalServerErrorCode, "I can't chroot to jail", jailPath);
 		Logger::log(LOG_INFO,"chrooted (fallback) \"%s\"",jailPath.c_str());
 		return;
+	}
+	// Make it private so mounts don't propagate (required for reliable cleanup).
+	if (mount(NULL, jailPath.c_str(), NULL, MS_REC | MS_PRIVATE, NULL) != 0) {
+		Logger::log(LOG_WARNING, "Failed to make jail path private: %s (errno=%d).", strerror(errno), errno);
 	}
 	
 	// Create a unique directory for the old root using prisoner ID
@@ -900,11 +992,9 @@ void Jail::pivotRoot(string jailPath, int prisonerID){
 	// Unmount the old root immediately - CRITICAL for security
 	// Use regular umount (not lazy MNT_DETACH) to fail fast if references exist
 	string oldrootAbsolute = "/" + oldrootRelative;
-	if (umount(oldrootAbsolute.c_str()) != 0) {
-		Logger::log(LOG_ERR, "SECURITY: Failed to unmount old root: %s (errno=%d)", strerror(errno), errno);
-		// This is a critical security failure - old root would be accessible
-		throw HttpException(internalServerErrorCode, "Failed to unmount old root - security breach prevented");
-	}
+	// EBUSY here is typically caused by nested mounts (e.g. /proc, /sys) living under the old root.
+	// Unmount any submounts first, deepest-first, then unmount the old root mount point.
+	unmountMountTreeOrThrow(oldrootAbsolute);
 	
 	// Remove the old root directory
 	rmdir(oldrootAbsolute.c_str());
@@ -955,9 +1045,9 @@ void Jail::setupPrivateTmp(processMonitor &pm){
 		return;
 	}
 
-	string tmpSource = pm.getRelativeHomePath() + "/tmp"; // /home/p<uid>/tmp inside jail
+	string tmpSource = pm.getRelativeHomePath() + "/.vpl_tmp"; // /home/p<uid>/tmp inside jail
 	if (mkdir(tmpSource.c_str(), 0700) != 0 && errno != EEXIST) {
-		Logger::log(LOG_WARNING, "Failed to create private tmp source %s: %s", tmpSource.c_str(), strerror(errno));
+		Logger::log(LOG_WARNING, "Failed to create private .vpl_tmp source %s: %s", tmpSource.c_str(), strerror(errno));
 		return;
 	}
 	// Best-effort ownership; not critical if already exists
@@ -1012,6 +1102,10 @@ void Jail::setupCgroup(processMonitor &pm){
 		Logger::log(LOG_INFO, "Process %d added to cgroup %s", pid, cgroupName.c_str());
 	} catch (const std::exception &e) {
 		Logger::log(LOG_WARNING, "Failed to setup cgroup: %s", e.what());
+	} catch (const char *s) {
+		Logger::log(LOG_WARNING, "Failed to setup cgroup: %s", s);
+	} catch (const string &s) {
+		Logger::log(LOG_WARNING, "Failed to setup cgroup: %s", s.c_str());
 	} catch (...) {
 		Logger::log(LOG_WARNING, "Failed to setup cgroup: unknown error");
 	}
@@ -1025,6 +1119,15 @@ void Jail::setupFilesystemIsolation(processMonitor &pm){
 	
 	if (jailPath == "") {
 		Logger::log(LOG_INFO,"No pivot_root, running in container");
+		return;
+	}
+	if (!configuration->getUseNamespace()) {
+		// Without namespaces, fallback to chroot
+		if(chdir(jailPath.c_str()) != 0)
+			throw HttpException(internalServerErrorCode, "I can't chdir to jail", jailPath);
+		if(chroot(jailPath.c_str()) != 0)
+			throw HttpException(internalServerErrorCode, "I can't chroot to jail", jailPath);
+		Logger::log(LOG_INFO,"chrooted \"%s\"",jailPath.c_str());
 		return;
 	}
 	
@@ -1041,7 +1144,7 @@ void Jail::setupFilesystemIsolation(processMonitor &pm){
  * Execute program at prisoner home directory
  */
 void Jail::transferExecution(processMonitor &pm, string fileName){
-	string dir=pm.getRelativeHomePath();
+	string dir = pm.getRelativeHomePath();
 	Logger::log(LOG_DEBUG, "Jail::transferExecution to %s+%s", dir.c_str(), fileName.c_str());
 	string fullname = dir + "/" + fileName;
 	if(chdir(dir.c_str())){
@@ -1053,7 +1156,29 @@ void Jail::transferExecution(processMonitor &pm, string fileName){
 	char *arg[6];
 	char *command= new char[fullname.size() + 1];
 	strcpy(command, fullname.c_str());
-	setpgrp();
+	const bool wantJobControl = (pm.isInteractive() && pm.getState() == processState::running);
+	if (setsid() != 0) {
+		// setsid() commonly fails with EPERM if we are already a process-group leader.
+		Logger::log(LOG_DEBUG, "setsid() failed (non-fatal): %s (errno=%d)", strerror(errno), errno);
+	}
+	if (wantJobControl) {
+		// Best-effort: (re)acquire controlling TTY on stdin.
+		if (ioctl(STDIN_FILENO, TIOCSCTTY, 0) != 0) {
+			Logger::log(LOG_DEBUG, "TIOCSCTTY failed (non-fatal): %s (errno=%d)", strerror(errno), errno);
+		}
+	}
+	// Create a dedicated process group for the executed program (and its children).
+	// This enables job control and group signaling.
+	if (setpgid(0, 0) != 0) {
+		Logger::log(LOG_DEBUG, "setpgid(0,0) failed (non-fatal): %s (errno=%d)", strerror(errno), errno);
+	}
+	if (wantJobControl && isatty(STDIN_FILENO)) {
+		// Make this process group the foreground group of the controlling terminal.
+		// If this fails, interactive programs may be stopped on read (SIGTTIN).
+		if (tcsetpgrp(STDIN_FILENO, getpgrp()) != 0) {
+			Logger::log(LOG_WARNING, "tcsetpgrp failed: %s (errno=%d)", strerror(errno), errno);
+		}
+	}
 	int narg=0;
 	arg[narg++] = command;
 	arg[narg++] = NULL;
@@ -1128,7 +1253,7 @@ void Jail::executeInJail(processMonitor &pm, string name, const char *detail){
 		 // pivot_root isolation or chroot
 		setupFilesystemIsolation(pm);
 		// setuid to prisoner (drops root)
-		pm.becomePrisoner(); 
+		pm.becomePrisoner();
 		// set resource limits (as prisoner)
 		setLimits(pm);
 		// exec program (never returns)
