@@ -120,7 +120,8 @@ public:
 	bool isMonitored();
 	void monitorize();
 	bool isOutOfMemory();
-	long long getMemoryUsed();
+	long long getMemoryUsedBasedOnProc();
+	long long getMemoryUsedBasedOnCgroup();
 	string getMemoryLimit();
 	string getCompilation();
 	void getResult(string &compilation, string &execution, bool &executed);

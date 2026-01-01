@@ -17,8 +17,10 @@ using namespace std;
 #include "vpl-jail-server.h"
 #include "cgroup.h"
 #include "vplregex.h"
+
 /**
  * Return the number of prisoners in jail
+ * @return number of prisoners in jail
  */
 int processMonitor::requestsInProgress() {
 	const string homeDir = Configuration::getConfiguration()->getJailPath() + "/home";
@@ -39,7 +41,8 @@ int processMonitor::requestsInProgress() {
 }
 
 /**
- * Root mutate to be prisoner
+ * Root user lost privileges mutating to be prisoner
+ * @param prisoner user id
  */
 void processMonitor::becomePrisoner(int prisoner) {
 	if (setresgid(prisoner, prisoner, prisoner)!= 0) {
@@ -74,16 +77,27 @@ void processMonitor::becomePrisoner(int prisoner) {
 }
 
 /**
- * Root mutate to be prisoner
+ * Root user lost privileges mutating to be prisoner
  */
 void processMonitor::becomePrisoner() {
 	becomePrisoner(prisoner);
 }
 
+/**
+ * Try to stop prisoner process
+ *
+ * @param soft If true send SIGTERM else SIGKILL
+ * @return 0 if /proc not found, the number of processes killed or if plan B used the number of processes found.
+ */
 size_t processMonitor::stopPrisonerProcess(bool soft) {
 	return stopPrisonerProcess(prisoner, soft);
 }
 
+/**
+ * Get the pids of all processes owned by prisoner using /proc
+ * @param prisoner Prisoner id
+ * @return vector with pids
+ */
 vector<pid_t> processMonitor::getPrisonerProcesses(int prisoner) {
 	vector<pid_t> pids;
 	DIR *dir = opendir("/proc");
@@ -101,11 +115,13 @@ vector<pid_t> processMonitor::getPrisonerProcesses(int prisoner) {
 	}
 	return pids;
 }
+
 /**
- * Stop prisoner process
+ * Try to stop prisoner process
+ *
  * @param prisoner Prisoner id
  * @param soft If true send SIGTERM else SIGKILL
- * @return number of processes killed or 0 if /proc not found
+ * @return 0 if /proc not found, the number of processes killed or if plan B used the number of processes found.
  */
 size_t processMonitor::stopPrisonerProcess(int prisoner, bool soft) {
 	if (configuration->isPrisonerUID(prisoner) == false) {
@@ -174,7 +190,7 @@ size_t processMonitor::stopPrisonerProcess(int prisoner, bool soft) {
 }
 
 /**
- * return prisoner relative home page
+ * Return prisoner relative home path
  */
 string processMonitor::prisonerRelativeHomePath() {
 	char buf[100];
@@ -183,7 +199,7 @@ string processMonitor::prisonerRelativeHomePath() {
 }
 
 /**
- * return prisoner home page
+ * Return prisoner home path
  * if user root absolute path if prisoner relative to jail path
  */
 string processMonitor::prisonerHomePath() {
@@ -256,6 +272,9 @@ void processMonitor::selectPrisoner() {
 	                      "I can't select prisoner home dir: free UID not found");
 }
 
+/**
+ * Write task monitor info to config file
+ */
 void processMonitor::writeInfo(ConfigData data) {
 	string configFile = getProcessConfigFile();
 	//Read current config and don't lost data not set now
@@ -282,6 +301,9 @@ void processMonitor::writeInfo(ConfigData data) {
 	ConfigurationFile::writeConfiguration(configFile, data);
 }
 
+/**
+ * Read task monitor info from config file
+ */
 ConfigData processMonitor::readInfo() {
 	ConfigData data;
 	data = ConfigurationFile::readConfiguration(getProcessConfigFile(), data);
@@ -305,6 +327,12 @@ ConfigData processMonitor::readInfo() {
 	return data;
 }
 
+/**
+ * Create a new task monitor given the generated admin, monitor and execution tickets
+ * @param adminticket output admin ticket string
+ * @param monitorticket output monitor ticket string
+ * @param executionticket output execution ticket string
+ */
 processMonitor::processMonitor(string & adminticket, string & monitorticket, string & executionticket) {
 	prisoner = -1; // Not selected
 	configuration = Configuration::getConfiguration();
@@ -354,6 +382,12 @@ processMonitor::processMonitor(string & adminticket, string & monitorticket, str
 		writeInfo();
 	}
 }
+
+/**
+ * Create a new task monitor given the generated admin and execution tickets
+ * @param adminticket output admin ticket string
+ * @param executionticket output execution ticket string
+ */
 processMonitor::processMonitor(string & adminticket, string & executionticket) {
 	prisoner = -1; // Not selected
 	configuration = Configuration::getConfiguration();
@@ -397,6 +431,10 @@ processMonitor::processMonitor(string & adminticket, string & executionticket) {
 	}
 }
 
+/**
+ * Create task monitor from ticket
+ * @param ticket Ticket string
+ */
 processMonitor::processMonitor(string ticket) {
 	prisoner = -1; // Not selected
 	configuration = Configuration::getConfiguration();
@@ -437,10 +475,16 @@ processMonitor::processMonitor(string ticket) {
 	}
 }
 
+/**
+ * Check if file exists in prisoner home directory
+ */
 bool processMonitor::FileExists(string name) {
 	return Util::fileExists(getHomePath() + "/" + name);
 }
 
+/**
+ * Check if control file exists
+ */
 bool processMonitor::controlFileExists(string name) {
 	return Util::fileExists(getProcessControlPath(name));
 }
@@ -473,6 +517,12 @@ void processMonitor::deleteFile(string name) {
 	Util::deleteFile(getHomePath() + "/" + name, getHomePath().size() + 1);
 }
 
+/**
+ * Install a script from /usr/sbin/vpl to prisoner home directory
+ * @param to Destination file path
+ * @param from Source file name in /usr/sbin/vpl
+ * @return true if installed
+ */
 bool processMonitor::installScript(string to, string from) {
 	if (Util::fileExists("/usr/sbin/vpl/" + from)) {
 		string scriptCode = Util::readFile("/usr/sbin/vpl/" + from);
@@ -483,10 +533,16 @@ bool processMonitor::installScript(string to, string from) {
 	return false;
 }
 
+/**
+ * Check if task is running
+ */
 bool processMonitor::isRunnig() {
 	return getState() != stopped;
 }
 
+/**
+ * Get current task state
+ */
 processState processMonitor::getState() {
 	if ( ! Util::dirExists(getProcessControlPath())) return stopped;
 	string fileName = getProcessConfigFile();
@@ -535,6 +591,9 @@ processState processMonitor::getState() {
 	return stopped;
 }
 
+/**
+ * Set current process as runner process of the task
+ */
 void processMonitor::setRunner() {
 	if (security == monitor) return;
 	Lock lock(getProcessControlPath());
@@ -542,6 +601,10 @@ void processMonitor::setRunner() {
 	runner_pid = getpid();
 	writeInfo();
 }
+
+/**
+ * Set current process as compiler process
+ */
 void processMonitor::setCompiler() {
 	if (security == monitor) return;
 	Lock lock(getProcessControlPath());
@@ -551,7 +614,9 @@ void processMonitor::setCompiler() {
 	writeInfo();
 }
 
-
+/**
+ * Check if task is being monitored
+ */
 bool processMonitor::isMonitored() {
 	if ( ! Util::dirExists(getProcessControlPath())) return false;
 	Lock lock(getProcessControlPath());
@@ -563,6 +628,9 @@ bool processMonitor::isMonitored() {
 	return Util::processExists(monitor);
 }
 
+/**
+ * Set current process as monitor process
+ */
 void processMonitor::monitorize() {
 	if ( security != monitor ) return;
 	Lock lock(getProcessControlPath());
@@ -573,6 +641,12 @@ void processMonitor::monitorize() {
 	writeInfo();
 }
 
+/**
+ * Set extra info about execution
+ * @param el Execution limits
+ * @param ri Is interactive
+ * @param lang Language code
+ */
 void processMonitor::setExtraInfo(ExecutionLimits el, bool ri, string lang) {
 	Lock lock(getProcessControlPath());
 	readInfo();
@@ -582,6 +656,11 @@ void processMonitor::setExtraInfo(ExecutionLimits el, bool ri, string lang) {
 	writeInfo();
 }
 
+/**
+ * Limit result size to configuration max size
+ * cutting middle part if needed
+ * @param r Result string
+ */
 void processMonitor::limitResultSize(string &r) {
 	if (r.size()
 			>= static_cast<unsigned int>(configuration->getRequestMaxSize())) {
@@ -590,6 +669,13 @@ void processMonitor::limitResultSize(string &r) {
 		r = men + r.substr(0, configuration->getRequestMaxSize()/2) + men + r.substr(r.size()-configuration->getRequestMaxSize()/2);
 	}
 }
+
+/**
+ * Return compilation and execution output
+ * @param compilation Compilation output
+ * @param execution Execution output
+ * @param executed true if execution was done
+ */
 void processMonitor::getResult(string &compilation, string &execution, bool &executed) {
 	if (security != admin)
 		throw HttpException(internalServerErrorCode, "Security: required admin ticket for request");
@@ -619,6 +705,9 @@ void processMonitor::getResult(string &compilation, string &execution, bool &exe
 	}
 }
 
+/**
+ * Return compilation output
+ */
 string processMonitor::getCompilation() {
 	if (security != monitor)
 		throw HttpException(internalServerErrorCode, "Security: required monitor ticket for getCompilation");
@@ -631,6 +720,9 @@ string processMonitor::getCompilation() {
 	}
 }
 
+/**
+ * Save compilation output
+ */
 void processMonitor::setCompilationOutput(const string &compilation) {
 	string fileName;
 	Lock lock(getProcessControlPath());
@@ -639,6 +731,10 @@ void processMonitor::setCompilationOutput(const string &compilation) {
 		throw "Compilation already saved";
 	Util::writeFile(fileName, compilation);
 }
+
+/**
+ * Save execution output if executed is true
+ */
 void processMonitor::setExecutionOutput(const string &execution, bool executed) {
 	string fileName;
 	Lock lock(getProcessControlPath());
@@ -652,7 +748,9 @@ void processMonitor::setExecutionOutput(const string &execution, bool executed) 
 		Util::writeFile(fileName, execution);
 	}
 }
-
+/**
+ * Return HTTP passthrough ticket
+ */
 string processMonitor::getHttpPassthroughTicket() {
 	readInfo();
 	if ( httpPassthroughticket == "" ) {
@@ -674,6 +772,9 @@ string processMonitor::getHttpPassthroughTicket() {
 	return httpPassthroughticket;
 }
 
+/**
+ * Return local web server address
+ */
 string processMonitor::getLocalWebServer() {
 	if ( localwebserver == "" ) {
 		readInfo();
@@ -686,18 +787,13 @@ string processMonitor::getLocalWebServer() {
 }
 
 /**
- * remove a directory and its content
- * if force = true remove always
- * else remove files owned by prisoner
- * and complete directories owned by prisoner (all files and directories owns by prisoner or not)
+ * Remove a directory and its content owned by prisoner or all if force
+ * @param dir Directory to remove
+ * @param force If true remove all files and directories in dir
  */
 int processMonitor::removeDir(string dir, bool force) {
 	return Util::removeDir(dir, prisoner, force);
 }
-
-/**
- * Remove prisoner files and stop prisoner process
- */
 
 /**
  * Removes ticket file if set and exists
@@ -710,7 +806,13 @@ void processMonitor::removeTicketFile(string ticket) {
 }
 
 /**
- * Remove task home dir and monitor control files
+ * Remove prisoner files and stop prisoner process
+ * If prisoner processes can't be stopped after retries
+ * log error messages
+ * Also remove cgroup if used
+ * If all prisoner processes are stopped remove ticket files
+ * for admin and monitor
+ * @return void
  */
 void processMonitor::cleanTask() {
 	const int maxretry = 10;
@@ -757,37 +859,20 @@ void processMonitor::cleanTask() {
 	}
 }
 
+/**
+ * Return if prisoner processes are out of memory
+ * Checks both cgroup and /proc memory usage
+ * @return true if out of memory
+ */
 bool processMonitor::isOutOfMemory() {
 	if (executionLimits.maxmemory <= 0) return false;
-	
-	// Use cgroup-based monitoring if enabled
-	if (configuration->getUseCGroup()) {
-		try {
-			string cgroupName = "p" + Util::itos(prisoner);
-			Cgroup cgroup(cgroupName);
-			
-			// Check OOM status directly from cgroup
-			map<string, int> oomControl = cgroup.getMemoryOOMControl();
-			if (oomControl["under_oom"] > 0) {
-				Logger::log(LOG_DEBUG, "Cgroup reports under_oom condition");
-				return true;
-			}
-			
-			// Check current memory usage vs limit
-			long int usage = cgroup.getMemoryUsageInBytes();
-			Logger::log(LOG_DEBUG, "Cgroup memory usage: %ld / %lld", usage, executionLimits.maxmemory);
-			return usage >= executionLimits.maxmemory;
-		} catch (const std::exception &e) {
-			Logger::log(LOG_DEBUG, "Failed to read cgroup memory status: %s, falling back to /proc", e.what());
-		} catch (...) {
-			Logger::log(LOG_DEBUG, "Failed to read cgroup memory status, falling back to /proc");
-		}
-	}
-	
-	// Fallback to /proc-based monitoring
-	return executionLimits.maxmemory < getMemoryUsed();
+	long long usedMemory = max(getMemoryUsedBasedOnCgroup(), getMemoryUsedBasedOnProc());
+	return executionLimits.maxmemory < usedMemory;
 }
 
+/**
+ * Get memory limit as string
+ */
 string processMonitor::getMemoryLimit() {
 	if (executionLimits.maxmemory == 0) return "unlimited";
 	return Util::itos(executionLimits.maxmemory/(1024*1024)) + "MiB";
@@ -809,35 +894,19 @@ int processMonitor::getProcessUID(pid_t  pid) {
 	return -1;
 }
 
-long long processMonitor::getMemoryUsed() {
-	// Use cgroup-based monitoring if enabled
-	if (configuration->getUseCGroup()) {
-		try {
-			string cgroupName = "p" + Util::itos(prisoner);
-			Cgroup cgroup(cgroupName);
-			long int usage = cgroup.getMemoryUsageInBytes();
-			Logger::log(LOG_DEBUG, "Cgroup memory usage: %ld bytes", usage);
-			return usage;
-		} catch (const std::exception &e) {
-			Logger::log(LOG_DEBUG, "Failed to read cgroup memory usage: %s, falling back to /proc", e.what());
-		} catch (...) {
-			Logger::log(LOG_DEBUG, "Failed to read cgroup memory usage, falling back to /proc");
-		}
-	}
-	
-	// Fallback to /proc scanning
+long long processMonitor::getMemoryUsedBasedOnProc() {
 	string dir = "/proc";
 	dirent *ent;
 	DIR *dirfd = opendir(dir.c_str());
 	if (dirfd == NULL) {
 		Logger::log(LOG_ERR, "Can't open \"/proc\" dir: %m");
-		return INT_MAX; //
+		return INT_MAX; // Can't check
 	}
 	static const vplregex reg_uid(".*^Uid:[ \t]+([0-9]+)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
 	static const vplregex reg_mem(".*^VmHWM:[ \t]+([0-9]+)[ \t]+(.*)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
 	vplregmatch uidMatch(2);
 	vplregmatch memMatch(3);
-	long long s = 0;
+	long long totalMemoryUsed = 0;
 	while ((ent = readdir(dirfd)) != NULL) {
 		const string name(ent->d_name);
 		const pid_t PID = Util::atoi(name);
@@ -851,12 +920,27 @@ long long processMonitor::getMemoryUsed() {
 				const int onek = 1024;
 				int mul = onek; //Default kB 1024
 				if (MUL == "mB") mul *= onek;
-				s += Util::atol(MEM) * mul;
+				totalMemoryUsed += Util::atol(MEM) * mul;
 			}
 		}
 	}
 	closedir(dirfd);
-	return s;
+	return totalMemoryUsed;
+}
+
+long long processMonitor::getMemoryUsedBasedOnCgroup() {
+	try {
+		string cgroupName = "p" + Util::itos(prisoner);
+		Cgroup cgroup(cgroupName);
+		long long usage = cgroup.getMemoryUsageInBytes();
+		Logger::log(LOG_DEBUG, "Cgroup memory usage: %ld bytes", usage);
+		return usage;
+	} catch (const std::exception &e) {
+		Logger::log(LOG_DEBUG, "Failed to read cgroup memory usage: %s", e.what());
+	} catch (...) {
+		Logger::log(LOG_DEBUG, "Failed to read cgroup memory usage");
+	}
+	return -1;
 }
 
 void processMonitor::freeWatchDog() {
