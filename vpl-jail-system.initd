@@ -354,7 +354,7 @@ function set_firewall {
 		#Drop auto connections to VPL service from non-root users
 		iptables -A VPL_OUT -p tcp -m conntrack --ctstate NEW -m multiport -s "$OWN" -d "$OWN" --dports "$PORT,$SECURE_PORT" -j VPL_LOG
 		#Accept local loopback connections (php builtin server, etc)
-		[ "$FIREWALL" -lt 4 ] && (iptables -A VPL_OUT -s 127.0.0.0/8 -d 127.0.0.0/8 -j ACCEPT)
+		iptables -A VPL_OUT -s 127.0.0.0/8 -d 127.0.0.0/8 -j ACCEPT
 		#Level 1: Full internet access (TCP + UDP)
 		[ "$FIREWALL" -eq 1 ] && (iptables -A VPL_OUT -m conntrack --ctstate NEW -j ACCEPT)
 		#Level 2: Limited internet (HTTP/HTTPS + DNS)
