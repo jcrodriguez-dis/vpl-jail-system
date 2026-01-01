@@ -145,7 +145,7 @@ size_t processMonitor::stopPrisonerProcess(int prisoner, bool soft) {
 	}
 	// Wait for process end
 	size_t nkilled = 0;
-	usleep(sleepTime);
+	Util::sleep(sleepTime);
 	for (size_t i = 0; i < pidsKilled.size(); i++) {
 		pid_t pid = pidsKilled[i];
 		pid_t wret = waitpid(pid, NULL, WNOHANG);
@@ -183,7 +183,7 @@ size_t processMonitor::stopPrisonerProcess(int prisoner, bool soft) {
 			if (pid == waitpid(pid, NULL, WNOHANG)) {
 				break;
 			}
-			usleep(waitIntervalUs);
+			Util::sleep(waitIntervalUs);
 		}
 	}
 	return pids.size();
@@ -823,13 +823,13 @@ void processMonitor::cleanTask() {
 	}
 	Logger::log(LOG_INFO, "Cleaning task");
 	stopPrisonerProcess(userid, true);
-	usleep(sleepTime);
+	Util::sleep(sleepTime);
 	int retry = 0;
 	int processes = 0;
 	while( (processes = stopPrisonerProcess(userid, false)) > 0
 	        && retry < maxretry) {
 		retry++;
-		usleep(sleepTime);
+		Util::sleep(sleepTime);
 	}
 	if (processes > 0) {
 		vector<pid_t> pids = getPrisonerProcesses(userid);

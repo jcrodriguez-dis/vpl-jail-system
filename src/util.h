@@ -203,6 +203,12 @@ public:
 	}
 
 	/**
+	 * Sleep for the specified number of microseconds
+	 * Replaces deprecated usleep
+	 */
+	static void sleep(long microseconds);
+
+	/**
 	 * Cleans the string removing spaces from end and start
 	 * remove a 'text'=>text and "text"=>text
 	 */

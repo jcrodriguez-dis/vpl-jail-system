@@ -49,7 +49,7 @@ public:
 				unlink(filePath.c_str());
 				Logger::log(LOG_DEBUG,"locking timeout %s",filePath.c_str());
 			}
-			usleep(5000);
+			Util::sleep(5000);
 			ntry++;
 		}
 		if (fd > 0) {

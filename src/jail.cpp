@@ -515,7 +515,7 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 		//Check running timeout
 		if (state != starting && timeout < time(NULL)) {
 			ws.send("message:timeout");
-			usleep(3000000);
+			Util::sleep(3000000);
 			ws.send("close:");
 			ws.close();
 			ws.wait(500); //wait client response
@@ -527,8 +527,7 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 			string ml = pm.getMemoryLimit();
 			Logger::log(LOG_DEBUG, "Out of memory (%s)", ml.c_str());
 			ws.send("message:outofmemory:" + ml);
-			usleep(1500000);
-			usleep(1500000);
+			Util::sleep(1500000);
 			ws.send("close:");
 			ws.close();
 			ws.wait(500); //wait client response
@@ -1367,7 +1366,7 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 	int max_iter = VNCLaunch ? 5 : 50;
 	for(int i=0; redirector.isActive() && i < max_iter; i++){
 		redirector.advance();
-		usleep(100000); // 1/10 sec
+		Util::sleep(100000); // 1/10 sec
 	}
 	string output = redirector.getOutput();
 	Logger::log(LOG_DEBUG,"Complete program output: %s", output.c_str());
@@ -1414,6 +1413,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 					if(stopSignal != SIGKILL)
 						redirector.addMessage("\r\nJail: process stopped\n");
 					redirector.stop();
+					pm.stopPrisonerProcess(stopSignal != SIGKILL);
 					kill(newpid, stopSignal);
 					stopSignal = SIGKILL;
 				} else if(elapsedTime > executionLimits.maxtime) {
@@ -1422,6 +1422,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 					redirector.stop();
 					Logger::log(LOG_INFO, "Execution time limit (%d) reached",
 							executionLimits.maxtime);
+					pm.stopPrisonerProcess(stopSignal != SIGKILL);
 					kill(newpid, stopSignal);
 					stopSignal = SIGKILL;
 				} else if (pm.isOutOfMemory()) {
@@ -1429,6 +1430,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 					if (stopSignal != SIGKILL)
 						redirector.addMessage("\r\nJail: out of memory (" + ml + ")\n");
 					Logger::log(LOG_INFO, "Out of memory (%s)",ml.c_str());
+					pm.stopPrisonerProcess(stopSignal != SIGKILL);
 					kill(newpid, stopSignal);
 					stopSignal = SIGKILL; //Second try
 				}
@@ -1441,7 +1443,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 	//wait until 5sg for redirector to read and send program output
 	for (int i = 0; redirector.isActive() && i < 50; i++) {
 		redirector.advance();
-		usleep(100000); // 1/10 sec
+		Util::sleep(100000); // 1/10 sec
 	}
 	pm.cleanTask();
 }
@@ -1477,7 +1479,7 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 			}
 			if(pm.isOutOfMemory()){
 				string ml= pm.getMemoryLimit();
-				Logger::log(LOG_INFO,"Out of memory (%s)",ml.c_str());
+				Logger::log(LOG_INFO,"Out of memory (%s)", ml.c_str());
 				redirector.stop();
 				break;
 			}
@@ -1493,10 +1495,10 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 	//wait until 5sg for redirector to read and send program output
 	for(int i=0;redirector.isActive() && i<50; i++){
 		redirector.advance();
-		usleep(100000); // 1/10 sec
+		Util::sleep(100000); // 1/10 sec
 	}
-	if(pm.installScript(".vpl_vnc_stopper.sh","vpl_vnc_stopper.sh")){
-		output=run(pm,".vpl_vnc_stopper.sh",5); //FIXME use constant
+	if(pm.installScript(".vpl_vnc_stopper.sh", "vpl_vnc_stopper.sh")){
+		output=run(pm, ".vpl_vnc_stopper.sh", 5); //FIXME use constant
 		Logger::log(LOG_DEBUG,"%s",output.c_str());
 	}
 	if(noMonitor){
@@ -1530,4 +1532,3 @@ void Jail::runPassthrough(processMonitor &pm, Socket *s) {
 	}
 	Logger::log(LOG_DEBUG,"End web redirector loop");
 }
-

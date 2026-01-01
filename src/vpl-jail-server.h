@@ -303,7 +303,7 @@ class Daemon {
 			Jail jail(IP);
 			jail.process(socket);
 			delete socket;
-			usleep(10000);//Wait for father process child
+			Util::sleep(10000);//Wait for father process child
 			_exit(EXIT_SUCCESS);
 		}
 		close(this->actualSocket);
@@ -366,7 +366,7 @@ class Daemon {
 		for (int i = 1; bindResult == -1 && i <= timeout; i++) {
 			bindResult = bind(socketfd, (struct sockaddr *) &local, sizeof(local));
 			if (bindResult == -1) {
-				sleep(1);
+				Util::sleep(1000000);
 				Logger::log(LOG_DEBUG,"bind() to %s retry %d: %m", type, i);
 			}
 		}

@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 #include "jail_limits.h"
 #include "redirector.h"
+#include "util.h"
 
 const int Redirector::MAX = JAIL_NET_BUFFER_SIZE; //Buffer size to read
 const int Redirector::POLLBAD = POLLERR | POLLHUP | POLLNVAL;
@@ -167,7 +168,7 @@ void RedirectorTerminalBatch::advance() {
 				break;
 			case end:
 			case error:
-				usleep(50000);
+				Util::sleep(50000);
 				break;
 		}
 		if(oldstate != state)
@@ -261,7 +262,7 @@ void RedirectorTerminal::advance() {
 			case end:
 			case error:
 				if(ws->isClosed())
-					usleep(50000);
+					Util::sleep(50000);
 				else ws->close();
 				break;
 		}
@@ -311,7 +312,7 @@ void RedirectorVNC::advance() {
 						break;
 					}else{
 						Logger::log(LOG_INFO, "socket connect to (127.0.0.1:%d) error: %m",(int)port);
-						usleep(100000); // 1/10 sec
+						Util::sleep(100000); // 1/10 sec
 					}
 					if (timeout < time(NULL)) {
 						Logger::log(LOG_ERR, "socket connect timeout: %m");
@@ -385,7 +386,7 @@ void RedirectorVNC::advance() {
 			case end:
 			case error:
 				if (ws->isClosed()) {
-					usleep(50000);
+					Util::sleep(50000);
 				} else {
 					ws->close();
 				}
@@ -447,7 +448,7 @@ void RedirectorWebServer::advance() {
 						break;
 					} else {
 						Logger::log(LOG_INFO, "socket connecting to (%s) error: %m", serverAddress.c_str());
-						usleep(100000); // 1/10 sec
+						Util::sleep(100000); // 1/10 sec
 					}
 					if (timeout < time(NULL)) {
 						Logger::log(LOG_ERR, "socket connect timeout: %m");
@@ -529,7 +530,7 @@ void RedirectorWebServer::advance() {
 			case end:
 			case error:
 				if(client->isClosed()) {
-					usleep(50000);
+					Util::sleep(50000);
 				} else {
 					client->close();
 				}
