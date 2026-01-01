@@ -807,7 +807,7 @@ public:
 					throw HttpException(badRequestCode,
 						"URLdecode: non hex digits in percent-encoding sequence");
 				}
-				char value = static_cast<char>(std::strtol(hex.c_str(), nullptr, 16));
+				char value = static_cast<char>(std::strtol(hex.c_str(), NULL, 16));
 				decoded.push_back(value);
 				i += 2;
 			} else if (currentChar == '+') {

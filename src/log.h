@@ -54,7 +54,7 @@ public:
     	vsnprintf(buf, buflen, format, args);
     	va_end(args);		
 		if (isForeground()) {
-		    time_t currentTime = time(nullptr);
+		    time_t currentTime = time(NULL);
     		const char* formatString = "%Y-%m-%d %H:%M:%S";
 		    char dateTime[80];
 		    strftime(dateTime, sizeof(dateTime), formatString, std::localtime(&currentTime));
