@@ -21,7 +21,7 @@ SSLBase* SSLBase::singlenton=NULL;
 
 const vplregex Socket::regRequestLine("^([^ ]+) ([^ ]+) ([^ ]+)$");
 const vplregex Socket::regHeader("^[ \t]*([^ \t:]+):[ \t]*(.*)$");
-const vplregex Socket::regURL("^([a-zA-Z]+)?(:\\/\\/[^\\/]+)?([^?]*)[?]?(.*$)");
+const vplregex Socket::regURL("^([a-zA-Z]+)?(:\\/\\/[^\\/]+)?([^?]*)[?]?(.*)$");
 const vplregex Socket::regCookie("([^=]+)=([^;]+)(; )?");
 
 /**
