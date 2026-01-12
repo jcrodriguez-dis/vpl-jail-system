@@ -42,6 +42,10 @@ function vpl_detect_package_manager() {
 			dnf -y -q install $1 >> "$LOGFILE"
 			return $?
 		}
+		function vpl_uninstall_base {
+			dnf -y -q remove $1 >> "$LOGFILE"
+			return $?
+		}
 		function vpl_install_check {
 			dnf -y -q list $1 &> /dev/null
 			return $?
@@ -56,6 +60,10 @@ function vpl_detect_package_manager() {
 			yum -y -q install $1 >> "$LOGFILE"
 			return $?
 		}
+		function vpl_uninstall_base {
+			yum -y -q remove $1 >> "$LOGFILE"
+			return $?
+		}
 		function vpl_install_check {
 			yum -y -q list $1 &> /dev/null
 			return $?
@@ -68,6 +76,10 @@ function vpl_detect_package_manager() {
 		apt-get -q -y upgrade >> "$LOGFILE"
 		function vpl_install_base {
 			apt-get -q -y --allow-unauthenticated install $1 >> "$LOGFILE"
+			return $?
+		}
+		function vpl_uninstall_base {
+			apt-get -q -y remove $1 >> "$LOGFILE"
 			return $?
 		}
 		function vpl_install_check {
@@ -86,6 +98,10 @@ function vpl_detect_package_manager() {
 		apk --no-interactive upgrade >> "$LOGFILE"
 		function vpl_install_base {
 			apk --no-interactive add $1 >> "$LOGFILE"
+			return $?
+		}
+		function vpl_uninstall_base {
+			apk --no-interactive del $1 >> "$LOGFILE"
 			return $?
 		}
 		function vpl_install_check {
@@ -443,6 +459,7 @@ function vpl_show_help() {
     echo "  update         Update the VPL-Jail-System server software."
     echo "  start          Start the VPL-Jail-System service after installation."
     echo "  noninteractive Install without user interaction."
+    echo "  uninstall      Uninstall all development packages leaving the minimum required."
     echo "  [inst_level]   Install programming languages development packages:"
 	echo "                 values [minimum | basic | standard | full]"
 	echo "  list           Show the packages to install by [inst_level]"
@@ -529,9 +546,11 @@ function vpl_install_update_extra_files() {
 	chmod 0600 /var/vpl-jail-system
 }
 
-function vpl_install_packages_file() {
+function vpl_process_packages_file() {
 	[ ! -s "$1" ] && (echo "Package file '$1' not found" ; return)
-	echo "Installing from $1"
+	local npm_command=$3
+	local package_command=$4
+	echo "$2 from $1"
 	local line
 	local name
 	local packages
@@ -543,13 +562,17 @@ function vpl_install_packages_file() {
 		if [ $? = 0 ] ; then
 			name=$(echo $line | sed -e "s/^ *npm \+\"\([^\"]\+\)\".*/\1/")
 			packages=$(echo $line | sed -e "s/.*\"[^\"]\+\"\(.*\)/\1/")
-			[ -n "$packages" ] && vpl_install_npm "$name" $packages
+			[ -n "$packages" ] && $npm_command "$name" $packages
 		else
 			name=$(echo $line | sed -e "s/.*\"\([^\"]\+\)\".*/\1/")
 			packages=$(echo $line | sed -e "s/.*\"[^\"]\+\"\(.*\)/\1/")
-			[ -n "$packages" ] && vpl_install_package "$name" $packages
+			[ -n "$packages" ] && $package_command "$name" $packages
 		fi
 	done < "$1"
+}
+
+function vpl_install_packages_file() {
+	vpl_process_packages_file "$1" "Installing" vpl_install_npm vpl_install_package
 }
 
 function vpl_install_minimum() {
@@ -611,6 +634,80 @@ function vpl_install_full() {
 			vpl_install_jgrasp
 		fi
 	fi
+}
+
+function vpl_uninstall_package {
+	local checked=""
+	echo -n "Uninstalling $1: "
+	shift
+	while [ "$#" != "0" ] ; do
+		checked="$checked $1"
+	    vpl_uninstall_base $1
+   	    if [ $? -eq 0 ] ; then
+   	   		echo " [OK]"
+   	    else
+   	   		echo " [FAILED/NOT FOUND]"
+   	    fi
+        shift
+   done
+}
+
+function vpl_uninstall_npm {
+    if [ "$(command -v npm)" == "" ] ; then
+       return
+    fi
+	echo -n "Uninstalling $1 (using npm): "
+	shift
+	while [ "$#" != "0" ] ; do
+   	    npm uninstall -g $1 &> /dev/null
+   	    if [ $? -eq 0 ] ; then
+   	   	    echo " [OK]"
+   	    fi
+        shift
+   done
+}
+
+function vpl_uninstall_packages_file() {
+	vpl_process_packages_file "$1" "Uninstalling" vpl_uninstall_npm vpl_uninstall_package
+}
+
+function vpl_uninstall_full_leaving_minimum() {
+	if [ "$NONINTERACTIVE" == "" ] ; then
+		echo ""
+		echo "WARNING:"
+		echo "This action will uninstall all development packages in the full set"
+		echo "except for those in the minimum set."
+		echo "This script cannot determine if a package was installed by this script or manually."
+		echo "Therefore, packages installed manually or by other means may be removed."
+		echo "Custom configurations or packages depending on the removed packages might be affected."
+		echo -n "Are you sure you want to proceed? (y/n) "
+		read A
+		if [ "$A" != "y" ] ; then
+			echo "Uninstall aborted."
+			return
+		fi
+	fi
+	echo ""
+	echo "Uninstalling Full, Standard and Basic packages"
+	local PACKAGE_LIST_FILE="packages_files/full.$PMTYPE.lst"
+	[ -s $PACKAGE_LIST_FILE ] && vpl_uninstall_packages_file $PACKAGE_LIST_FILE
+	PACKAGE_LIST_FILE="packages_files/standard.$PMTYPE.lst"
+	[ -s $PACKAGE_LIST_FILE ] && vpl_uninstall_packages_file $PACKAGE_LIST_FILE
+	PACKAGE_LIST_FILE="packages_files/basic.$PMTYPE.lst"
+	[ -s $PACKAGE_LIST_FILE ] && vpl_uninstall_packages_file $PACKAGE_LIST_FILE
+
+	if [ -d "/opt/kotlin" ]; then
+        echo "Removing Kotlin"
+        rm -R /opt/kotlin
+        rm /usr/bin/kotlinc
+    fi
+    
+    if [ -d "/usr/local/jgrasp" ]; then
+         echo "Removing JGrasp"
+         rm -R /usr/local/jgrasp
+         rm /usr/bin/jgrasp
+    fi
+    echo "Done."
 }
 
 function vpl_check_SSL_certificate() {
@@ -687,6 +784,9 @@ function vpl_commandline_action_arg() {
 			vpl_install_update_daemon
 			vpl_install_update_extra_files
 			[ -z "$NONINTERACTIVE" ] && vpl_info_using_service
+			;;
+		uninstall)
+			vpl_uninstall_full_leaving_minimum
 			;;
 		list)
 			export LISTPACKAGES=yes
