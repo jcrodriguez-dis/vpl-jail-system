@@ -104,7 +104,7 @@ void Configuration::readConfigFile() {
 	configDefault["MIN_PRISONER_UGID"] = "10000";
 	configDefault["MAX_PRISONER_UGID"] = "20000";
 	configDefault["ENVPATH"] = Util::getEnv("PATH");
-	configDefault["USE_CGROUP"] = "false";
+	configDefault["USE_CGROUP"] = "true";
 	configDefault["USE_NAMESPACE"] = "true";
 
 	ConfigData data = ConfigurationFile::readConfiguration(configPath, configDefault);
