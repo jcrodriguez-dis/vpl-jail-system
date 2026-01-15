@@ -40,6 +40,7 @@ int main(int const argc, const char ** const argv) {
 	Logger::setLogLevel(conf->getLogLevel(), foreground);
 	if ( conf->getLogLevel() >= LOG_INFO) {
 		conf->readConfigFile(); // Reread configuration file to show values in log
+		conf->foundWritableDirsInJail(); // Reread writable dirs to show values in log
 	}
 	if (conf->getJailPath() == "" && ! isInContainer) {
 		Logger::log(LOG_EMERG, "Jail directory root \"/\" but not running in container");
