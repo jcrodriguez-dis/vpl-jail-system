@@ -1107,43 +1107,58 @@ void Jail::remountProc(){
 }
 
 /**
- * Make /tmp private per prisoner to avoid information sharing.
+ * Make private per prisoner any writable dir in the jail to avoid information sharing.
  *
- * When mount namespaces are enabled, bind-mount /home/p<uid>/tmp onto /tmp.
- * This ensures programs using the hardcoded /tmp path cannot see other prisoners' temp files.
+ * When mount namespaces are enabled, bind-mount /home/p<uid>/.writabledir onto /writabledir.
  */
-void Jail::setupPrivateTmp(processMonitor &pm){
-	if (!configuration->getUseNamespace()) {
-		return;
-	}
-
-	string tmpSource = pm.getRelativeHomePath() + "/.vpl_tmp"; // /home/p<uid>/tmp inside jail
-	if (mkdir(tmpSource.c_str(), 0700) != 0 && errno != EEXIST) {
-		Logger::log(LOG_WARNING, "Failed to create private .vpl_tmp source %s: %s", tmpSource.c_str(), strerror(errno));
-		return;
-	}
-	// Best-effort ownership; not critical if already exists
-	if (chown(tmpSource.c_str(), pm.getPrisonerID(), pm.getPrisonerID()) != 0) {
-		Logger::log(LOG_DEBUG, "Failed to chown %s: %s", tmpSource.c_str(), strerror(errno));
-	}
-	chmod(tmpSource.c_str(), 0700);
-
-	// Ensure mount point exists
-	if (mkdir("/tmp", 01777) != 0 && errno != EEXIST) {
-		Logger::log(LOG_WARNING, "Failed to ensure /tmp exists: %s", strerror(errno));
-		return;
-	}
-
-	// Bind mount private tmp onto /tmp
-	if (mount(tmpSource.c_str(), "/tmp", NULL, MS_BIND, NULL) != 0) {
-		Logger::log(LOG_WARNING, "Failed to bind-mount %s to /tmp: %s", tmpSource.c_str(), strerror(errno));
-		return;
-	}
-	// Make mount private (best-effort)
-	mount(NULL, "/tmp", NULL, MS_PRIVATE, NULL);
-	// Best-effort hardening flags on the bind mount (ignore failures)
-	mount(NULL, "/tmp", NULL, MS_BIND | MS_REMOUNT | MS_NODEV | MS_NOSUID, NULL);
-	Logger::log(LOG_DEBUG, "Private /tmp set to %s", tmpSource.c_str());
+void Jail::setupPrivateWritableDirs(processMonitor &pm){
+    if (!configuration->getUseNamespace()) {
+        return;
+    }
+    for (const string &dir : configuration->getWritableDirsInJail()) {
+        // Source is /home/p<uid>/writable-dirname written with '.' instead of '/'
+        string sanitizedDirName = dir;
+        std::replace(sanitizedDirName.begin(), sanitizedDirName.end(), '/', '.');
+        string source = pm.getRelativeHomePath() + "/" + sanitizedDirName;
+        // Get original directory's permissions BEFORE creating source
+        struct stat origStat;
+        mode_t origMode = 0755; // Sensible default
+        if (stat(dir.c_str(), &origStat) == 0) {
+            origMode = origStat.st_mode & 07777;
+            Logger::log(LOG_DEBUG, "Original %s has permissions %04o", dir.c_str(), origMode);
+        } else {
+            Logger::log(LOG_DEBUG, "Failed to stat original %s, using default 0755", dir.c_str());
+        }
+        // Create source with matching permissions
+        if (mkdir(source.c_str(), origMode) != 0 && errno != EEXIST) {
+            Logger::log(LOG_WARNING, "Failed to create private writable source %s: %s", source.c_str(), strerror(errno));
+            continue;
+        }       
+        // Ensure permissions match (in case directory already existed)
+        if (chmod(source.c_str(), origMode) != 0) {
+            Logger::log(LOG_DEBUG, "Failed to chmod %s to %04o: %s", source.c_str(), origMode, strerror(errno));
+        }
+        if (chown(source.c_str(), pm.getPrisonerID(), pm.getPrisonerID()) != 0) {
+            Logger::log(LOG_DEBUG, "Failed to chown %s: %s", source.c_str(), strerror(errno));
+        }
+        // Ensure mount point exists with original permissions
+        if (mkdir(dir.c_str(), origMode) != 0 && errno != EEXIST) {
+            Logger::log(LOG_WARNING, "Failed to ensure %s exists: %s", dir.c_str(), strerror(errno));
+            continue;
+        }
+        
+        // Bind mount private writable dir onto mount point
+        if (mount(source.c_str(), dir.c_str(), NULL, MS_BIND, NULL) != 0) {
+            Logger::log(LOG_WARNING, "Failed to bind-mount %s to %s: %s", source.c_str(), dir.c_str(), strerror(errno));
+            continue;
+        }
+        
+        // Make mount private (best-effort)
+        mount(NULL, dir.c_str(), NULL, MS_PRIVATE, NULL);       
+        // Best-effort hardening flags on the bind mount (ignore failures)
+        mount(NULL, dir.c_str(), NULL, MS_BIND | MS_REMOUNT | MS_NODEV | MS_NOSUID, NULL);       
+        Logger::log(LOG_DEBUG, "Private writable dir %s set to %s (mode %04o)", dir.c_str(), source.c_str(), origMode);
+    }
 }
 
 /**
@@ -1208,8 +1223,8 @@ void Jail::setupFilesystemIsolation(processMonitor &pm){
 	
 	// After pivot_root, remount /proc to show only this namespace's processes
 	remountProc();
-	// Isolate /tmp per prisoner (requires mount namespace)
-	setupPrivateTmp(pm);
+	// Isolate writable dirs
+	setupPrivateWritableDirs(pm);
 }
 
 /**
