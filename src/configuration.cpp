@@ -177,9 +177,62 @@ Configuration::Configuration() {
 	configPath = "/etc/vpl/vpl-jail-system.conf";
 	checkConfigFile(configPath, "Config file");
 	readConfigFile();
+	foundWritableDirsInJail();
 }
 
 Configuration::Configuration(string path) {
 	configPath = path;
 	readConfigFile();
+	foundWritableDirsInJail();
+}
+
+/**
+ * Returns writable directories inside directory dirPath
+ */
+vector<string> Configuration::getWritableDirsInDir(const string &dirPath) {
+	vector<string> writableDirs;
+	DIR *dir = opendir(dirPath.c_str());
+	if (dir == NULL) {
+		Logger::log(LOG_ERR, "Error opening directory %s to find writable dirs", dirPath.c_str());
+		return writableDirs;
+	}
+	uid_t minPrisoner = this->getMinPrisoner();
+	uid_t maxPrisoner = this->getMaxPrisoner();
+	struct dirent *entry;
+	while ((entry = readdir(dir)) != NULL) {
+		string entryName = entry->d_name;
+		if (entryName == "." || entryName == "..") {
+			continue;
+		}
+		string fullPath = dirPath + "/" + entryName;
+		struct stat info;
+		if (lstat(fullPath.c_str(), &info) != 0) {
+			Logger::log(LOG_ERR, "Error stating file %s to find writable dirs", fullPath.c_str());
+			continue;
+		}
+		if (S_ISDIR(info.st_mode)) {
+			// Check if writable by prisoners
+			if ((info.st_mode & S_IWOTH) ||
+			    ((info.st_mode & S_IWGRP) && info.st_gid >= minPrisoner && info.st_gid <= maxPrisoner) ||
+			    ((info.st_mode & S_IWUSR) && info.st_uid >= minPrisoner && info.st_uid <= maxPrisoner)) {
+				string jailRelativePath = fullPath.substr(jailPath.size());
+				writableDirs.push_back(jailRelativePath);
+				Logger::log(LOG_INFO, "Found writable dir in jail: %s", jailRelativePath.c_str());
+				continue;
+			}
+			// Recurse into subdirectory
+			vector<string> subDirs = getWritableDirsInDir(fullPath);
+			writableDirs.insert(writableDirs.end(), subDirs.begin(), subDirs.end());
+		}
+	}
+	closedir(dir);
+	return writableDirs;
+}
+
+void Configuration::foundWritableDirsInJail() {
+	writableDirsInJail = getWritableDirsInDir(jailPath);
+	Logger::log(LOG_INFO, "Total writable dirs found in jail: %lu", (long unsigned int)writableDirsInJail.size());
+	for (size_t i = 0; i < writableDirsInJail.size(); i++) {
+		Logger::log(LOG_INFO, "Writable dir in jail: %s", writableDirsInJail[i].c_str());
+	}
 }

@@ -24,6 +24,7 @@ private:
 	uid_t  minPrisoner; //Minimum value of range of uid prisoner
 	uid_t maxPrisoner; //Maximum value of range of uid prisoner
 	vector<string> taskOnlyFrom; //Moodle servers that can submit task
+	vector<string> writableDirsInJail; //Writable directories inside jail
 	string interface; //Interface to serve default all
 	string URLPath; //URL path to accept tasks
 	int port; // Plain communications port number
@@ -44,6 +45,7 @@ private:
 protected:
 	static Configuration* singlenton;
 	void checkConfigFile(string fileName, string men);
+	vector<string> getWritableDirsInDir(const string &dirPath); // Recursive helper
 	Configuration();
 	Configuration(string path);
 public:
@@ -53,6 +55,7 @@ public:
 	}
 	void readEnvironmentConfigVars(ConfigData& data);
 	void readConfigFile();
+	void foundWritableDirsInJail(); // Find writable directories inside jail
 	static string generateCleanPATH(string path, string dirtyPATH);
 	const ExecutionLimits & getLimits() const { return jailLimits;}
 	const string & getJailPath() const { return jailPath;}
@@ -67,6 +70,7 @@ public:
 		return (uid >= getMinPrisoner() && uid <= getMaxPrisoner());
 	}
 	const vector<string> & getTaskOnlyFrom() const { return taskOnlyFrom;}
+	const vector<string> & getWritableDirsInJail() const { return writableDirsInJail;}
 	const string &  getInterface() const { return interface;}
 	const string &  getURLPath() const { return URLPath;}
 	int getPort() const { return port;}
