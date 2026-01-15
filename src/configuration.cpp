@@ -117,6 +117,7 @@ void Configuration::readConfigFile() {
 	}
 
 	readEnvironmentConfigVars(data);
+	inContainer = false;
 	minPrisoner = atoi(data["MIN_PRISONER_UGID"].c_str());
 	if(minPrisoner < JAIL_MIN_PRISONER_UID || minPrisoner > JAIL_MAX_PRISONER_UID)
 		throw "Incorrect MIN_PRISONER_UGID config value" + data["MIN_PRISONER_UGID"];

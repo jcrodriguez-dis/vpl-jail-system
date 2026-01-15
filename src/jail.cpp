@@ -281,6 +281,9 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 				pm.setExtraInfo(executionLimits, interactive, vpl_lang);
 			}else{
 				Logger::log(LOG_INFO, "Compilation fail");
+				for(int i = 0; !pm.isMonitored() && i < 30; i++){
+					usleep(100000); //wait until monitor start and send compilation output
+				}
 			}
 		}
 		catch(std::exception &e){
@@ -459,8 +462,13 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 				} else if (pm.FileExists(VPL_WEXECUTION)) {
 					ws.send("run:vnc:" + pm.getVNCPassword());
 				} else {
-					if (pm.getCompilation().empty()) {
+					Logger::log(LOG_DEBUG, "No executable to run");
+					usleep(200000); //give time to save compilation output
+					string compilationOutput = pm.getCompilation();
+					if (compilationOutput.empty()) {
 						ws.send("compilation:The compilation process did not generate an executable nor error message.");
+					} else {
+						ws.send("compilation:" + compilationOutput);
 					}
 					ws.send("close:");
 					ws.close();
@@ -469,6 +477,8 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 					ws.receive();
 					return;
 				}
+				usleep(200000); //give time to save compilation output
+				ws.send("compilation:" + pm.getCompilation());
 				break;
 			case running:
 				Logger::log(LOG_DEBUG, "Monitor running");
@@ -888,7 +898,7 @@ void Jail::process(Socket *socket){
  * Setup Linux namespaces for process isolation
  * Isolates PID, mounts and IPC namespaces
  */
-void Jail::setupNamespaces(){
+void Jail::setupNamespaces() {
 	// Check if namespace isolation is enabled
 	if (!configuration->getUseNamespace()) {
 		Logger::log(LOG_DEBUG, "Namespace isolation disabled in configuration");
@@ -926,10 +936,73 @@ void Jail::setupNamespaces(){
 		if (prctl(PR_SET_PTRACER, 0, 0, 0, 0) != 0) {
 			Logger::log(LOG_WARNING, "Failed to set PTRACER to 0: %m");
 		}
+		// Wait for child to finish
 		waitpid(pid, NULL, 0);
 		_exit(EXIT_SUCCESS);
 	}
-	Logger::log(LOG_INFO, "Namespaces created: PID, NS, IPC");
+	Logger::log(LOG_INFO, "Namespaces created: PID, NS, IPC, USER");
+}
+
+/**
+ * Setup Linux USER namespace for process isolation
+ * @param mp The process monitor
+ */
+void Jail::setupNamespaceUser(processMonitor &mp) {
+	// Check if namespace isolation is enabled
+	if (!configuration->getUseNamespace()) {
+		Logger::log(LOG_DEBUG, "Namespace isolation disabled in configuration");
+		return;
+	}
+	if (configuration->isRunningInContainer()) {
+		Logger::log(LOG_DEBUG, "Running in container, skipping user namespace setup");
+		return;
+	}
+	try{
+		// Fix PTY ownership before unsharing so it is accessible inside the user namespace.
+		// We set it to the prisoner UID so they own the terminal (stdin/stdout/stderr).
+		uid_t prisonerUID = mp.getPrisonerID();
+		if (isatty(STDIN_FILENO)) {
+			if (fchmod(STDIN_FILENO, 0620) != 0) {
+				Logger::log(LOG_WARNING, "Failed to chmod PTY slave: %m");
+			}
+			if (fchown(STDIN_FILENO, prisonerUID, -1) != 0) {
+				Logger::log(LOG_WARNING, "Failed to chown PTY slave: %m");
+			}
+		}
+	} catch(...) {
+		// Ignore errors here, main logic is in the try block below
+	}
+	
+	// CLONE_NEWUSER: User namespace - isolated user and group IDs
+	int flags = CLONE_NEWUSER;
+	if (unshare(flags) != 0) {
+		// If unshare fails, log but continue (some kernels may not support all namespaces)
+		Logger::log(LOG_WARNING, "Failed to create namespaces: %s (errno=%d). Continuing without full namespace isolation.", strerror(errno), errno);
+		// Restore PTY ownership to root if we failed
+		try{
+			uid_t rootUGID = 0;
+			if (isatty(STDIN_FILENO)) {
+				if (fchown(STDIN_FILENO, rootUGID, -1) != 0) {
+					Logger::log(LOG_WARNING, "Failed to chown PTY slave: %m");
+				}
+			}
+		} catch(...) {
+			// Ignore errors here
+		}
+		return;
+	}
+	try{
+		uid_t fakeRootUGID = configuration->getHomeDirOwnerUid();
+		// Write UID map to /proc/self/uid_map and /proc/self/setgroups, /proc/self/gid_map
+		string uidMap = "0 " + Util::itos(fakeRootUGID) + " 1\n";
+		uidMap += Util::itos(mp.getPrisonerID()) + " " + Util::itos(mp.getPrisonerID()) + " 1\n";
+		Util::writeFile("/proc/self/uid_map", uidMap);
+		Util::writeFile("/proc/self/gid_map", uidMap);
+		Util::writeFile("/proc/self/setgroups", "deny"); // Prevent "setgroups" syscall in user namespace
+	} catch(...) {
+		Logger::log(LOG_WARNING, "Failed to set up UID/GID mappings for user namespace. Continuing without user namespace isolation.");
+	}
+	Logger::log(LOG_INFO, "Namespaces created: USER");
 }
 
 /**
@@ -1252,6 +1325,8 @@ void Jail::executeInJail(processMonitor &pm, string name, const char *detail){
 		 // pivot_root isolation or chroot
 		setupFilesystemIsolation(pm);
 		// setuid to prisoner (drops root)
+		// setupNamespaceUser(pm); STILL NEEDS TESTING
+		// become prisoner (drops to prisoner UID/GID)
 		pm.becomePrisoner();
 		// set resource limits (as prisoner)
 		setLimits(pm);
@@ -1298,7 +1373,6 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 	time_t startTime = time(NULL);
 	time_t lastTime = startTime;
 	int stopSignal = SIGTERM;
-	bool noMonitor = false;
 	int status;
 	while(redirector.isActive()) {
 		redirector.advance();
@@ -1341,7 +1415,6 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 					Logger::log(LOG_INFO,"Not monitored");
 					kill(newpid, stopSignal);
 					stopSignal = SIGKILL; //Second try
-					noMonitor = true;
 				} else if(elapsedTime > maxtime){
 					redirector.addMessage("\r\nJail: execution time limit reached.\n");
 					Logger::log(LOG_INFO,"Execution time limit (%d) reached"
@@ -1370,9 +1443,6 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 	}
 	string output = redirector.getOutput();
 	Logger::log(LOG_DEBUG,"Complete program output: %s", output.c_str());
-	if(noMonitor && !VNCLaunch){
-		pm.cleanTask();
-	}
 	return output;
 }
 
@@ -1493,7 +1563,7 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 	}
 	Logger::log(LOG_DEBUG,"End redirector loop");
 	//wait until 5sg for redirector to read and send program output
-	for(int i=0;redirector.isActive() && i<50; i++){
+	for(int i=0; redirector.isActive() && i<50; i++){
 		redirector.advance();
 		Util::sleep(100000); // 1/10 sec
 	}

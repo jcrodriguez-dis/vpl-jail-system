@@ -151,7 +151,7 @@ void RedirectorTerminalBatch::advance() {
 						break; //program output read error
 					}
 					if (readsize >0) {
-						netbuf += string(buf,readsize);
+						netbuf += string(buf, readsize);
 						break;
 					}
 				}

@@ -37,10 +37,11 @@ int main() {
 	}
 
 	struct sockaddr_in local;
+	in_port_t port = 9876;
 	memset(&local, 0, sizeof(local));
 	local.sin_family = AF_INET;
 	local.sin_addr.s_addr = INADDR_ANY;
-	local.sin_port = htons(8080);
+	local.sin_port = htons(port);
 	if (bind(listenSocket, (struct sockaddr *) &local, sizeof(local)) == -1) {
 		cerr << "bind failed" << endl;
 		exit(0);

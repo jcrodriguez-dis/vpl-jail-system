@@ -56,7 +56,8 @@ class ConfigurationTest: public BaseTest {
 		assert(config->getHSTSMaxAge() == -1);
 		assert(config->getSSLCertFile() == "/etc/vpl/cert.pem");
 		assert(config->getSSLKeyFile() == "/etc/vpl/key.pem");
-		assert(config->getUseCGroup() == false);
+		assert(config->getUseCGroup() == true);
+		assert(config->getUseNamespace() == true);
 		assert(config->getRequestMaxSize() == Util::memSizeToBytesi("128 Mb"));
 		assert(config->getResultMaxSize() == Util::memSizeToBytesi("1 Mb"));
 	}

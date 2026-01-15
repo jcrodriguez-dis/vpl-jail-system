@@ -17,14 +17,14 @@ using namespace std;
  */
 int main(int const argc, const char ** const argv) {
 	bool foreground = false;
-	bool inContaier = false;
+	bool isInContainer = false;
 	for (int i = 1; i < argc; i++) {
 		string arg = argv[i];
 		if (arg == "foreground") {
 			foreground = true;
 		}
 		if (arg ==  "in_container") {
-			inContaier = true;
+			isInContainer = true;
 		}
 		if (arg ==  "version" || arg == "-version") {
 			cout << Util::version() <<endl;
@@ -33,7 +33,7 @@ int main(int const argc, const char ** const argv) {
 	}
 	cout << "Server running";
 	if (foreground) cout << " in foreground mode (non-daemon mode)";
-	if (inContaier) cout << " inside a container (no chroot used)";
+	if (isInContainer) cout << " inside a container (no chroot used)";
 	cout << endl;
 	Logger::setLogLevel(LOG_ERR, foreground);
 	Configuration *conf = Configuration::getConfiguration();
@@ -41,15 +41,16 @@ int main(int const argc, const char ** const argv) {
 	if ( conf->getLogLevel() >= LOG_INFO) {
 		conf->readConfigFile(); // Reread configuration file to show values in log
 	}
-	if (conf->getJailPath() == "" && ! inContaier) {
+	if (conf->getJailPath() == "" && ! isInContainer) {
 		Logger::log(LOG_EMERG, "Jail directory root \"/\" but not running in container");
 		exit(1);
 	}
-	if (conf->getJailPath() != "" && inContaier) {
+	if (conf->getJailPath() != "" && isInContainer) {
 		Logger::log(LOG_EMERG, "Running in container but Jail directory not root \"/\"");
 		exit(1);
 	}
-	int exitStatus=static_cast<int>(internalError);
+	conf->setInContainer(isInContainer || foreground);
+	int exitStatus = static_cast<int>(internalError);
 	try{
 		Daemon* runner = Daemon::getRunner();
 		if (foreground) {

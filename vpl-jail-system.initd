@@ -154,6 +154,8 @@ function set_etc {
 		for (( I=$MIN_PRISONER_UGID+1 ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
 			echo "p$I:*:$I:$I:prisoner $I:/home/p$I:/bin/bash" >> "$PASSWORDFILE"
 		done
+		# Add nobody user
+		echo "nobody:*:65534:65534:nobody:/nonexistent:/bin/false" >> "$PASSWORDFILE"
 		chmod 644 "$PASSWORDFILE"
 		#group file
 		echo "root:*:0:root" > "$GROUPFILE"
@@ -161,6 +163,8 @@ function set_etc {
 		for (( I=$MIN_PRISONER_UGID+1 ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
 			echo "p$I:*:$I:p$I" >> "$GROUPFILE"
 		done
+		# Add nogroup group
+		echo "nogroup:*:65534:nobody" >> "$GROUPFILE"
 		chmod 644 "$GROUPFILE"
 		chown root:root "$SHADOWFILE"
 		chmod 600 "$SHADOWFILE"
@@ -172,6 +176,7 @@ function set_etc {
 		for (( I=$MIN_PRISONER_UGID+1 ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
 			echo "p$I:*:$I:$I:prisoner $I:/home/p$I:/bin/bash" >> $TMPFILE
 		done
+		echo "nobody:*:65534:65534:nobody:/nonexistent:/bin/false" >> $TMPFILE
 		cp $TMPFILE "$PASSWORDFILE"
 		chown root:root "$PASSWORDFILE"
 		chmod 644 "$PASSWORDFILE"
@@ -182,6 +187,7 @@ function set_etc {
 		for (( I=$MIN_PRISONER_UGID+1 ; $I < $MAX_PRISONER_UGID ; I+=1 )) ; do
 			echo "p$I:*:$I:p$I" >> $TMPFILE
 		done
+		echo "nogroup:*:65534:nobody" >> $TMPFILE
 		cp $TMPFILE "$GROUPFILE"
 		chown root:root "$GROUPFILE"
 		chmod 644 "$GROUPFILE"

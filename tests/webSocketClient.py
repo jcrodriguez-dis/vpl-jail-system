@@ -18,7 +18,7 @@ async def checkEcho(conn, value):
         exit(1)
 
 async def main():
-    uri = "ws://localhost:8080"
+    uri = "ws://localhost:9876"
     async with websockets.connect(uri) as websocket:
         if "Hello from echo websocket" !=  (await websocket.recv()):
             print('Error incorrect hello message')

@@ -31,6 +31,7 @@ private:
 	int logLevel; //Log level 0 to 8, 0 = no log, 8 += do not remove home dir.
 	int fail2ban; //Fail to ban configuration. Relation fail / success to ban IP
 	int HSTSMaxAge; // Max-age of HSTS response header
+	bool inContainer; //True if running in container
 	string SSLCipherList;
 	string SSLCipherSuites;
 	string SSLCertFile;
@@ -57,6 +58,8 @@ public:
 	const string & getJailPath() const { return jailPath;}
 	const string &  getCleanPATH() const { return cleanPATH;}
 	const string &  getControlPath() const { return controlPath;}
+	bool isRunningInContainer() const { return inContainer; }
+	void setInContainer(bool val) { inContainer = val; }
 	uid_t getHomeDirOwnerUid() const { return minPrisoner; }
 	uid_t getMinPrisoner() const { return minPrisoner + 1;}
 	uid_t getMaxPrisoner() const { return maxPrisoner;}

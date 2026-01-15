@@ -712,6 +712,7 @@ string processMonitor::getCompilation() {
 	if (security != monitor)
 		throw HttpException(internalServerErrorCode, "Security: required monitor ticket for getCompilation");
 	{
+		Logger::log(LOG_DEBUG, "Getting compilation output");
 		Lock lock(getProcessControlPath());
 		string fileName = getProcessControlPath("compilation");
 		if (Util::fileExists(fileName))
@@ -724,6 +725,7 @@ string processMonitor::getCompilation() {
  * Save compilation output
  */
 void processMonitor::setCompilationOutput(const string &compilation) {
+	Logger::log(LOG_DEBUG, "Saving compilation output %d bytes", compilation.size());
 	string fileName;
 	Lock lock(getProcessControlPath());
 	fileName = getProcessControlPath("compilation");

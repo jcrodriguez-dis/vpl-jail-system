@@ -40,11 +40,11 @@ protected:
 	static void catchSIGTERM(int n);
 	void setupFilesystemIsolation(processMonitor &pm);
 	void setupCgroup(processMonitor &pm);
+	void setupNamespaceUser(processMonitor &pm);
 	void setupNamespaces();
 	void pivotRoot(string jailPath, int prisonerID);
 	void remountProc();
 	void setupPrivateTmp(processMonitor &pm);
-	void changeUser(processMonitor &pm);
 	void setLimits(processMonitor &pm);
 	void executeInJail(processMonitor &pm, string name, const char *detail);
 	void transferExecution(processMonitor &pm,string fileName);
