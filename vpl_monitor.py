@@ -14,11 +14,9 @@ Usage: sudo python3 vpl_monitor.py
 import os
 import sys
 import time
-import json
 import psutil
 from datetime import datetime
 from collections import defaultdict
-import glob
 
 # ANSI color codes for terminal output
 class Colors:
@@ -40,19 +38,12 @@ class VPLMonitor:
         
         # Statistics storage
         self.stats = {
-            'total_requests': 0,
             'peak_concurrent': 0,
-            'total_prisoners_seen': set(),
-            'states': defaultdict(int),
-            'files_written': 0,
-            'files_read': 0,
-            'total_cpu_time': 0,
-            'total_memory_mb': 0,
+            'total_tasks': 0,  # Count each task (including prisoner reuse)
         }
         
         # Historical data for tracking changes
         self.previous_prisoners = set()
-        self.previous_processes = {}
         
     def check_root(self):
         """Check if running as root"""
@@ -106,34 +97,6 @@ class VPLMonitor:
                 'subdirs': 0
             }
     
-    def get_active_prisoners(self):
-        """Get list of active prisoner directories"""
-        prisoners = []
-        try:
-            if os.path.exists(self.jail_home_path):
-                for entry in os.listdir(self.jail_home_path):
-                    if entry.startswith('p'):
-                        prisoner_path = os.path.join(self.jail_home_path, entry)
-                        if os.path.isdir(prisoner_path):
-                            prisoners.append(entry)
-        except Exception as e:
-            pass
-        return prisoners
-    
-    def get_control_prisoners(self):
-        """Get list of prisoner control directories"""
-        prisoners = []
-        try:
-            if os.path.exists(self.control_path):
-                for entry in os.listdir(self.control_path):
-                    if entry.startswith('p'):
-                        control_path = os.path.join(self.control_path, entry)
-                        if os.path.isdir(control_path):
-                            prisoners.append(entry)
-        except Exception as e:
-            pass
-        return prisoners
-    
     def read_prisoner_config(self, prisoner_id):
         """Read prisoner configuration file"""
         config_file = os.path.join(self.control_path, prisoner_id, "config")
@@ -150,32 +113,6 @@ class VPLMonitor:
         except:
             pass
         return {}
-    
-    def get_prisoner_processes(self, prisoner_id):
-        """Get processes for a specific prisoner"""
-        processes = []
-        try:
-            for proc in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_info', 'status', 'cmdline', 'cwd']):
-                try:
-                    # Match by username or working directory containing prisoner ID
-                    pinfo = proc.info
-                    username = pinfo.get('username', '')
-                    cwd = pinfo.get('cwd', '')
-                    
-                    if prisoner_id in username or prisoner_id in cwd:
-                        processes.append({
-                            'pid': pinfo['pid'],
-                            'name': pinfo['name'],
-                            'status': pinfo['status'],
-                            'cpu': pinfo['cpu_percent'] or 0,
-                            'mem_mb': (pinfo['memory_info'].rss / (1024 * 1024)) if pinfo['memory_info'] else 0,
-                            'cmdline': ' '.join(pinfo['cmdline'][:3]) if pinfo['cmdline'] else pinfo['name']
-                        })
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                    pass
-        except:
-            pass
-        return processes
     
     def get_all_system_info(self):
         """Get all system information in one pass - much faster"""
@@ -281,21 +218,14 @@ class VPLMonitor:
         else:
             return f"{secs}s"
     
-    def update_statistics(self, prisoners_home, prisoners_control):
+    def update_statistics(self, prisoners_control, new_prisoners):
         """Update cumulative statistics"""
         current_count = len(prisoners_control)
         if current_count > self.stats['peak_concurrent']:
             self.stats['peak_concurrent'] = current_count
         
-        # Track all prisoners we've seen
-        for p in prisoners_control:
-            self.stats['total_prisoners_seen'].add(p)
-        
-        # Update states from config files
-        for prisoner in prisoners_control:
-            config = self.read_prisoner_config(prisoner)
-            if 'state' in config:
-                self.stats['states'][config['state']] += 1
+        # Count new tasks (including prisoner ID reuse)
+        self.stats['total_tasks'] += len(new_prisoners)
     
     def display_header(self):
         """Display monitor header"""
@@ -361,16 +291,16 @@ class VPLMonitor:
     
     def display_active_prisoners(self, prisoners_home, prisoners_control, prisoner_processes):
         """Display active prisoner information with what they're doing"""
-        # Update statistics
-        self.update_statistics(prisoners_home, prisoners_control)
-        
-        print(f"{Colors.BOLD}{Colors.OKCYAN}[ACTIVE PRISONERS: {len(prisoners_control)}]{Colors.ENDC}")
-        print(f"  In /jail/home: {len(prisoners_home)} | In /var/vpl-jail-system: {len(prisoners_control)}")
-        
         # Detect new and removed prisoners
         current_set = set(prisoners_control)
         new_prisoners = current_set - self.previous_prisoners
         removed_prisoners = self.previous_prisoners - current_set
+        
+        # Update statistics (must be after detecting new prisoners)
+        self.update_statistics(prisoners_control, new_prisoners)
+        
+        print(f"{Colors.BOLD}{Colors.OKCYAN}[ACTIVE PRISONERS: {len(prisoners_control)}]{Colors.ENDC}")
+        print(f"  In /jail/home: {len(prisoners_home)} | In /var/vpl-jail-system: {len(prisoners_control)}")
         
         if new_prisoners:
             print(f"  {Colors.OKGREEN}NEW:{Colors.ENDC} {', '.join(sorted(new_prisoners))}")
@@ -436,14 +366,8 @@ class VPLMonitor:
         """Display cumulative statistics since monitoring started"""
         print(f"{Colors.BOLD}{Colors.OKCYAN}[CUMULATIVE STATISTICS]{Colors.ENDC}")
         print(f"  Monitor Uptime:        {self.format_uptime(time.time() - self.start_time)}")
-        print(f"  Total Prisoners Seen:  {len(self.stats['total_prisoners_seen'])}")
+        print(f"  Total Tasks Executed:  {self.stats['total_tasks']}")
         print(f"  Peak Concurrent:       {self.stats['peak_concurrent']}")
-        
-        if self.stats['states']:
-            print(f"  {Colors.BOLD}States Observed:{Colors.ENDC}")
-            for state, count in sorted(self.stats['states'].items()):
-                print(f"    {state:20s}: {count}")
-        
         print()
     
     def display_footer(self):
@@ -484,7 +408,7 @@ class VPLMonitor:
             print(f"\n\n{Colors.OKGREEN}Monitoring stopped by user.{Colors.ENDC}")
             print(f"{Colors.BOLD}Final Statistics:{Colors.ENDC}")
             print(f"  Total monitoring time: {self.format_uptime(time.time() - self.start_time)}")
-            print(f"  Total prisoners seen:  {len(self.stats['total_prisoners_seen'])}")
+            print(f"  Total tasks executed:  {self.stats['total_tasks']}")
             print(f"  Peak concurrent:       {self.stats['peak_concurrent']}")
             sys.exit(0)
         except Exception as e:
