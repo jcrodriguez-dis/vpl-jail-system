@@ -193,7 +193,7 @@ vector<string> Configuration::getWritableDirsInDir(const string &dirPath) {
 	vector<string> writableDirs;
 	DIR *dir = opendir(dirPath.c_str());
 	if (dir == NULL) {
-		Logger::log(LOG_ERR, "Error opening directory %s to find writable dirs", dirPath.c_str());
+		Logger::log(LOG_ERR, "Error opening directory '%s' to find writable dirs", dirPath.c_str());
 		return writableDirs;
 	}
 	uid_t minPrisoner = this->getMinPrisoner();
@@ -207,7 +207,7 @@ vector<string> Configuration::getWritableDirsInDir(const string &dirPath) {
 		string fullPath = dirPath + "/" + entryName;
 		struct stat info;
 		if (lstat(fullPath.c_str(), &info) != 0) {
-			Logger::log(LOG_ERR, "Error stating file %s to find writable dirs", fullPath.c_str());
+			Logger::log(LOG_ERR, "Error stating file '%s' to find writable dirs", fullPath.c_str());
 			continue;
 		}
 		if (S_ISDIR(info.st_mode)) {
@@ -217,7 +217,7 @@ vector<string> Configuration::getWritableDirsInDir(const string &dirPath) {
 			    ((info.st_mode & S_IWUSR) && info.st_uid >= minPrisoner && info.st_uid <= maxPrisoner)) {
 				string jailRelativePath = fullPath.substr(jailPath.size());
 				writableDirs.push_back(jailRelativePath);
-				Logger::log(LOG_INFO, "Found writable dir in jail: %s", jailRelativePath.c_str());
+				Logger::log(LOG_INFO, "Found writable dir in jail: '%s'", jailRelativePath.c_str());
 				continue;
 			}
 			// Recurse into subdirectory
@@ -230,6 +230,10 @@ vector<string> Configuration::getWritableDirsInDir(const string &dirPath) {
 }
 
 void Configuration::foundWritableDirsInJail() {
+	if (jailPath == "") {
+		Logger::log(LOG_INFO, "Jail path is root /, skipping search for writable dirs in jail");
+		return;
+	}
 	writableDirsInJail = getWritableDirsInDir(jailPath);
 	Logger::log(LOG_INFO, "Total writable dirs found in jail: %lu", (long unsigned int)writableDirsInJail.size());
 	for (size_t i = 0; i < writableDirsInJail.size(); i++) {
