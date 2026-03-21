@@ -42,7 +42,7 @@ public:
 		filePath = baseDir + "/" + transformDirPath(DirPath);
 		int ntry=0;
 		int fd;
-		while ( (fd=open(filePath.c_str(),O_CREAT|O_EXCL|O_WRONLY, 0x600)) == -1
+		while ( (fd=open(filePath.c_str(),O_CREAT|O_EXCL|O_WRONLY, 0600)) == -1
 				&& ntry <1000){
 			time_t lastModification = Util::timeOfFileModification(filePath);
 			if (lastModification &&  (lastModification + 2 < time(NULL))) {
@@ -54,6 +54,8 @@ public:
 		}
 		if (fd > 0) {
 			close(fd);
+		} else {
+			Logger::log(LOG_ERR,"Failed to acquire lock %s after retries", filePath.c_str());
 		}
 
 	}
