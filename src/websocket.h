@@ -20,6 +20,7 @@ class webSocket{
 	bool closeSent;
 	bool base64;
 	Socket *socket;
+	string previous_data;
 	string receiveBuffer;
 	FrameType lFrameType;
 	string getHandshakeAnswer();
