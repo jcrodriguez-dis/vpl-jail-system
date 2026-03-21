@@ -67,7 +67,7 @@ function vpl_is_tigervnc {
     if [ -x "$(command -v Xvnc)" ] ; then
         Xvnc -version 2>&1 | grep -qi TigerVNC
         [[ $? -eq 0 ]] && return 0
-        Xvnc --help 2>&1 | grep -qi TigerVNC
+        Xvnc -help 2>&1 | grep -qi TigerVNC
         [[ $? -eq 0 ]] && return 0
         Xvnc -V 2>&1 | grep -qi TigerVNC
         [[ $? -eq 0 ]] && return 0  
