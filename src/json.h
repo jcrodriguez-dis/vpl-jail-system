@@ -139,6 +139,9 @@ class JSON: public RequestMessage {
 		for(size_t offset = node->getOffset(); offset < length; offset++) {
 			char c = raw[offset];
 			if ( c == '\\' ) {
+				if (offset + 1 >= length) {
+					throw HttpException(badRequestCode, "JSON parse error: trailing backslash in string");
+				}
 				offset++;
 				if (raw[offset] == 'u' && offset + 4 < length) {
 					offset += 4;
@@ -219,10 +222,11 @@ public:
 	static string encodeJSONString(const string &data) {
 		string ret;
 		for(size_t i=0; i<data.size(); i++){
-			char c = data[i];
-			if (c < 0) {
-				ret += c;
+			unsigned char uc = data[i];
+			if (uc >= 0x80) {
+				ret += data[i];
 			} else {
+				char c = data[i];
 				switch(c) {
 					case '"':ret += "\\\"";
 					break;
@@ -280,9 +284,9 @@ public:
 				i += 3;
 				return "�";  // The replacement character
 			}
-			ss.clear();
-			ss << std::hex << data.substr(i + 6, 4);
-			ss >> low_su;
+			std::stringstream ss2;
+			ss2 << std::hex << data.substr(i + 6, 4);
+			ss2 >> low_su;
 			if (!(low_su >= 0xDC00lu && low_su <= 0xDFFFlu)) {
 				i += 6;
 				return "��";  // The replacement character
@@ -312,6 +316,7 @@ public:
 		for(; i < limit; i++){
 			char c = data[i];
 			if ( c == '\\' ) {
+				if (i + 1 >= limit) break;
 				i++;
 				char next = data[i];
 				switch(next) {
@@ -336,7 +341,7 @@ public:
 						ret += decodeHexaUnicodeToUTF8(data, i);
 					break;
 					default: 
-						throw "JSON coding error: bad escape secuence";
+						throw HttpException(badRequestCode, "JSON coding error: bad escape sequence");
 					break;
 				}
 
