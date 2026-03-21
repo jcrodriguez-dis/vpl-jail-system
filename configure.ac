@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([vpl jail system], [5.0.0], jc.rodriguezdelpino@ulpgc.es)
+AC_INIT([vpl jail system], [5.0.1], jc.rodriguezdelpino@ulpgc.es)
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADERS([config.h])
 
@@ -41,7 +41,7 @@ AC_TYPE_UID_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT8_T
-CPPFLAGS="-Wall -Wextra -Wpedantic"
+CPPFLAGS="-Wall -Wextra -Wpedantic -fsigned-char"
 AM_INIT_AUTOMAKE
 
 # Checks for library functions.
@@ -55,4 +55,3 @@ AC_CHECK_FUNCS([getcwd inet_ntoa lchown memset mkdir regcomp rmdir socket\
 AC_CONFIG_FILES([Makefile
                  src/Makefile])
 AC_OUTPUT
-
