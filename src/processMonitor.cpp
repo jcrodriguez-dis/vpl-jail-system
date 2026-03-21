@@ -620,12 +620,12 @@ void processMonitor::setCompiler() {
 bool processMonitor::isMonitored() {
 	if ( ! Util::dirExists(getProcessControlPath())) return false;
 	Lock lock(getProcessControlPath());
-	if ( monitor == 0 ) readInfo();
+	if ( monitor_pid == 0 ) readInfo();
 	if (this->monitorticket == "NO_MONITOR" && this->isRunnig()) {
 		return true;
 	}
-	if ( monitor == 0 ) return false;
-	return Util::processExists(monitor);
+	if ( monitor_pid == 0 ) return false;
+	return Util::processExists(monitor_pid);
 }
 
 /**
