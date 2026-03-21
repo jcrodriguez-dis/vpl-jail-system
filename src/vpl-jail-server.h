@@ -291,7 +291,7 @@ class Daemon {
 			Logger::log(LOG_ERR,"%s: Request rejected: IP banned", IP.c_str());
 			return;
 		}
-		fcntl(this->actualSocket, FD_CLOEXEC); //Close socket on execve
+		fcntl(this->actualSocket, F_SETFD, FD_CLOEXEC); //Close socket on execve
 		pid_t pid = fork();
 		if (pid == 0) { //new process
 			Socket *socket = NULL;
