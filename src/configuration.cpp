@@ -112,7 +112,7 @@ void Configuration::readConfigFile() {
 	for(ConfigData::iterator i = data.begin(); i != data.end(); i++) {
 		string param = i->first;
 		param = Util::toUppercase(param);
-		if(configDefault.find(param) == data.end())
+		if(configDefault.find(param) == configDefault.end())
 			Logger::log(LOG_ERR,"Error: Unknown config param %s", param.c_str());
 	}
 
