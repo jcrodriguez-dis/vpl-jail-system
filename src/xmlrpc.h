@@ -4,8 +4,8 @@
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
 
-#ifndef RPC_INC_H
-#define PPC_INC_H
+#ifndef XMLRPC_INC_H
+#define XMLRPC_INC_H
 
 #include "rpc.h"
 #include "xml.h"
@@ -63,14 +63,14 @@ public:
 	string responseMember(string name, long long value) {
 		if (value <= INT32_MAX) {
 			return "<member><name>"
-					+name+"</name>\n"
+					+XML::encodeXML(name)+"</name>\n"
 					"<value><int>"
 					+ Util::itos(value) +
 					"</int></value>\n"
 					"</member>\n";
 		} else {
 			return "<member><name>"
-					+name+"</name>\n"
+					+XML::encodeXML(name)+"</name>\n"
 					"<value><double>"
 					+ Util::dtos(value) +
 					"</double></value>\n"
