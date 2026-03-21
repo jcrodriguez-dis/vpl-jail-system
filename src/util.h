@@ -100,14 +100,14 @@ class Base64{
 	}
 
 	static void setData(string &data,int pos,char c){
-		int ibyte=pos/8;
-		int ides=pos%8;
-		int dc=decodeChar(c);
+		int ibyte = pos/8;
+		int ides = pos%8;
+		int dc = decodeChar(c);
 		int size = (int) data.size();
-		if(ibyte>=size)return;
+		if(ibyte >= size)return;
 		//Sorry for to be so raw
-		unsigned char *rawdata=(unsigned char *)data.c_str();
-		rawdata[ibyte] |=(unsigned char)(dc>>ides);
+		unsigned char *rawdata = (unsigned char *)data.c_str();
+		rawdata[ibyte] |= (unsigned char)(dc>>ides);
 		if(ides>2 && ibyte+1 < size){
 			rawdata[ibyte+1] |= (unsigned char)(dc<<(8-ides));
 		}
@@ -634,7 +634,7 @@ public:
 			if (lchown(name.c_str(), user, user))
 				Logger::log(LOG_WARNING, "Can't change file owner %m");
 		}
-		bool isScript = name.size() > 4 && name.substr(name.size() - 3) == ".sh";
+		bool isScript = name.size() >= 4 && name.substr(name.size() - 3) == ".sh";
 		if (chmod(name.c_str(), isScript ? 0700 : 0600))
 			Logger::log(LOG_ERR, "Can't change file perm %m");
 	}
