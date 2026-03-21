@@ -25,6 +25,8 @@ typedef vector<string> vplregmatch;
 class vplregex {
 	regex_t creg;
 public:
+	vplregex(const vplregex &) = delete;
+	vplregex &operator=(const vplregex &) = delete;
 	/**
 	 * Constructor, compile the regular expression
 	 * @param reg regular expression
@@ -32,9 +34,9 @@ public:
 	vplregex(const string &reg) {
 		int res = regcomp(& creg, reg.c_str(), REG_EXTENDED);
 		if (res) {
-			static char buf[100];
-			regerror(res, &creg, buf, 100);
-			throw buf;
+			char buf[100];
+			regerror(res, &creg, buf, sizeof(buf));
+			throw string(buf);
 		}
 	}
 	/**
@@ -45,9 +47,9 @@ public:
 	vplregex(const string &reg, int cflags) {
 		int res = regcomp(& creg, reg.c_str(), cflags);
 		if (res) {
-			static char buf[100];
-			regerror(res, &creg, buf, 100);
-			throw buf;
+			char buf[100];
+			regerror(res, &creg, buf, sizeof(buf));
+			throw string(buf);
 		}
 	}
 	/**
@@ -69,9 +71,9 @@ public:
 		int nomatch = regexec(&creg, input.c_str(), maxmatch, match, 0);
 		if (nomatch == REG_NOMATCH) return false;
 		if (nomatch) {
-			static char buf[100];
-			regerror(nomatch, &creg, buf, 100);
-			throw buf;
+			char buf[100];
+			regerror(nomatch, &creg, buf, sizeof(buf));
+			throw string(buf);
 		}
 		int nmatchs = limit > maxmatch? maxmatch : limit;
 		for ( int i = 0; i < nmatchs; i++) {
