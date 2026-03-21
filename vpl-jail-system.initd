@@ -69,7 +69,6 @@ declare -f start_daemon &> /dev/null
 if [ "$?" == "1" ] ; then 
 	function start_daemon {
 		$1 $2 $3 &
-		echo $! > "$PIDFILE"
 	}
 fi
 
@@ -536,7 +535,12 @@ function start_vpl {
 		wait $!
 	else
 		start_daemon $DAEMON $1 $2
-		sleep 1
+		# Wait for daemon to daemonize and write PID file
+		local WAIT=0
+		while [ ! -f $PIDFILE ] && [ $WAIT -lt 150 ]; do
+			sleep 0.2
+			WAIT=$((WAIT + 1))
+		done
 		if [ -f $PIDFILE ] ; then
 			set_firewall $1
 		else
