@@ -63,6 +63,18 @@ function vpl_generate_cookie {
     done
 }
 
+function vpl_is_tigervnc {
+    if [ -x "$(command -v Xvnc)" ] ; then
+        Xvnc -version 2>&1 | grep -qi TigerVNC
+        [[ $? -eq 0 ]] && return 0
+        Xvnc --help 2>&1 | grep -qi TigerVNC
+        [[ $? -eq 0 ]] && return 0
+        Xvnc -V 2>&1 | grep -qi TigerVNC
+        [[ $? -eq 0 ]] && return 0  
+    fi
+    return 1
+}
+
 function vpl_set_xauth {
     local COOKIE=$(mcookie)
     [ "$?" != "0" ] && COOKIE=$(vpl_generate_cookie)
@@ -223,8 +235,7 @@ echo $VNCPORT
             -name vpl \
             :$NDIS &> $HOME/.vnc/vncserver.log &
     elif [ -x "$(command -v Xvnc)" ] ; then
-        Xvnc -version 2>&1 | grep -qi TigerVNC
-        if [ $? = 0 ] ; then
+        if vpl_is_tigervnc ; then
             echo "$SECONDS: Using TigerVNC with Xvnc"
             $XSTARTUPFILE &
             {
