@@ -54,30 +54,31 @@ string webSocket::getHandshakeAnswer(){
 }
 
 long long webSocket::frameSize(const string &data
-		,int &control_size,int &mask_size, long long &payload_size){
+		,int &control_size,int &mask_size, long long &payload_size) {
+	long long int data_size = data.size();
 	control_size = 2;
 	mask_size = 0;
 	payload_size = 0;
 	const unsigned char *rawdata = (const unsigned char *)data.data();
-	if (data.size() < control_size) {
+	if (data_size < control_size) {
 		return -1;
 	}
 	//Is masked frame (must be musked)
 	mask_size = (rawdata[1] & 0x80) ? 4:0;
 	payload_size = rawdata[1] & 0x7f;
-	if( data.size() < (unsigned long long) (control_size + mask_size + payload_size)) {
+	if (data_size < (control_size + mask_size + payload_size)) {
 		return -1;
 	}
 	if (payload_size == 126) {
 		control_size = 4; //for len extension
-		if (data.size() < control_size) {
+		if (data_size < control_size) {
 			return -1;
 		}
 		payload_size = (((unsigned int) rawdata[2]) << 8);
 		payload_size += rawdata[3];
 	}else if (payload_size == 127) {
 		control_size = 10; //for len extension
-		if (data.size() < control_size) {
+		if (data_size < control_size) {
 			return -1;
 		}
 		payload_size = ((unsigned long long) rawdata[2] << 56);
