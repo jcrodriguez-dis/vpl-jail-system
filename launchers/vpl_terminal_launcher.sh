@@ -16,4 +16,4 @@
 	stty sane iutf8 erase ^?
 } &>/dev/null
 ./vpl_execution
-exit
+exit $?

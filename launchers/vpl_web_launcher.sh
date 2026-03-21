@@ -22,4 +22,4 @@
 	export serverIP="127.$((1+$UID/1024%64)).$((1+$UID/16%64)).$((10+$UID%16))"
 } &>/dev/null
 ./vpl_webexecution
-exit
+exit $?

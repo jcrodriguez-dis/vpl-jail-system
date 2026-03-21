@@ -16,4 +16,4 @@
 	stty raw -echo iutf8 nl
 } &>/dev/null
 ./vpl_execution
-exit
+exit $?
