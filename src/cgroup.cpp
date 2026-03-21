@@ -197,7 +197,7 @@ vector<int> Cgroup::getCPUProcs(){
     size_t pos = 0;
     size_t ini = 0;
     while((pos = procs.find('\n', ini)) != string::npos){
-        pids.push_back(Util::atoi(procs.substr(ini, pos)));
+        pids.push_back(Util::atoi(procs.substr(ini, pos - ini)));
         ini = pos + 1;
     }
     return pids;
@@ -246,7 +246,7 @@ vector<int> Cgroup::getPIDs(){
     size_t pos = 0;
     size_t ini = 0;
     while((pos = file.find('\n', ini)) != string::npos){
-        pids.push_back(Util::atoi(file.substr(ini, pos)));
+        pids.push_back(Util::atoi(file.substr(ini, pos - ini)));
         ini = pos + 1;
     }
     return pids;
@@ -263,7 +263,7 @@ vector<int> Cgroup::getNetProcs(){
     size_t pos = 0;
     size_t ini = 0;
     while((pos = file.find('\n', ini)) != string::npos){
-        tasks.push_back(Util::atoi(file.substr(ini, pos)));
+        tasks.push_back(Util::atoi(file.substr(ini, pos - ini)));
         ini = pos + 1;
     }
     return tasks;
@@ -282,7 +282,7 @@ vector<int> Cgroup::getMemoryProcs(){
     size_t pos = 0;
     size_t ini = 0;
     while((pos = file.find('\n', ini)) != string::npos){
-        tasks.push_back(Util::atoi(file.substr(ini, pos)));
+        tasks.push_back(Util::atoi(file.substr(ini, pos - ini)));
         ini = pos + 1;
     }
     return tasks;
