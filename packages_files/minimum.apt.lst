@@ -10,7 +10,7 @@
 "Firewall" iptables
 "X system" xorg
 "dbus-x11" dbus-x11
-"VNC server" tightvncserver
+"VNC server" tigervnc-standalone-server tightvncserver
 "Fonts" xfonts-75dpi
 "Fonts" xfonts-100dpi
 "Window manager" fluxbox metacity openbox
