@@ -3,9 +3,11 @@
  * copyright:	Copyright (C) 2014 Juan Carlos Rodríguez-del-Pino. All rights reserved.
  * license:		GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl-3.0.html
  **/
+	
 #include <sys/syslog.h>
 #include <climits>
 #include <sstream>
+#include <algorithm>
 #include "configuration.h"
 #include "jail_limits.h"
 #include "util.h"
@@ -190,6 +192,8 @@ Configuration::Configuration(string path) {
  * Returns writable directories inside directory dirPath
  */
 vector<string> Configuration::getWritableDirsInDir(const string &dirPath) {
+	// Ignore entries disappearing in these directories.
+	static vector<string> mutableDirs = {"/proc", "/run", "/dev", "/sys"};
 	vector<string> writableDirs;
 	DIR *dir = opendir(dirPath.c_str());
 	if (dir == NULL) {
@@ -207,7 +211,10 @@ vector<string> Configuration::getWritableDirsInDir(const string &dirPath) {
 		string fullPath = dirPath + "/" + entryName;
 		struct stat info;
 		if (lstat(fullPath.c_str(), &info) != 0) {
-			Logger::log(LOG_ERR, "Error stating file '%s' to find writable dirs", fullPath.c_str());
+			// Don't log if directory is in mutableDirs, as it may disappear while we are reading it
+			if (find(mutableDirs.begin(), mutableDirs.end(), dirPath) == mutableDirs.end()) {
+				Logger::log(LOG_ERR, "Error stating file '%s' to find writable dirs", fullPath.c_str());
+			}
 			continue;
 		}
 		if (S_ISDIR(info.st_mode)) {
