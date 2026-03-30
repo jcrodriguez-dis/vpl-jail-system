@@ -511,13 +511,16 @@ function start_vpl {
 			rm -Rf "$JAILPATH/jail" &> /dev/null
 			rm -Rf "$JAILPATH/etc/vpl" &> /dev/null
 			rm -Rf "$JAILPATH/$CONTROLPATH" &> /dev/null
+			rm -Rf "$JAILPATH/var/log/"* &> /dev/null
+			rm -Rf "$JAILPATH/$VPL_PROGRAMS_DIR" &> /dev/null
+			rm -Rf "$JAILPATH/run" &> /dev/null
 			create_check_dir "$JAILPATH/home" 0711
 			set_other /proc
 			set_other /dev
+			set_tmpdir /run 1048576 0755
+			set_tmpdir /run/lock 1048576 0755
 			set_tmpdir /dev/shm $SHMSIZE 1777
 			set_other /dev/pts
-			set_other /run
-			set_other /run/lock
 			set_snap
 		fi
 		set_etc
@@ -570,8 +573,6 @@ function stop_vpl {
 			fi
 
 			unset_snap
-			unset_other /run/lock
-			unset_other /run
 			unset_other /dev/pts
 			unset_tmpdir /dev/shm
 			unset_other /dev
