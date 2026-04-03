@@ -49,7 +49,7 @@ protected:
 	Configuration();
 	Configuration(string path);
 public:
-	static Configuration* getConfiguration(){
+	static Configuration* getConfiguration() {
 		if(singlenton == NULL) singlenton = new Configuration();
 		return singlenton;
 	}
@@ -59,8 +59,8 @@ public:
 	static string generateCleanPATH(string path, string dirtyPATH);
 	const ExecutionLimits & getLimits() const { return jailLimits;}
 	const string & getJailPath() const { return jailPath;}
-	const string &  getCleanPATH() const { return cleanPATH;}
-	const string &  getControlPath() const { return controlPath;}
+	const string & getCleanPATH() const { return cleanPATH;}
+	const string & getControlPath() const { return controlPath;}
 	bool isRunningInContainer() const { return inContainer; }
 	void setInContainer(bool val) { inContainer = val; }
 	uid_t getHomeDirOwnerUid() const { return minPrisoner; }
@@ -71,8 +71,8 @@ public:
 	}
 	const vector<string> & getTaskOnlyFrom() const { return taskOnlyFrom;}
 	const vector<string> & getWritableDirsInJail() const { return writableDirsInJail;}
-	const string &  getInterface() const { return interface;}
-	const string &  getURLPath() const { return URLPath;}
+	const string & getInterface() const { return interface;}
+	const string & getURLPath() const { return URLPath;}
 	int getPort() const { return port;}
 	int getSecurePort() const { return sport;}
 	int getLogLevel() const { return logLevel;}

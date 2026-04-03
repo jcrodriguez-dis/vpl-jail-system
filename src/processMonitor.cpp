@@ -950,6 +950,11 @@ void processMonitor::freeWatchDog() {
 	//looking for inconsistencies
 }
 
+/**
+ * Get a list of prisoners from a directory
+ * @param dir Directory to search
+ * @return Vector of prisoner names
+ */
 vector<string> processMonitor::getPrisonersFromDir(string dir) {
 	static const vplregex reguserdir("^p[0-9]+$");
 	vplregmatch match;
@@ -974,8 +979,9 @@ vector<string> processMonitor::getPrisonersFromDir(string dir) {
 
 void processMonitor::cleanPrisonerFiles(string pdir) {
 	Logger::log(LOG_INFO, "Cleaning prisoner files");
-	const string controlDir = Configuration::getConfiguration()->getControlPath();
-	const string jailPath = Configuration::getConfiguration()->getJailPath();
+	const Configuration* configuration = Configuration::getConfiguration();
+	const string controlDir = configuration->getControlPath();
+	const string jailPath = configuration->getJailPath();
 	const string phome = jailPath + "/home/" + pdir;
 	const string tmpDir = jailPath + "/tmp";
 	const string configDir = controlDir + "/" + pdir;
@@ -992,9 +998,12 @@ void processMonitor::cleanPrisonerFiles(string pdir) {
 			removeTicketFile( data["HTTPPASSTHROUGHTTICKET"] );
 		} catch(...) {}
 	}
-	try {
-		Util::removeDir(phome, uid, true);
-	} catch(...) {}
+	// Remove home dir content owned by prisoner, if log level < 8.
+	if (configuration->getLogLevel() <= LOG_DEBUG) {
+		try {
+			Util::removeDir(phome, uid, true);
+		} catch(...) {}
+	}
 	try {
 		Util::removeDir(tmpDir, uid, false);
 	}catch(...) {}
@@ -1005,10 +1014,14 @@ void processMonitor::cleanPrisonerFiles(string pdir) {
 
 void processMonitor::cleanZombieTasks() {
 	Logger::log(LOG_INFO, "Cleaning zombie tasks");
-	const string controlDir = Configuration::getConfiguration()->getControlPath();
-	const string homeDir = Configuration::getConfiguration()->getJailPath() + "/home";
-	vector<string> homes = getPrisonersFromDir(homeDir);
-	vector<string> tasks = getPrisonersFromDir(controlDir);
+	const Configuration* configuration = Configuration::getConfiguration();
+	const string controlDir = configuration->getControlPath();
+	const string homeDir = configuration->getJailPath() + "/home";
+	const vector<string> tasks = getPrisonersFromDir(controlDir);
+	// Search home dir, if log level < 8.
+	const bool checkHomes = configuration->getLogLevel() <= LOG_DEBUG;
+	const vector<string> homes = checkHomes ? getPrisonersFromDir(homeDir) : vector<string>();
+	// First loop: Check all prisoner control directories (tasks) for zombies
 	for (size_t i = 0; i < tasks.size(); i++) {
 		ConfigData data;
 		Logger::log(LOG_INFO, "Cleaning zombie tasks: checking(1) %s", tasks[i].c_str());
@@ -1035,6 +1048,7 @@ void processMonitor::cleanZombieTasks() {
 			}
 		}
 	}
+	// Second loop: Check all prisoner home directories (homes) for orphaned directories
 	for (size_t i = 0; i < homes.size(); i++) {
 		Logger::log(LOG_INFO, "Cleaning zombie tasks: checking(2) %s", homes[i].c_str());
 		string configFile = controlDir + "/" + homes[i] + "/" + "config";
