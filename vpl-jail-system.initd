@@ -608,11 +608,24 @@ function chek_running_in_container() {
 		grep -q "^overlay on / type overlay" /etc/mtab
 		USING_OVERLAY=$?
 	else
-		return
+		USING_OVERLAY=1
 	fi
-	[[ $USING_OVERLAY != 0 && $JAILPATH == "/" ]] && (echo "Error: trying to use "/" as jail mount and not in container"; exit 1)
+	# Detect container environment by multiple methods
+	local IS_CONTAINER=1
+	if [ "$USING_OVERLAY" = "0" ] ; then
+		IS_CONTAINER=0
+	elif [ -f /.dockerenv ] ; then
+		IS_CONTAINER=0
+	elif grep -q -s 'docker\|lxc\|kubepods\|containerd' /proc/1/cgroup 2>/dev/null ; then
+		IS_CONTAINER=0
+	elif grep -q -s 'container=' /proc/1/environ 2>/dev/null ; then
+		IS_CONTAINER=0
+	elif [ -n "$container" ] ; then
+		IS_CONTAINER=0
+	fi
+	[[ $IS_CONTAINER != 0 && $JAILPATH == "/" ]] && (echo "Error: trying to use "/" as jail mount and not in container"; exit 1)
 	IN_CONTAINER=
-	[[ $USING_OVERLAY = 0 && $JAILPATH == "/" ]] && IN_CONTAINER=yes
+	[[ $IS_CONTAINER = 0 && $JAILPATH == "/" ]] && IN_CONTAINER=yes
 	[ -n "$IN_CONTAINER" ] && echo "Detected running in container"
 }
 

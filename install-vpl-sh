@@ -172,6 +172,30 @@ function vpl_detect_service_manager(){
 			echo "service vpl-jail-system [start|stop|status|start_foreground]"
 		}
 		SMANAGER="2"
+	elif [ -f /.dockerenv ] \
+		|| [ -f /run/.containerenv ] \
+		|| [ -n "$container" ] \
+		|| grep -q -s 'docker\|lxc\|kubepods\|containerd' /proc/1/cgroup 2>/dev/null \
+		|| grep -q -s 'container=' /proc/1/environ 2>/dev/null \
+		|| ! [ -d /run/systemd/system -o -x /sbin/init ] ; then
+		echo "No service manager detected (container or minimal environment)"
+		function vpl_install_service {
+			cp vpl-jail-system.initd $VPL_PROGRAMS_DIR/vpl-jail-system
+			chmod +x $VPL_PROGRAMS_DIR/vpl-jail-system
+		}
+		function vpl_stop_service {
+			$VPL_PROGRAMS_DIR/vpl-jail-system stop
+		}
+		function vpl_start_service {
+			$VPL_PROGRAMS_DIR/vpl-jail-system start
+		}
+		function vpl_info_using_service {
+			echo
+			echo "-------------------------------------------------------"
+			echo "Notice: running inside a container."
+			echo "Use: /usr/sbin/vpl/vpl-jail-system [start|stop|restart|start_foreground]"
+		}
+		SMANAGER="4"
 	else
 		echo "Unknown service manager"	 
 		function vpl_install_service {
