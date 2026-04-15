@@ -74,5 +74,6 @@
         "filesystem": "cpp",
         "codecvt": "cpp"
     },
-    "esbonio.sphinx.confDir": "${workspaceFolder}/docs/source"
+    "esbonio.sphinx.confDir": "${workspaceFolder}/docs/source",
+    "makefile.configureOnOpen": false
 }
