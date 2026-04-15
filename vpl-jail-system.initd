@@ -529,10 +529,10 @@ function start_vpl {
 		trap "signal_stop_vpl" SIGTERM
 		echo
 		if [ -n "$IN_CONTAINER" ] ; then
-			echo "Starting in container in foreground mode (nondaemon mode)"
+			echo "Launching vpl-jail-system in container and foreground mode"
 			$DAEMON in_container foreground $2 $3 &
 		else
-			echo "Starting in foreground mode (nondaemon mode)"
+			echo "Launching vpl-jail-system in foreground mode"
 			$DAEMON foreground $2 $3 &
 		fi
 		wait $!
