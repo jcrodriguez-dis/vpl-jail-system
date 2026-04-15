@@ -6,9 +6,9 @@
 
 CHECK_MARK="✅"
 X_MARK="❌"
-ERRORS_LOG_FILE=".errors.log"
-PLAIN_PORT=8080
-SECURE_PORT=9000
+ERRORS_LOG_FILE="$(pwd)/.errors.log"
+PLAIN_PORT=8880
+SECURE_PORT=9990
 
 function writeHeading {
 	echo -e "\e[33m RUNNING \e[0m \e[34m$1\e[0m"
@@ -92,6 +92,8 @@ function checkDockerComposeUp() {
     docker compose up -d 2>&1 | tee $ERRORS_LOG_FILE | show_progress
     showMessageIfError $? "Docker compose up of '$PROJECT_NAME' $PRIVILEGED fail"
     [[ $? -ne 0 ]] && return 1
+    # Wait for the daemon to start listening
+    sleep 1
     docker compose ls
 
     # Test project
@@ -227,5 +229,6 @@ function runTests() {
     rm $TARPACKAGE
 }
 
+echo "$(date) Running tests for vpl-jail-system in Docker with compose" > "$ERRORS_LOG_FILE"
 writeHeading "Testing vpl-jail-system running in Docker with compose $1 $2"
 runTests $1 $2

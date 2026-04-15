@@ -6,9 +6,9 @@
 
 CHECK_MARK="✅"
 X_MARK="❌"
-ERRORS_LOG_FILE=".errors.log"
-PLAIN_PORT=8080
-SECURE_PORT=9000
+ERRORS_LOG_FILE="$(pwd)/.errors.log"
+PLAIN_PORT=8880
+SECURE_PORT=9990
 
 function writeHeading {
 	echo -e "\e[33m$2\e[0m\e[34m$1\e[0m"
@@ -106,6 +106,8 @@ function checkDockerRunContainer() {
                -d $IMAGE_NAME &>> $ERRORS_LOG_FILE
     showMessageIfError $? "The container '$CONTAINER_NAME' run fail."
     [[ $? -ne 0 ]] && return 2
+    # Wait for the daemon to start listening
+    sleep 1
     writeInfo "Container '$CONTAINER_NAME' state:"
     docker container ls | head -1
     docker container ls | grep $CONTAINER_NAME
@@ -172,7 +174,7 @@ function checkDockerBuild() {
 
     # Remove image
     if [ "$3" == "" ] ; then
-        docker rmi $IMAGE_NAME &> $ERRORS_LOG_FILE
+        docker rmi $IMAGE_NAME &>> $ERRORS_LOG_FILE
         showMessageIfError $? "Error removing image $IMAGE_NAME"
         [[ $? -ne 0 ]] && return 9
         writeCorrect "Image '$IMAGE_NAME' removed" "$CHECK_MARK"
@@ -214,7 +216,7 @@ function runTests() {
         autoreconf -i
         ./configure
         make distcheck
-     ) > $ERRORS_LOG_FILE
+     ) >> $ERRORS_LOG_FILE
     if [ $? -ne 0 ] ; then
         writeError "Packge build fails. See '$ERRORS_LOG_FILE' file"
         exit 1
@@ -254,6 +256,6 @@ function runTests() {
     rm $TARPACKAGE
     return $nfails
 }
-
+echo "$(date) Running tests for vpl-jail-system in Docker" > "$ERRORS_LOG_FILE"
 writeHeading "vpl-jail-system running in Docker $1 $2 $3" "TESTING "
 runTests $1 $2 $3
