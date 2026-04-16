@@ -218,7 +218,7 @@ function runTests() {
         make distcheck
      ) >> $ERRORS_LOG_FILE
     if [ $? -ne 0 ] ; then
-        writeError "Packge build fails. See '$ERRORS_LOG_FILE' file"
+        writeError "Package build fails. See '$ERRORS_LOG_FILE' file"
         exit 1
     fi
     [ -f ./config.h ] && VERSION=$(grep -E "PACKAGE_VERSION" ./config.h | sed -e "s/[^\"]\+\"\([^\"]\+\).*/\1/")

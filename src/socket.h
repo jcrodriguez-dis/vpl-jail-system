@@ -217,7 +217,7 @@ public:
 	bool end(ssize_t ret){
 		if (ret > 0) return true;
 		int code = SSL_get_error(ssl, ret);
-		const char *scode = "UNKNOW SSL ERROR ";
+		const char *scode = "UNKNOWN SSL ERROR ";
 		switch (code) {
 			case SSL_ERROR_WANT_CONNECT:
 				scode = "SSL_ERROR_WANT_CONNECT ";
@@ -232,7 +232,7 @@ public:
 				scode = "SSL_ERROR_SSL ";
 			break;
 			default:
-				scode = "UNKNOW SSL_ERROR ";
+				scode = "UNKNOWN SSL_ERROR ";
 		}
 		switch (code) {
 			case SSL_ERROR_NONE: return true;

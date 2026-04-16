@@ -13,7 +13,7 @@ function vpl_set_lang() {
 }
 
 function vpl_vncaccel() {
-    # Use old VNC acelerate directory
+    # Use old VNC accelerate directory
     local VNCACCELDIR=/etc/vncaccel
     [ -d "$VNCACCELDIR" ] && cp -a $VNCACCELDIR/.??* $HOME
 }

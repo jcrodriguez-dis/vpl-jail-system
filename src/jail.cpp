@@ -213,7 +213,7 @@ void Jail::deleteFilesMarkedForDeletion(processMonitor &pm, RPC &rpc) {
 ExecutionLimits Jail::getParseExecutionLimits(RPC &rpc) {
 	mapstruct parsedata = rpc.getData();
 	ExecutionLimits executionLimits = Configuration::getConfiguration()->getLimits();
-	Logger::log(LOG_INFO,"Reading parms");
+	Logger::log(LOG_INFO,"Reading parameters");
 	executionLimits.log("Config");
 	const TreeNode* maxtime = parsedata["maxtime"];
 	const TreeNode* maxfilesize = parsedata["maxfilesize"];
@@ -243,13 +243,13 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 	checkFilesNameCorrectness(rpc.getFiles());
 	checkFilesNameCorrectness(rpc.getFileToDelete());
 	processMonitor pm(adminticket, monitorticket, executionticket);
-	// TODO: Cheking file names before the fork will give a proper response to the caller or not?
+	// TODO: Checking file names before the fork will give a proper response to the caller or not?
 	pid_t pid=fork();
 	if(pid==0){ //new process
 		try {
 			Logger::log(LOG_INFO,"Parse data %lu", (long unsigned int)parsedata.size());
 			saveParseFiles(pm, rpc);
-			Logger::log(LOG_INFO,"Reading parms");
+			Logger::log(LOG_INFO,"Reading parameters");
 			ExecutionLimits executionLimits = configuration->getLimits();
 			string vpl_lang = parsedata["lang"]->getString();
 			Logger::log(LOG_DEBUG, "VPL_LANG %s", vpl_lang.c_str());
@@ -322,7 +322,7 @@ void Jail::commandDirectRun(RPC &rpc, string &homepath, string &adminticket, str
 		try {
 			Logger::log(LOG_INFO,"Parse data %lu", (long unsigned int)parsedata.size());
 			saveParseFiles(pm, rpc);
-			Logger::log(LOG_INFO,"Reading parms");
+			Logger::log(LOG_INFO,"Reading parameters");
 			ExecutionLimits executionLimits = configuration->getLimits();
 			string vpl_lang = parsedata["lang"]->getString();
 			Logger::log(LOG_DEBUG, "VPL_LANG %s", vpl_lang.c_str());
@@ -608,7 +608,7 @@ bool Jail::commandSetPassthroughCookie(string passthroughticket, HttpJailServer 
  * 
  * @param socket The open socket that manage the connection
  * 
- * @return if the request finnaly has rigth to access
+ * @return if the request finally has right to access
  */
 bool Jail::httpPassthrough(string passthroughticket, Socket *socket){
 	try {

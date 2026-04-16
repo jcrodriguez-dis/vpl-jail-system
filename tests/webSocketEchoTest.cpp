@@ -95,7 +95,7 @@ int main() {
 		} catch(const char *e) {
 			cerr << "Exception: " << e << endl;
 		} catch(...) {
-			cerr << "Unknow exception" << endl;
+			cerr << "Unknown exception" << endl;
 		}
 
 	}

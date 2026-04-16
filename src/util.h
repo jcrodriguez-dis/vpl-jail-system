@@ -487,7 +487,7 @@ public:
 	}
 
 	/**
-	 * Retruns the directory path of a filepath
+	 * Returns the directory path of a filepath
 	 * @param filePath file path
 	 * @return directory path or ""
 	 */
@@ -781,7 +781,7 @@ public:
 		#ifdef VERSION
 		return VERSION;
 		#else
-		return "Unknow";
+		return "Unknown";
 		#endif
 	}
 

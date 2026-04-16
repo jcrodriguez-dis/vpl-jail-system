@@ -612,7 +612,7 @@ function vpl_install_minimum() {
 
 function vpl_install_basic() {
 	echo ""
-	echo "Basic aditional packages"
+	echo "Basic additional packages"
 	local PACKAGE_LIST_FILE="packages_files/basic.$PMTYPE.lst"
 	[ -s $PACKAGE_LIST_FILE ] && vpl_install_packages_file $PACKAGE_LIST_FILE
 	if [ "$PMTYPE" = "apt" ] ; then
@@ -626,7 +626,7 @@ function vpl_install_basic() {
 
 function vpl_install_standard() {
 	echo ""
-	echo "Standard aditional packages"
+	echo "Standard additional packages"
 	local PACKAGE_LIST_FILE="packages_files/standard.$PMTYPE.lst"
 	[ -s $PACKAGE_LIST_FILE ] && vpl_install_packages_file $PACKAGE_LIST_FILE
 	echo
@@ -634,7 +634,7 @@ function vpl_install_standard() {
 
 function vpl_install_full() {
 	echo ""
-	echo "Full aditional packages"
+	echo "Full additional packages"
 	local PACKAGE_LIST_FILE="packages_files/full.$PMTYPE.lst"
 	[ -s $PACKAGE_LIST_FILE ] && vpl_install_packages_file $PACKAGE_LIST_FILE
 	if [ "$LISTPACKAGES" != "" ] ; then
@@ -744,14 +744,14 @@ function vpl_check_SSL_certificate() {
 			echo "If you do not have a certificate, the installer can automatically install"
 			echo "and configure the Let's Encrypt certbot in standalone mode for you."
 			echo "If you want to use certbot in webroot mode you must install and configure it manually (answer n)."
-			echo "Notice that this machine must be accesible from internet and has port 80 available."
+			echo "Notice that this machine must be accessible from internet and has port 80 available."
 			echo -n "Install Let's Encrypt in standalone mode to get and renew free certificates?"
 			echo -n "(y/n)"
 			read A	
 			if [ "$A" != "n" ] ; then
 				vpl_install_letsencrypt	
 			else
-				echo "If you want the intaller can generate a selfsigned certificate for you."
+				echo "If you want the installer can generate a selfsigned certificate for you."
 				echo -n "Generate the certificate?"
 				read A
 				if [ "$A" != "n" ] ; then
@@ -821,7 +821,7 @@ function vpl_commandline_action_arg() {
 			;;
 		*)
 			echo ""
-			echo " => Error: unknow parameter '$1'"
+			echo " => Error: unknown parameter '$1'"
 			vpl_show_help
 			exit 1
 			;;

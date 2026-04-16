@@ -24,7 +24,7 @@ using namespace std;
 class TreeNode {
 protected:
 	const string &raw;			//Reference to raw data
-	string tag;					//Tag name, no parm
+	string tag;					//Tag name, no parameter
 	size_t tag_offset;			//Tag offset in raw
 	size_t tag_len;				//Length of tag information
 	vector<TreeNode*> children;	//List of child tags

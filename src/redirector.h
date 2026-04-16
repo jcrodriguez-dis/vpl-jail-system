@@ -93,9 +93,9 @@ public:
 
 class RedirectorWebServer: public Redirector {
 protected:
-	Socket *client; // Socket object conneted with client
+	Socket *client; // Socket object connected with client
 	string serverAddress; // Local web server address as 127.X.X.X:PORT
-	int server; // Socket raw conneted with local web server
+	int server; // Socket raw connected with local web server
 public:
 	/**
 	 * Constructor

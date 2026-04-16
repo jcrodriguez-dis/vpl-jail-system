@@ -110,7 +110,7 @@ void Configuration::readConfigFile() {
 	configDefault["USE_NAMESPACE"] = "true";
 
 	ConfigData data = ConfigurationFile::readConfiguration(configPath, configDefault);
-	// Check unkown parameters
+	// Check unknown parameters
 	for(ConfigData::iterator i = data.begin(); i != data.end(); i++) {
 		string param = i->first;
 		param = Util::toUppercase(param);

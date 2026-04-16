@@ -157,7 +157,7 @@ class JSON: public RequestMessage {
 	size_t processNode(TreeNode *node) {
 		size_t offset = node->getOffset();
 		char c = raw[offset];
-		if (c == '{') { // Objet
+		if (c == '{') { // Object
 			node->setTag("object");
 			return processObjectNode(node);
 		} else if (c == '[') { //Array

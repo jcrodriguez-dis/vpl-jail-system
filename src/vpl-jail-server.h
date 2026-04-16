@@ -537,7 +537,7 @@ public:
 	void loop() {
 		while(!finishRequested) {
 			accept(); //Accept one request waiting JAIL_ACCEPT_WAIT msec
-			harvest(); //Process all dead childrens
+			harvest(); //Process all dead children
 			periodicTasks();
 		}
 		closeSockets();
