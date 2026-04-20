@@ -223,6 +223,75 @@ function vpl_detect_service_manager(){
 	fi
 }
 
+function vpl_check_security_config {
+	local VPL_CONFIGFILE=$VPL_CONFIG_DIR/vpl-jail-system.conf
+	local INSECURE=""
+	if [ -f "$VPL_CONFIGFILE" ] ; then
+		# Check URLPATH: not set or set to "/"
+		local URLPATH_VALUE=$(grep -E '^URLPATH=' "$VPL_CONFIGFILE" | tail -1 | cut -d'=' -f2-)
+		if [ -z "$URLPATH_VALUE" ] || [ "$URLPATH_VALUE" = "/" ] ; then
+			echo "WARNING: URLPATH is not set in $VPL_CONFIGFILE."
+			echo "         URLPATH acts as a password to accept task requests."
+			echo "         Without it, anyone knowing the server address can send tasks."
+			INSECURE="yes"
+		fi
+		# Check URLPATH exposure over unciphered HTTP
+		local PORT_VALUE=$(grep -E '^PORT=' "$VPL_CONFIGFILE" | tail -1 | cut -d'=' -f2-)
+		if [ -n "$URLPATH_VALUE" ] && [ "$URLPATH_VALUE" != "/" ] && [ "$PORT_VALUE" != "0" ] ; then
+			echo "WARNING: URLPATH is set but unciphered port (HTTP) is enabled."
+			echo "         URLPATH is transmitted in plain text over HTTP"
+			echo "         and can be intercepted on the network."
+			INSECURE="yes"
+		fi
+		# Check TASK_ONLY_FROM: not set or empty
+		local TASK_ONLY_FROM_VALUE=$(grep -E '^TASK_ONLY_FROM=' "$VPL_CONFIGFILE" | tail -1 | cut -d'=' -f2-)
+		if [ -n "$INSECURE" ] && [ -z "$TASK_ONLY_FROM_VALUE" ] ; then
+			echo "WARNING: TASK_ONLY_FROM is not set in $VPL_CONFIGFILE."
+			echo "         Task requests are not restricted to servers with predefined"
+			echo "         (allowed) IP addresses."
+		fi
+		if [ -n "$INSECURE" ] ; then
+			echo "WARNING: Risky security configuration."
+			echo "         Set URLPATH and/or TASK_ONLY_FROM and PORT=0 in $VPL_CONFIGFILE"
+			echo "         to cipher data and restrict access."
+			echo "         See manual at https://vpl.dis.ulpgc.es/"
+		fi
+	fi
+}
+
+function vpl_check_private_network {
+	# Check if server has only private IPs (not directly accessible from internet)
+	local HAS_PUBLIC=""
+	local HAS_NONLOOPBACK=""
+	if command -v ip &> /dev/null ; then
+		while IFS= read -r addr ; do
+			[[ -z "$addr" ]] && continue
+			HAS_NONLOOPBACK="yes"
+			if ! [[ "$addr" =~ ^10\. ]] && \
+			   ! [[ "$addr" =~ ^172\.(1[6-9]|2[0-9]|3[01])\. ]] && \
+			   ! [[ "$addr" =~ ^192\.168\. ]] ; then
+				HAS_PUBLIC="yes"
+				break
+			fi
+		done < <(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+	elif command -v hostname &> /dev/null ; then
+		while IFS= read -r addr ; do
+			[[ -z "$addr" ]] && continue
+			[[ "$addr" == "127."* ]] && continue
+			HAS_NONLOOPBACK="yes"
+			if ! [[ "$addr" =~ ^10\. ]] && \
+			   ! [[ "$addr" =~ ^172\.(1[6-9]|2[0-9]|3[01])\. ]] && \
+			   ! [[ "$addr" =~ ^192\.168\. ]] ; then
+				HAS_PUBLIC="yes"
+				break
+			fi
+		done < <(hostname -I 2>/dev/null | tr ' ' '\n')
+	fi
+	if [ -n "$HAS_NONLOOPBACK" ] && [ -z "$HAS_PUBLIC" ] ; then
+		echo "WARNING: Server is on a private network and not directly accessible from the internet."
+	fi
+}
+
 function vpl_check_selinux {
 	if [ "$(command -v setenforce)" != "" ] ; then
 		echo "----------------------------------------------------"
@@ -864,3 +933,6 @@ if [ "$START" == "yes" ] ; then
 	vpl_start_service
 fi
 vpl_info_using_service
+echo "-----------------------------------------------------------------"
+vpl_check_security_config
+vpl_check_private_network

@@ -34,6 +34,9 @@ public:
 		Logger::loglevel = level;
 		log(LOG_INFO, "Set log mask up to LOG_%s", levelName[level]);
 	}
+	static int getLogLevel() {
+		return Logger::loglevel;
+	}
 	static void setForeground(bool foreground) {
 		Logger::foreground = foreground;
 	}
