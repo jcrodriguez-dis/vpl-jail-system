@@ -441,6 +441,33 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 	pm.cleanTask();
 }
 
+/**
+ * Extract a non-negative integer parameter from a URL query string.
+ * Matches key only at a parameter boundary (start or after '&'). Returns 0 if absent.
+ */
+static int queryIntParam(const string &qs, const string &key){
+	string token = key + "=";
+	size_t pos = 0;
+	while ((pos = qs.find(token, pos)) != string::npos) {
+		if (pos == 0 || qs[pos - 1] == '&') {
+			size_t p = pos + token.size();
+			int value = 0;
+			bool hasDigit = false;
+			while (p < qs.size() && qs[p] >= '0' && qs[p] <= '9') {
+				value = value * 10 + (qs[p] - '0');
+				hasDigit = true;
+				p++;
+				if (value > 100000) {
+					return 0; //Overflow guard
+				}
+			}
+			return hasDigit ? value : 0;
+		}
+		pos += token.size();
+	}
+	return 0;
+}
+
 void Jail::commandExecute(string executeticket, Socket *s){
 	processMonitor pm(executeticket);
 	webSocket ws(s);
@@ -449,7 +476,10 @@ void Jail::commandExecute(string executeticket, Socket *s){
 		throw "Internal server error";
 	}
 	Logger::log(LOG_INFO,"Start executing");
-	if (pm.getState() == beforeRunning) { 
+	// Terminal size requested by the client via the query string (e.g. ?cols=140&rows=40).
+	int termCols = queryIntParam(s->getQueryString(), "cols");
+	int termRows = queryIntParam(s->getQueryString(), "rows");
+	if (pm.getState() == beforeRunning) {
 		pm.setRunner();
 		if (pm.FileExists(VPL_EXECUTION)) {
 			string program;
@@ -458,7 +488,7 @@ void Jail::commandExecute(string executeticket, Socket *s){
 			} else {
 				program = VPL_EXECUTION;
 			}
-			runTerminal(pm, ws, program);
+			runTerminal(pm, ws, program, termCols, termRows);
 		} else if (pm.FileExists(VPL_WEBEXECUTION)) {
 			string program;
 			if (pm.installScript(".vpl_launcher.sh", "vpl_web_launcher.sh")) {
@@ -466,7 +496,7 @@ void Jail::commandExecute(string executeticket, Socket *s){
 			} else {
 				program = VPL_WEBEXECUTION;
 			}
-			runTerminal(pm, ws, program);
+			runTerminal(pm, ws, program, termCols, termRows);
 		} else if (pm.FileExists(VPL_WEXECUTION)) {
 			if (pm.installScript(".vpl_launcher.sh", "vpl_vnc_launcher.sh"))
 				runVNC(pm, ws, ".vpl_launcher.sh");
@@ -1002,12 +1032,23 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 /**
  * run program in terminal controlling timeout and redirection
  */
-void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
+void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name, int cols, int rows){
 	int fdmaster = -1;
 	ExecutionLimits executionLimits = pm.getLimits();
 	signal(SIGTERM, SIG_IGN);
 	signal(SIGKILL, SIG_IGN);
-	newpid = forkpty(&fdmaster, NULL, NULL, NULL);
+	// Create the pseudo terminal with the client's real size so TUI apps (and the SSH
+	// remote PTY) use the whole window instead of the default 80x24.
+	struct winsize wsize;
+	struct winsize *wsizep = NULL;
+	if (cols > 0 && rows > 0 && cols <= 1000 && rows <= 1000) {
+		memset(&wsize, 0, sizeof(wsize));
+		wsize.ws_col = (unsigned short) cols;
+		wsize.ws_row = (unsigned short) rows;
+		wsizep = &wsize;
+		Logger::log(LOG_INFO, "Terminal pty size %dx%d", cols, rows);
+	}
+	newpid = forkpty(&fdmaster, NULL, NULL, wsizep);
 	if (newpid == -1) { //fork error
 		Logger::log(LOG_INFO, "Jail: fork error %m");
 		return;

@@ -70,7 +70,7 @@ public:
 	string readFile(processMonitor &pm,string name);
 	void deleteFile(processMonitor &pm,string name);
 	string run(processMonitor &pm,string name, int othermaxtime=0, bool VNCLaunch=false);
-	void runTerminal(processMonitor &pm, webSocket &s, string name);
+	void runTerminal(processMonitor &pm, webSocket &s, string name, int cols=0, int rows=0);
 	void runVNC(processMonitor &pm, webSocket &s, string name);
 	void runPassthrough(processMonitor &pm, Socket *s);
 };

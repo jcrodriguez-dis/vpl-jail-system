@@ -225,7 +225,11 @@ void RedirectorTerminal::advance() {
 							break; //program output read error
 						}
 						if(readsize >0) {
-							ws->send(string(buf,readsize));
+							// Send raw program output as a binary frame. Text frames must be valid
+							// UTF-8, but PTY reads can split a multibyte character (e.g. TUI box-drawing)
+							// across two frames, which makes the browser drop the WebSocket. Binary
+							// frames carry the bytes verbatim and the client (xterm.js) reassembles UTF-8.
+							ws->send(string(buf,readsize), BINARY_FRAME);
 						}
 					}
 					if(programbuf.size()>0 && (devices[0].revents & POLLOUT)){ //Write to program
