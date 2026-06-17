@@ -191,38 +191,37 @@ int main(int const argc, const char ** const argv) {
 			exit(EXIT_SUCCESS);
 		}
 	}
-	Logger::setLogLevel(LOG_ERR, foreground);
+	Logger::setLogLevel(LOG_ERR, true); // Default log level for early messages
 	Configuration *conf = Configuration::getConfiguration();
-	Logger::setLogLevel(conf->getLogLevel(), foreground);
+	Logger::setLogLevel(conf->getLogLevel(), true);
 	if ( conf->getLogLevel() >= LOG_INFO) {
 		conf->readConfigFile(); // Reread configuration file to show values in log
 		conf->foundWritableDirsInJail(); // Reread writable dirs to show values in log
 	}
 	bool containerAutoDetected = detectContainerMode(conf->getJailPath());
 	bool runningInContainer = containerAutoDetected || containerByArgument;
-
-	cout << "Server running";
+	string startupMessage = "Server running";
 	if (foreground){
-		cout << " in foreground mode";
+		startupMessage += " in foreground mode";
 	} else {
-		cout << " as daemon";
+		startupMessage += " as daemon";
 	}
 	if (runningInContainer) {
-		cout << " inside a container";
+		startupMessage += " inside a container";
 		if (containerAutoDetected && containerByArgument) {
-			cout << " (container by argument and auto-detection)";
+			startupMessage += " (container by argument and auto-detection)";
 		} else if (containerAutoDetected) {
-			cout << " (auto-detected)";
+			startupMessage += " (auto-detected)";
 		} else {
-			cout << " (argument not confirmed)";
+			startupMessage += " (argument not confirmed)";
 		}
 	} else {
-		cout << " on host system";
+		startupMessage += " on host system";
 		if (isInContainer()) {
-			cout << " (container detected)";
+			startupMessage += " (container detected)";
 		}
 	}
-	cout << endl;
+	Logger::log(LOG_INFO, "%s", startupMessage.c_str());
 	if (conf->getJailPath() == "" && ! runningInContainer) {
 		Logger::log(LOG_EMERG, "Jail directory root \"/\" but not running in container");
 		exit(1);
@@ -243,26 +242,32 @@ int main(int const argc, const char ** const argv) {
 			runner->daemonize();
 		}
 		Logger::log(LOG_INFO, "VPL Jail Server %s started", Util::version());
+		Logger::setLogLevel(conf->getLogLevel(), foreground);
 		runner->loop();
 		exitStatus = EXIT_SUCCESS;
 	}
 	catch(HttpException &exception) {
+		Logger::setLogLevel(conf->getLogLevel(), true);
 		Logger::log(LOG_CRIT, "%s", exception.getLog().c_str());
 		exitStatus=static_cast<int>(httpError);
 	}
 	catch(const string &me) {
+		Logger::setLogLevel(conf->getLogLevel(), true);
 		exitStatus = EXIT_FAILURE;
 		Logger::log(LOG_CRIT, "%s", me.c_str());
 	}
 	catch(const char * const me) {
+		Logger::setLogLevel(conf->getLogLevel(), true);
 		exitStatus = EXIT_FAILURE;
 		Logger::log(LOG_CRIT, "%s",me);
 	}
 	catch(std::exception &e) {
+		Logger::setLogLevel(conf->getLogLevel(), true);
 		exitStatus = EXIT_FAILURE;
 		Logger::log(LOG_CRIT, "Unexpected exception: %s %s:%d", e.what(), __FILE__, __LINE__);
 	}
 	catch(...){
+		Logger::setLogLevel(conf->getLogLevel(), true);
 		exitStatus = EXIT_FAILURE;
 		Logger::log(LOG_CRIT, "Unexpected exception %s:%d", __FILE__, __LINE__);
 	}
