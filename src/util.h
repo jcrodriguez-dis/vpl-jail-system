@@ -250,7 +250,7 @@ public:
 	 * Check if process exists
 	 */
 	static bool processExists(pid_t pid){
-		return kill(pid,0)==0;
+		return pid > 0 && kill(pid, 0) == 0;
 	}
 
 	/**

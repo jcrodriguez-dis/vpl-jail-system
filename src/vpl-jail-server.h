@@ -428,7 +428,7 @@ class Daemon {
 	}
 public:
 	static Daemon* getRunner(){
-		if(singlenton == NULL) singlenton= new Daemon();
+		if(singlenton == NULL) singlenton = new Daemon();
 		return singlenton;
 	}
 

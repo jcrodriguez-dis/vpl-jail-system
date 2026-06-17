@@ -108,7 +108,7 @@ public:
 	string getLocalWebServer();
 	void becomePrisoner();
 	void becomePrisoner(int);
-	bool isRunnig();
+	bool isRunning();
 	vector<pid_t> getPrisonerProcesses(int prisoner);
 	int getProcessUID(pid_t pid);
 	size_t stopPrisonerProcess(bool);
