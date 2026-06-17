@@ -536,7 +536,7 @@ bool processMonitor::installScript(string to, string from) {
 /**
  * Check if task is running
  */
-bool processMonitor::isRunnig() {
+bool processMonitor::isRunning() {
 	return getState() != stopped;
 }
 
@@ -619,13 +619,16 @@ void processMonitor::setCompiler() {
  */
 bool processMonitor::isMonitored() {
 	if ( ! Util::dirExists(getProcessControlPath())) return false;
-	Lock lock(getProcessControlPath());
-	if ( monitor_pid == 0 ) readInfo();
-	if (this->monitorticket == "NO_MONITOR" && this->isRunnig()) {
-		return true;
+	{
+		Lock lock(getProcessControlPath());
+		if ( monitor_pid == 0 ) readInfo();
+		if (this->monitorticket != "NO_MONITOR") {
+			if ( monitor_pid == 0 ) return false;
+			return Util::processExists(monitor_pid);
+		}
 	}
-	if ( monitor_pid == 0 ) return false;
-	return Util::processExists(monitor_pid);
+	return this->isRunning();
+
 }
 
 /**
