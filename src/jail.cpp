@@ -380,6 +380,7 @@ bool Jail::commandUpdate(string adminticket, RPC &rpc){
 	processMonitor pm(adminticket);
 	try {
 		saveParseFiles(pm, rpc);
+		deleteFilesMarkedForDeletion(pm, rpc);
 		return true;
 	} catch(...) {
 		return false;
@@ -389,7 +390,7 @@ bool Jail::commandUpdate(string adminticket, RPC &rpc){
 bool Jail::commandRunning(string adminticket){
 	try{
 		processMonitor pm(adminticket);
-		bool running = pm.isRunnig();
+		bool running = pm.isRunning();
 		if ( ! running ) {
 			pm.cleanTask();
 		}
@@ -1468,40 +1469,51 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 	int fdmaster = -1;
 	ExecutionLimits executionLimits = pm.getLimits();
 	signal(SIGTERM, SIG_IGN);
-	signal(SIGKILL, SIG_IGN);
+	// Note: SIGKILL cannot be caught or ignored; removed misleading signal(SIGKILL, SIG_IGN)
 	newpid = forkpty(&fdmaster, NULL, NULL, NULL);
 	if (newpid == -1) { //fork error
 		Logger::log(LOG_INFO, "Jail: fork error %m");
+		pm.cleanTask();
 		return;
 	}
 	if (newpid == 0) { //new process
 		executeInJail(pm, name, "terminal"); // Never returns
 	}
-	Logger::log(LOG_INFO, "child pid %d",newpid);
-	RedirectorTerminal redirector(fdmaster,&ws);
+	Logger::log(LOG_INFO, "child pid %d", newpid);
+	RedirectorTerminal redirector(fdmaster, &ws);
 	Logger::log(LOG_INFO, "Redirector start terminal control");
 	time_t startTime = time(NULL);
 	time_t lastTime = startTime;
 	int stopSignal = SIGTERM;
 	int status;
-	Logger::log(LOG_INFO,"run: start redirector loop");
-	while(redirector.isActive() && !ws.isClosed()){
-		redirector.advance();
-		pid_t wret = waitpid(newpid, &status, WNOHANG);
-		if(wret == 0){
+	Logger::log(LOG_INFO, "run: start redirector loop");
+	try {
+		while(redirector.isActive() && !ws.isClosed()){
+			redirector.advance();
+			pid_t wret = waitpid(newpid, &status, WNOHANG);
+			if (wret == newpid) { // Child exited normally
+				Logger::log(LOG_DEBUG, "Child pid %d exited", newpid);
+				newpid = -1;
+				break;
+			} else if (wret == -1) { // waitpid error
+				Logger::log(LOG_INFO, "Jail waitpid error: %m");
+				newpid = -1;
+				break;
+			}
+			// wret == 0: child still running
 			time_t now = time(NULL);
 			if(lastTime != now){
-				int elapsedTime = now-startTime;
+				int elapsedTime = now - startTime;
 				lastTime = now;
 				if (elapsedTime > JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()) {
 					Logger::log(LOG_INFO, "Not monitored");
-					if(stopSignal != SIGKILL)
+					if (stopSignal != SIGKILL)
 						redirector.addMessage("\r\nJail: process stopped\n");
 					redirector.stop();
 					pm.stopPrisonerProcess(stopSignal != SIGKILL);
 					kill(newpid, stopSignal);
 					stopSignal = SIGKILL;
-				} else if(elapsedTime > executionLimits.maxtime) {
+				} else if (elapsedTime > executionLimits.maxtime) {
 					if (stopSignal != SIGKILL)
 						redirector.addMessage("\r\nJail: execution time limit reached.\n");
 					redirector.stop();
@@ -1511,24 +1523,32 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 					kill(newpid, stopSignal);
 					stopSignal = SIGKILL;
 				} else if (pm.isOutOfMemory()) {
-					string ml= pm.getMemoryLimit();
+					string ml = pm.getMemoryLimit();
 					if (stopSignal != SIGKILL)
 						redirector.addMessage("\r\nJail: out of memory (" + ml + ")\n");
-					Logger::log(LOG_INFO, "Out of memory (%s)",ml.c_str());
+					Logger::log(LOG_INFO, "Out of memory (%s)", ml.c_str());
 					pm.stopPrisonerProcess(stopSignal != SIGKILL);
 					kill(newpid, stopSignal);
-					stopSignal = SIGKILL; //Second try
+					stopSignal = SIGKILL;
 				}
 			}
-		} else { //Not running or error
-			break;
 		}
+		Logger::log(LOG_DEBUG, "End redirector loop");
+		//wait until 5s for redirector to read and send program output
+		for (int i = 0; redirector.isActive() && i < 50; i++) {
+			redirector.advance();
+			Util::sleep(100000); // 1/10 sec
+		}
+	} catch (const std::exception &e) {
+		Logger::log(LOG_ERR, "Exception in redirector loop: %s", e.what());
+	} catch (...) {
+		Logger::log(LOG_ERR, "Unknown exception in redirector loop");
 	}
-	Logger::log(LOG_DEBUG, "End redirector loop");
-	//wait until 5sg for redirector to read and send program output
-	for (int i = 0; redirector.isActive() && i < 50; i++) {
-		redirector.advance();
-		Util::sleep(100000); // 1/10 sec
+	// Reap child if still running to avoid zombie
+	if (newpid != -1) {
+		kill(newpid, SIGKILL);
+		waitpid(newpid, &status, 0);
+		newpid = -1;
 	}
 	pm.cleanTask();
 }
