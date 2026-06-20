@@ -41,7 +41,7 @@
 #define VPL_SETWEBCOOKIE "Set-Cookie: " VPL_WEBCOOKIE "="
 #define VPL_CLEANWEBCOOKIE VPL_SETWEBCOOKIE "n; Max-Age=-1\r\n"
 #define VPL_IWASHERECOOKIE "VPL_Iwh"
-#define VPL_SETIWASHERECOOKIE "Set-Cookie: " VPL_IWASHERECOOKIE "=y; Path=/; SameSite=none; Secure\r\n"
+#define VPL_SETIWASHERECOOKIE "Set-Cookie: " VPL_IWASHERECOOKIE "=y; Path=/; SameSite=none; Secure; Partitioned\r\n"
 #define VPL_LOCALREDIRECT "Location: /\r\n"
 #define VPL_LOCALSERVERADDRESSFILE ".vpl_localserveraddress"
 
