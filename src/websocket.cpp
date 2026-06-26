@@ -20,6 +20,88 @@
  * RFC 6455
  * binary and base64 extension of noVNC supported
  */
+
+/**
+ * Validates that the given string is valid UTF-8 as required by RFC 6455 §8.1
+ * for TEXT_FRAME payloads.
+ */
+static bool isValidUTF8(const string &s) {
+	const unsigned char *bytes = (const unsigned char *)s.data();
+	size_t len = s.size();
+	size_t i = 0;
+	while (i < len) {
+		unsigned char b = bytes[i];
+		int extra;
+		unsigned long codepoint;
+		if (b < 0x80) { i++; continue; }
+		else if ((b & 0xE0) == 0xC0) { extra = 1; codepoint = b & 0x1F; }
+		else if ((b & 0xF0) == 0xE0) { extra = 2; codepoint = b & 0x0F; }
+		else if ((b & 0xF8) == 0xF0) { extra = 3; codepoint = b & 0x07; }
+		else return false;
+		if (i + (size_t)extra >= len) return false;
+		for (int j = 1; j <= extra; j++) {
+			unsigned char cb = bytes[i + j];
+			if ((cb & 0xC0) != 0x80) return false;
+			codepoint = (codepoint << 6) | (cb & 0x3F);
+		}
+		if (extra == 1 && codepoint < 0x80)    return false;
+		if (extra == 2 && codepoint < 0x800)   return false;
+		if (extra == 3 && codepoint < 0x10000) return false;
+		if (codepoint > 0x10FFFF)              return false;
+		if (codepoint >= 0xD800 && codepoint <= 0xDFFF) return false;
+		i += 1 + extra;
+	}
+	return true;
+}
+
+/**
+ * Replaces invalid UTF-8 byte sequences with the Unicode replacement character
+ * U+FFFD (\xEF\xBF\xBD) so the result is always a valid UTF-8 string.
+ * Used for TEXT_FRAME payloads that may contain raw process output.
+ */
+static string sanitizeUTF8(const string &s) {
+	const unsigned char *bytes = (const unsigned char *)s.data();
+	size_t len = s.size();
+	string out;
+	out.reserve(len);
+	size_t i = 0;
+	while (i < len) {
+		unsigned char b = bytes[i];
+		int extra;
+		unsigned long codepoint;
+		if (b < 0x80) { out += (char)b; i++; continue; }
+		else if ((b & 0xE0) == 0xC0) { extra = 1; codepoint = b & 0x1F; }
+		else if ((b & 0xF0) == 0xE0) { extra = 2; codepoint = b & 0x0F; }
+		else if ((b & 0xF8) == 0xF0) { extra = 3; codepoint = b & 0x07; }
+		else { out += '?'; i++; continue; } // invalid leading byte → '?' (size-preserving)
+		bool valid = (i + (size_t)extra < len);
+		if (valid) {
+			for (int j = 1; j <= extra && valid; j++) {
+				unsigned char cb = bytes[i + j];
+				if ((cb & 0xC0) != 0x80) { valid = false; break; }
+				codepoint = (codepoint << 6) | (cb & 0x3F);
+			}
+		}
+		if (valid) {
+			if ((extra == 1 && codepoint < 0x80) ||
+			    (extra == 2 && codepoint < 0x800) ||
+			    (extra == 3 && codepoint < 0x10000) ||
+			    codepoint > 0x10FFFF ||
+			    (codepoint >= 0xD800 && codepoint <= 0xDFFF)) {
+				valid = false;
+			}
+		}
+		if (valid) {
+			for (int j = 0; j <= extra; j++) out += (char)bytes[i + j];
+			i += 1 + extra;
+		} else {
+			out += '?'; // replace bad sequence with '?' (size-preserving: 1 byte per bad byte)
+			i++;
+		}
+	}
+	return out;
+}
+
 string webSocket::getHandshakeAnswer(){
 	string key = socket->getHeader("Sec-WebSocket-Key")
 					+"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
@@ -197,6 +279,19 @@ string webSocket::receive(){
 						data = previous_data + data;
 						previous_data = "";
 					}
+					if (lFrameType == TEXT_FRAME && !isValidUTF8(data)) {
+						// RFC 6455 §8.1: close with status 1007 (invalid frame payload data)
+						string closePayload(2, '\0');
+						closePayload[0] = (1007 >> 8) & 0xFF;
+						closePayload[1] = 1007 & 0xFF;
+						closePayload += "Invalid UTF-8 data";
+						if (!closeSent) {
+							socket->send(encodeFrame(closePayload, CONNECTION_CLOSE_FRAME));
+							closeSent = true;
+						}
+						socket->close();
+						return "";
+					}
 					return data;
 				} else {
 					previous_data += data;
@@ -231,7 +326,8 @@ string webSocket::receive(){
 
 void webSocket::send(const string &s, FrameType ft){
 	//Logger::log(LOG_INFO,"Websocket framing type %d data \"%s\"",ft,s.c_str());
-	string frame = encodeFrame(s, ft);
+	const string &payload = (ft == TEXT_FRAME && !isValidUTF8(s)) ? sanitizeUTF8(s) : s;
+	string frame = encodeFrame(payload, ft);
 	//Logger::log(LOG_INFO,"Frame send \"%s\"",frame.c_str());
 	socket->send(frame);
 }
@@ -247,4 +343,3 @@ bool webSocket::wait(const int msec){
 	if (receiveBuffer.size()>0) return false;
 	return socket->wait(msec);
 }
-
