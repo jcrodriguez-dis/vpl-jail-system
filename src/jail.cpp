@@ -508,7 +508,7 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 				break;
 			}
 		}
-		ws.wait(100); // 10 times a second
+		ws.wait(200); // 5 times a second
 		
 		string rec = ws.receive();
 		if (ws.isClosed()) {

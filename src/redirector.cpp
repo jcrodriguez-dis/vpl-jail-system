@@ -18,7 +18,7 @@
 const int Redirector::MAX = JAIL_NET_BUFFER_SIZE; //Buffer size to read
 const int Redirector::POLLBAD = POLLERR | POLLHUP | POLLNVAL;
 const int Redirector::POLLREAD = POLLIN | POLLPRI;
-const int Redirector::polltimeout = 100; //  0.1 sec 
+const int Redirector::polltimeout = 500; //  0.5 sec 
 
 Redirector::Redirector(): bufferSizeLimit(50*1024) {
 	state = error;

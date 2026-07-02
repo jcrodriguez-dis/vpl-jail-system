@@ -11,6 +11,8 @@
 #endif
 #include <string>
 #include <map>
+#include <cerrno>
+#include <cstring>
 #include <unistd.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -83,7 +85,14 @@ class SSLBase{
 				return;
 			}
 		}
-		SSL_CTX_set_options(newContext,SSL_OP_NO_SSLv2|SSL_OP_NO_TLSv1_1|SSL_OP_NO_TLSv1);
+		// Enforce TLS 1.2 as minimum using the modern API (OpenSSL 1.1+).
+		// SSL_OP_NO_* flags are deprecated in OpenSSL 3.x and can cause
+		// "unsupported protocol", "no shared cipher" and "bad key share" errors.
+		#ifdef HAVE_TLS_SERVER_METHOD
+		SSL_CTX_set_min_proto_version(newContext, TLS1_2_VERSION);
+		#else
+		SSL_CTX_set_options(newContext, SSL_OP_NO_SSLv2 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
+		#endif
 		SSL_CTX_set_mode(newContext, SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 		this->timePrivateKeyFileModification = Util::timeOfFileModification(keyFile);
 		this->timeCertificateFileModification = Util::timeOfFileModification(certFile);
@@ -244,11 +253,18 @@ public:
 				devices[0].events = POLLOUT;
 				break;
 			case SSL_ERROR_WANT_CONNECT:
+				devices[0].events = POLLOUT;
+				break;
 			case SSL_ERROR_WANT_ACCEPT:
+				devices[0].events = POLLIN;
+				break;
 			case SSL_ERROR_SYSCALL:
-				Logger::log(LOG_INFO,"SSL socket closed unexpected ret==0: %s %s",
-					message.c_str(), scode);
-				return true;
+				if (errno == 0 || ret == 0) {
+					Logger::log(LOG_INFO, "SSL socket closed unexpectedly: %s", message.c_str());
+					return true;
+				}
+				throw HttpException(internalServerErrorCode,
+					message + "SSL_ERROR_SYSCALL: " + strerror(errno));
 			case SSL_ERROR_SSL:
 			default:
 				throw HttpException(internalServerErrorCode,
@@ -290,7 +306,7 @@ public:
 	SSLSocket(int s): Socket(s){
 		SSL_CTX *context = SSLBase::getSSLBase()->getContext();
 		if (context == NULL) {
-			Logger::log(LOG_ERR, "No SSL context available: certificate o private key file access error?");
+			Logger::log(LOG_ERR, "No SSL context available: certificate or private key file access error?");
 			_exit(EXIT_FAILURE);
 		}
 		ssl = SSL_new(SSLBase::getSSLBase()->getContext());
@@ -298,9 +314,16 @@ public:
 		SSL_set_fd(ssl, s);
 		//SSL_accept with timeout
 		SSLRetry retry(getSocket(), ssl, "accept");
-		while(true){
-			int ret= SSL_accept(ssl);
-			if(retry.end(ret)) break;
+		try {
+			while(true){
+				int ret= SSL_accept(ssl);
+				if(retry.end(ret)) break;
+			}
+		} catch(HttpException &e) {
+			// TLS handshake failures (bad client, probe, plain HTTP on HTTPS port)
+			// are client-side issues, not server errors. Log at INFO and exit cleanly.
+			Logger::log(LOG_INFO, "TLS handshake failed (client error): %s", e.getMessage().c_str());
+			_exit(static_cast<int>(neutral));
 		}
 	}
 	~SSLSocket(){

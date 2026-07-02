@@ -42,6 +42,8 @@
 #include <config.h>
 #endif
 
+#include <cerrno>
+#include <cstring>
 #include <memory>
 #include <map>
 #include <list>
@@ -224,18 +226,17 @@ class Daemon {
 	 * exit status for statistics and fail2ban heuristics.
 	 */
 	void harvest(){
-		while(true){
-			if(children.size()==0) return;
+		while(children.size() > 0){
 			int status;
-			pid_t wret=waitpid(-1, &status, WNOHANG);
+			pid_t wret = waitpid(-1, &status, WNOHANG);
 			if(wret == 0) return; //All Children running o no child
 			if(wret == -1){
-				Logger::log(LOG_ERR,"Server waitpid error");
+				Logger::log(LOG_ERR,"Server waitpid error: %s", strerror(errno));
 				return;
 			}
 			statistics.requests++;
 			if(WIFSIGNALED(status)){
-				processChildEnd(wret,internalError);
+				processChildEnd(wret, internalError);
 			}else if(WIFEXITED(status)){
 				processChildEnd(wret, static_cast<ExitStatus>(WEXITSTATUS(status)));
 			}
@@ -443,7 +444,7 @@ public:
 			Logger::log(LOG_EMERG, "daemonize() => fork() fail (child_pid < 0)");
 			exit(EXIT_FAILURE);
 		}
-		if(child_pid > 0) _exit(EXIT_SUCCESS); //gradparent exit
+		if(child_pid > 0) _exit(EXIT_SUCCESS); //grandparent exit
 		if(setsid() < 0) {
 			Logger::log(LOG_EMERG, "daemonize() => (setsid() < 0)");
 			exit(EXIT_FAILURE);
@@ -454,9 +455,39 @@ public:
 			exit(EXIT_FAILURE);
 		}
 		if(grandchild_pid > 0) _exit(EXIT_SUCCESS); //parent exit
-		FILE *fd=fopen("/run/vpl-jail-server.pid", "w");
-		fprintf(fd, "%d", (int)getpid());
-		fclose(fd);
+		// Redirect stdin/stdout/stderr to /dev/null so terminal closure
+		// does not send SIGHUP or cause EIO errors.
+		int devnull = open("/dev/null", O_RDWR);
+		if (devnull >= 0) {
+			dup2(devnull, STDIN_FILENO);
+			dup2(devnull, STDOUT_FILENO);
+			dup2(devnull, STDERR_FILENO);
+			if (devnull > STDERR_FILENO) close(devnull);
+		}
+		// Avoid keeping any directory's filesystem busy.
+		if (chdir("/") != 0) {
+			Logger::log(LOG_WARNING, "daemonize() => chdir(\"/\") fail: %s", strerror(errno));
+		}
+		Util::writeFile("/run/vpl-jail-server.pid", std::to_string((int)getpid()));
+		if (Util::fileExists("/run/vpl-jail-server.pid", true)) {
+			Logger::log(LOG_INFO, "daemonize() => PID file written to /run/vpl-jail-server.pid");
+		} else {
+			Logger::log(LOG_EMERG, "daemonize() => PID file NOT written to /run/vpl-jail-server.pid");
+			exit(EXIT_FAILURE);
+		}
+		FILE *fd = fopen("/run/vpl-jail-server.pid", "w");
+		if(fd == nullptr) {
+			Logger::log(LOG_EMERG, "daemonize() => fopen(\"/run/vpl-jail-server.pid\") fail: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		if (fprintf(fd, "%d", (int)getpid()) < 0) {
+			Logger::log(LOG_EMERG, "daemonize() => fprintf(\"/run/vpl-jail-server.pid\") fail: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		if (fclose(fd) != 0) {
+			Logger::log(LOG_EMERG, "daemonize() => fclose(\"/run/vpl-jail-server.pid\") fail: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	/**
@@ -466,9 +497,19 @@ public:
 	 */
 	void foreground(){
 		setsid(); // NOTE: fail in Docker.
-		FILE *fd=fopen("/run/vpl-jail-server.pid", "w");
-		fprintf(fd, "%d", (int)getpid());
-		fclose(fd);
+		FILE *fd = fopen("/run/vpl-jail-server.pid", "w");
+		if(fd == nullptr) {
+			Logger::log(LOG_EMERG, "foreground() => fopen(\"/run/vpl-jail-server.pid\") fail: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		if (fprintf(fd, "%d", (int)getpid()) < 0) {
+			Logger::log(LOG_EMERG, "foreground() => fprintf(\"/run/vpl-jail-server.pid\") fail: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		if (fclose(fd) != 0) {
+			Logger::log(LOG_EMERG, "foreground() => fclose(\"/run/vpl-jail-server.pid\") fail: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	/**
@@ -501,11 +542,10 @@ public:
 	 * - Fork a helper to clean zombie tasks (best-effort)
 	 */
 	void periodicTasks() {
-		static int checkPoint = 5 * 60 * 1000 / JAIL_ACCEPT_WAIT; // 5 minutes.
-		static int loops = 0;
-		loops++;
-		if ( loops >= checkPoint ) {
-			loops = 0;
+		static time_t nextCheckTime = 0;
+		time_t currentTime = time(NULL);
+		if ( currentTime >= nextCheckTime ) {
+			nextCheckTime = currentTime + 5 * 60; // 5 minutes.
 			try {
 				SSLBase::getSSLBase()->createUpdateContext();
 			} catch(...) {
