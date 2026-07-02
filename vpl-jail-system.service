@@ -1,15 +1,15 @@
 [Unit]
 Description=VPL Jail System Service
-After=network-online.target
 After=network.target
 Documentation=https://github.com/jcrodriguez-dis/vpl-xmlrpc-jail
 Documentation=https://vpl.dis.ulpgc.es
 
 [Service]
+TimeoutStartSec=60
 Type=forking
 PIDFile=/run/vpl-jail-server.pid
 ExecStart=/usr/sbin/vpl/vpl-jail-system start
-ExecStopPost=/usr/sbin/vpl/vpl-jail-system stop
+ExecStop=/usr/sbin/vpl/vpl-jail-system stop
 ExecReload=/usr/sbin/vpl/vpl-jail-system restart
 
 [Install]
