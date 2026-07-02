@@ -74,17 +74,11 @@ string Socket::getHeader(string name){
  */
 void Socket::parseCookies(const string &value){
 	string rawcookies = value;
-	Logger::log(LOG_INFO,"Cookie :\"%s\"", rawcookies.c_str());
+	Logger::log(LOG_DEBUG,"Cookie :\"%s\"", rawcookies.c_str());
 	vplregmatch match(3);
-	size_t nmatchs = 0;
 	while (regCookie.search(rawcookies, match)) {
-		nmatchs++;
 		cookies[match[1]] = match[2];
 		rawcookies = rawcookies.substr(match[0].length());
-	}
-	if (cookies.size() != nmatchs) {
-		Logger::log(LOG_DEBUG, "Bad cookiees (repeated): %s", value.c_str());
-		throw HttpException(badRequestCode, "Erroneous cookie (repeated)", value);
 	}
 }
 
@@ -95,7 +89,7 @@ void Socket::parseCookies(const string &value){
  * @param line header to process
  */
 void Socket::parseHeader(const string &line){
-	Logger::log(LOG_INFO,"Header :\"%s\"", line.c_str());
+	Logger::log(LOG_DEBUG,"Header :\"%s\"", line.c_str());
 	vplregmatch match(3);
 	bool nomatch = !regHeader.search(line, match);
 	if (nomatch) {
