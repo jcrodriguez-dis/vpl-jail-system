@@ -481,7 +481,7 @@ function unset_controldir {
 
 function check_selinux_vpl {
 	if [ -x "$(command -v sestatus)" ] && [ ! "$(sestatus | grep -i 'disable')" ] ; then
-		log_failure_msg "SELinux state: enforcing or permissive. SELinux must be You must disabled"
+		log_failure_msg "SELinux is active. vpl-jail-system may need SELinux to be disabled."
 	fi
 }
 
@@ -560,7 +560,11 @@ function stop_vpl {
 		fi
 		if [ -f $PIDFILE ] ; then
 			kill -15 $(cat $PIDFILE) &> /dev/null
-			sleep 1
+			local WAIT=0
+			while kill -0 $(cat $PIDFILE) &> /dev/null && [ $WAIT -lt 100 ]; do
+				sleep 0.2
+				WAIT=$((WAIT + 1))
+			done
 			kill -9 $(cat $PIDFILE) &> /dev/null
 			rm $PIDFILE
 		fi
