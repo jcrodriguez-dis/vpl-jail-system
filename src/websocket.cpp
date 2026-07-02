@@ -282,8 +282,8 @@ string webSocket::receive(){
 					if (lFrameType == TEXT_FRAME && !isValidUTF8(data)) {
 						// RFC 6455 §8.1: close with status 1007 (invalid frame payload data)
 						string closePayload(2, '\0');
-						closePayload[0] = (1007 >> 8) & 0xFF;
-						closePayload[1] = 1007 & 0xFF;
+						closePayload[0] = static_cast<char>((1007 >> 8) & 0xFF);
+						closePayload[1] = static_cast<char>(1007 & 0xFF);
 						closePayload += "Invalid UTF-8 data";
 						if (!closeSent) {
 							socket->send(encodeFrame(closePayload, CONNECTION_CLOSE_FRAME));
