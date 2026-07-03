@@ -179,13 +179,11 @@ Configuration::Configuration() {
 	configPath = "/etc/vpl/vpl-jail-system.conf";
 	checkConfigFile(configPath, "Config file");
 	readConfigFile();
-	foundWritableDirsInJail();
 }
 
 Configuration::Configuration(string path) {
 	configPath = path;
 	readConfigFile();
-	foundWritableDirsInJail();
 }
 
 /**

@@ -42,6 +42,7 @@ VPL_PROGRAMS_DIR=/usr/sbin/vpl
 VPL_CONFIG_DIR=/etc/vpl
 DAEMON=$VPL_PROGRAMS_DIR/vpl-jail-server
 PIDFILE=/run/vpl-jail-server.pid
+READYFILE=/run/vpl-jail-server.ready
 NOMOUNT="^vpl|^init|^ldap|^udev|grub|^rc[0-6S]|^pam|^cron|^apm|^logrotate"
 NOMOUNT="$NOMOUNT|^mail|^rsyslog|^shadow|^security|^ssl|^ssh|^update"
 
@@ -58,10 +59,10 @@ fi
 declare -f log_failure_msg &> /dev/null
 if [ "$?" == "1" ] ; then 
 	function log_failure_msg {
-		echo $1
+		echo "vpl-jail-system error: $1"
 	}
 	function log_success_msg {
-		echo $1
+		echo "vpl-jail-system: $1"
 	}
 fi
 
@@ -486,8 +487,25 @@ function check_selinux_vpl {
 }
 
 function start_vpl {
+	local foregroundjob
 	if [ -f $PIDFILE ] ; then
 		stop_vpl
+	fi
+	rm -f $READYFILE
+	if [ "$1" == "foreground" ] ; then
+		trap "signal_stop_vpl" SIGTERM
+		echo
+		if [ -n "$IN_CONTAINER" ] ; then
+			echo "Launching vpl-jail-system in container and foreground mode"
+			$DAEMON in_container foreground $2 $3 &
+			foregroundjob=$!
+		else
+			echo "Launching vpl-jail-system in foreground mode"
+			$DAEMON foreground $2 $3 &
+			foregroundjob=$!
+		fi
+	else
+		start_daemon $DAEMON $1 $2
 	fi
 	{
 		pre_start
@@ -525,25 +543,11 @@ function start_vpl {
 		fi
 		set_etc
 	} 2>> $LOGFILE
+	touch $READYFILE
+	log_success_msg $"Jail ready for use at $JAILPATH"
 	if [ "$1" == "foreground" ] ; then
-		trap "signal_stop_vpl" SIGTERM
-		echo
-		if [ -n "$IN_CONTAINER" ] ; then
-			echo "Launching vpl-jail-system in container and foreground mode"
-			$DAEMON in_container foreground $2 $3 &
-		else
-			echo "Launching vpl-jail-system in foreground mode"
-			$DAEMON foreground $2 $3 &
-		fi
-		wait $!
+		wait $foregroundjob
 	else
-		start_daemon $DAEMON $1 $2
-		# Wait for daemon to daemonize and write PID file
-		local WAIT=0
-		while [ ! -f $PIDFILE ] && [ $WAIT -lt 150 ]; do
-			sleep 0.2
-			WAIT=$((WAIT + 1))
-		done
 		if [ -f $PIDFILE ] ; then
 			set_firewall $1
 		else
@@ -561,12 +565,13 @@ function stop_vpl {
 		if [ -f $PIDFILE ] ; then
 			kill -15 $(cat $PIDFILE) &> /dev/null
 			local WAIT=0
-			while kill -0 $(cat $PIDFILE) &> /dev/null && [ $WAIT -lt 100 ]; do
+			while kill -0 $(cat $PIDFILE) &> /dev/null && [ $WAIT -lt 25 ]; do
 				sleep 0.2
 				WAIT=$((WAIT + 1))
 			done
 			kill -9 $(cat $PIDFILE) &> /dev/null
-			rm $PIDFILE
+			rm -f $PIDFILE
+			rm -f $READYFILE
 		fi
 		if [ -z "$IN_CONTAINER" ] ; then
 			if [ -d "$JAILPATH" ] ; then
