@@ -36,6 +36,7 @@ function vpl_detect_package_manager() {
 	if [ "$(command -v dnf)" != "" ] ; then
 		echo "Using DNF package manager" 
 		echo "Upgrading installed software"
+		dnf -y -q makecache >> "$LOGFILE"
 		dnf -y -q check-update >> "$LOGFILE"
 		dnf -y -q upgrade >> "$LOGFILE"
 		function vpl_install_base {
@@ -47,7 +48,7 @@ function vpl_detect_package_manager() {
 			return $?
 		}
 		function vpl_install_check {
-			dnf -y -q list $1 &> /dev/null
+			dnf install -y --downloadonly $1 &>/dev/null
 			return $?
 		}
 		PMTYPE="dnf"
@@ -320,6 +321,7 @@ function vpl_install_package {
 	fi
 	local found=0
 	local checked=""
+	local name="$1"
 	echo -n "Installing $1: "
 	shift
 	while [ "$#" != "0" ] ; do
@@ -340,6 +342,7 @@ function vpl_install_package {
    done
    if [ $found -eq 0 ] ; then
    	   echo "[Package not found. Checked:$checked]"
+	   echo "Package not found for $name. Checked:$checked" >> "$LOGFILE"
    fi
 }
 
@@ -370,6 +373,7 @@ function vpl_install_npm {
 	fi
 	local found=1
 	local checked=""
+	local name="$1"
 	echo -n "Installing $1 (using npm): "
 	shift
 	while [ "$#" != "0" ] ; do
@@ -383,7 +387,8 @@ function vpl_install_npm {
         shift
    done
    if [ $found -eq 1 ] ; then
-   	   echo "[Package npm not found. Checked$checked"
+   	   echo "[Package npm not found. Checked:$checked]"
+	   echo "Package npm not found for $name. Checked:$checked" >> "$LOGFILE"
    fi
 }
 
