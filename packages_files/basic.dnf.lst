@@ -4,6 +4,7 @@
 "Java (OpenJDK)" java-25-openjdk-devel java-21-openjdk-devel java-17-openjdk-devel java-11-openjdk-devel java-1.8.0-openjdk-devel
 "JavaFX" openjfx
 "Junit framework" junit
+"Hamcrest library" hamcrest
 "PHP interpreter" php-cli
 "Python3" python3
 "Python3 Tkinter" python3-tkinter

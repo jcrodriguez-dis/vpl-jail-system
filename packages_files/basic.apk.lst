@@ -4,6 +4,7 @@
 "Java" openjdk25 openjdk21 openjdk17 openjdk11 openjdk8
 "JavaFX" openjfx
 "Junit framework" junit4 junit
+"Hamcrest" libhamcrest-java
 "PHP interpreter" php83 php82 php81 php8
 "Sqlite for PHP" php83-sqlite3 php82-sqlite3 php81-sqlite3 php8-sqlite3
 "Python3" python3
