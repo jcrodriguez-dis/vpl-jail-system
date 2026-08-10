@@ -881,6 +881,7 @@ function vpl_commandline_action_arg() {
 		update)
 			vpl_install_update_daemon
 			vpl_install_update_extra_files
+			vpl_install_service
 			[ -z "$NONINTERACTIVE" ] && vpl_info_using_service
 			;;
 		uninstall)
