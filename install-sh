@@ -1,2 +1,3 @@
-./install-bash-sh
-./install-vpl-sh
+#!/bin/bash
+source install-bash-sh
+source install-vpl-sh
