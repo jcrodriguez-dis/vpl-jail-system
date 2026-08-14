@@ -55,7 +55,7 @@ public:
 	}
 	void readEnvironmentConfigVars(ConfigData& data);
 	void readConfigFile();
-	void foundWritableDirsInJail(); // Find writable directories inside jail
+	void findWritableDirsInJail(); // Find writable directories inside jail
 	static string generateCleanPATH(string path, string dirtyPATH);
 	const ExecutionLimits & getLimits() const { return jailLimits;}
 	const string & getJailPath() const { return jailPath;}

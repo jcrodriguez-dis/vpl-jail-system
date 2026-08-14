@@ -234,7 +234,7 @@ vector<string> Configuration::getWritableDirsInDir(const string &dirPath) {
 	return writableDirs;
 }
 
-void Configuration::foundWritableDirsInJail() {
+void Configuration::findWritableDirsInJail() {
 	if (jailPath == "") {
 		Logger::log(LOG_INFO, "Jail path is root /, skipping search for writable dirs in jail");
 		return;

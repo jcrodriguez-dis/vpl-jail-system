@@ -320,7 +320,7 @@ int main(int const argc, const char ** const argv) {
 			startupMessage += " (container detected)";
 		}
 	}
-	Logger::log(LOG_INFO, "%s", startupMessage.c_str());
+	Logger::log(LOG_NOTICE, "%s", startupMessage.c_str());
 	if (conf->getJailPath() == "" && ! runningInContainer) {
 		Logger::log(LOG_EMERG, "Jail directory root \"/\" but not running in container");
 		exit(1);
@@ -335,18 +335,19 @@ int main(int const argc, const char ** const argv) {
 		Main::daemonize();
 	}
 	// Wait for Jail creation end
+	Logger::log(LOG_NOTICE, "Waiting for the Jail File System to be ready ...");
 	Main::waitReadyFile();
-	if ( conf->getLogLevel() >= LOG_INFO) {
+	if (conf->getLogLevel() >= LOG_INFO) {
 		conf->readConfigFile(); // Reread configuration file to show values in log
-		conf->foundWritableDirsInJail(); // Reread writable dirs to show values in log
 	}
+	conf->findWritableDirsInJail(); // Find writable dirs inside jail
 	conf->setInContainer(runningInContainer || foreground);
 	Main::checkSecurityConfiguration(conf);
 	Main::checkPrivateNetwork();
 	int exitStatus = static_cast<int>(internalError);
 	try{
 		Daemon* runner = Daemon::getRunner();
-		Logger::log(LOG_INFO, "VPL Jail Server %s started", Util::version());
+		Logger::log(LOG_NOTICE, "VPL Jail Server %s started", Util::version());
 		Logger::setLogLevel(conf->getLogLevel(), foreground);
 		runner->loop();
 		exitStatus = EXIT_SUCCESS;
