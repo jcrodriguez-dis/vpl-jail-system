@@ -1,4 +1,5 @@
 SUBDIRS=src
+EXTRA_DIST = tests/daemonExecutionTest.py
 dist_pkgdata_DATA = launchers/vncaccel.sh launchers/vpl_terminal_launcher.sh launchers/vpl_vnc_launcher.sh
 dist_pkgdata_DATA += launchers/vpl_batch_launcher.sh launchers/vpl_web_launcher.sh launchers/vpl_vnc_stopper.sh
 dist_pkgdata_DATA += packages_files/minimum.dnf.lst packages_files/basic.dnf.lst packages_files/standard.dnf.lst packages_files/full.dnf.lst

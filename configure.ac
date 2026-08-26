@@ -22,7 +22,7 @@ AC_CHECK_LIB([crypto], [SHA1],)
 AC_CHECK_LIB([ssl], [SSL_CTX_new],)
 
 # Checks for header files.
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netinet/in.h stdint.h stdlib.h string.h sys/socket.h syslog.h unistd.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h linux/openat2.h limits.h netinet/in.h stdint.h stdlib.h string.h sys/socket.h syslog.h unistd.h])
 AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <filesystem>], [auto p = std::filesystem::weakly_canonical("dummy")])],
                [AC_DEFINE([HAVE_WEAKLY_CANONICAL], [1],
                           [Define to 1 if you have the weakly_canonical function using the filesystem header file])],
