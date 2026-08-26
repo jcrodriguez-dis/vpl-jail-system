@@ -145,32 +145,41 @@ long long webSocket::frameSize(const string &data
 	if (data_size < control_size) {
 		return -1;
 	}
-	//Is masked frame (must be musked)
+	// The length is decoded separately from the sentinel values 126 and 127.
 	mask_size = (rawdata[1] & 0x80) ? 4:0;
-	payload_size = rawdata[1] & 0x7f;
-	if (data_size < (control_size + mask_size + payload_size)) {
-		return -1;
-	}
-	if (payload_size == 126) {
+	unsigned int lengthCode = rawdata[1] & 0x7f;
+	unsigned long long decodedSize;
+	if (lengthCode < 126) {
+		decodedSize = lengthCode;
+	} else if (lengthCode == 126) {
 		control_size = 4; //for len extension
 		if (data_size < control_size) {
 			return -1;
 		}
-		payload_size = (((unsigned int) rawdata[2]) << 8);
-		payload_size += rawdata[3];
-	}else if (payload_size == 127) {
+		decodedSize = (((unsigned int) rawdata[2]) << 8) | rawdata[3];
+		if (decodedSize < 126) return -2;
+	} else {
 		control_size = 10; //for len extension
 		if (data_size < control_size) {
 			return -1;
 		}
-		payload_size = ((unsigned long long) rawdata[2] << 56);
-		payload_size += ((unsigned long long) rawdata[3] << 48);
-		payload_size += ((unsigned long long) rawdata[4] << 40);
-		payload_size += ((unsigned long long) rawdata[5] << 32);
-		payload_size += ((unsigned long long) rawdata[6] << 24);
-		payload_size += ((unsigned long long) rawdata[7] << 16);
-		payload_size += ((unsigned long long) rawdata[8] << 8);
-		payload_size += rawdata[9];
+		if (rawdata[2] & 0x80) return -2;
+		decodedSize = ((unsigned long long) rawdata[2] << 56)
+			| ((unsigned long long) rawdata[3] << 48)
+			| ((unsigned long long) rawdata[4] << 40)
+			| ((unsigned long long) rawdata[5] << 32)
+			| ((unsigned long long) rawdata[6] << 24)
+			| ((unsigned long long) rawdata[7] << 16)
+			| ((unsigned long long) rawdata[8] << 8)
+			| rawdata[9];
+		if (decodedSize <= 0xffff) return -2;
+	}
+	if (decodedSize > JAIL_WEBSOCKET_FRAME_SIZE_LIMIT) return -2;
+	if ((rawdata[0] & 0x0f) >= 8 && (rawdata[0] & 0x80) == 0) return -2;
+	if ((rawdata[0] & 0x0f) >= 8 && decodedSize > 125) return -2;
+	payload_size = (long long) decodedSize;
+	if (data_size < (long long) control_size + mask_size + payload_size) {
+		return -1;
 	}
 	return control_size + mask_size + payload_size;
 }
@@ -180,6 +189,7 @@ bool webSocket::isFrameComplete(const string &data){
 	long long payload_size;
 	long long fSize = frameSize(data, control_size, mask_size, payload_size);
 	if (fSize == -1) return false;
+	if (fSize == -2) return true;
 	return (long long) data.size() >= fSize;
 }
 
@@ -191,6 +201,10 @@ string webSocket::decodeFrame(string &data, FrameType &ft, bool &fin){
 	if(fSize == -1 || (long long) data.size() < fSize){
 		ft = ERROR_FRAME;
 		return "Frame size too large";
+	}
+	if (fSize == -2) {
+		ft = ERROR_FRAME;
+		return "Invalid frame length";
 	}
 	if (mask_size == 0) {
 		ft = ERROR_FRAME;
@@ -266,6 +280,11 @@ webSocket::webSocket(Socket *s){
 
 string webSocket::receive(){
 	receiveBuffer += socket->receive();
+	if (receiveBuffer.size() > JAIL_WEBSOCKET_FRAME_SIZE_LIMIT + 14 && !isFrameComplete(receiveBuffer)) {
+		close("Error");
+		socket->close();
+		return "";
+	}
 	if (isFrameComplete(receiveBuffer)) {
 		//Logger::log(LOG_INFO,"Websocket receive frame \"%s\"",receiveBuffer.c_str());
 		bool fin;
@@ -294,6 +313,11 @@ string webSocket::receive(){
 					}
 					return data;
 				} else {
+					if (previous_data.size() > JAIL_WEBSOCKET_FRAME_SIZE_LIMIT - data.size()) {
+						close("Error");
+						socket->close();
+						return "";
+					}
 					previous_data += data;
 					return "";
 				}
