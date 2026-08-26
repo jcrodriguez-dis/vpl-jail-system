@@ -20,6 +20,7 @@
 #endif
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <syslog.h>
@@ -33,6 +34,13 @@
 #include "vplregex.h"
 #include "jail_limits.h"
 #include "httpException.h"
+
+#if HAVE_LINUX_OPENAT2_H
+#include <linux/openat2.h>
+#ifndef SYS_openat2
+#define SYS_openat2 437
+#endif
+#endif
 
 #define VPL_EXECUTION "vpl_execution"
 #define VPL_WEXECUTION "vpl_wexecution"
@@ -207,6 +215,25 @@ public:
 	 * Replaces deprecated usleep
 	 */
 	static void sleep(long microseconds);
+
+	/**
+	 * Compare two strings in constant time to prevent timing attacks
+	 * @param a first string
+	 * @param b second string
+	 * @return true if both strings are equal, false otherwise
+	 */
+	static bool compareConstantTime(const string &a, const string &b) {
+		size_t workSize = a.size() > b.size() ? a.size() : b.size();
+		if (workSize % 32 != 0) workSize += 32 - workSize % 32;
+		volatile unsigned char result = 0;
+		for (size_t i = 0; i < workSize; i++) {
+			unsigned char aByte = i < a.size() ? a[i] : 0;
+			unsigned char bByte = i < b.size() ? b[i] : 0;
+			result |= aByte ^ bByte;
+		}
+		result |= a.size() != b.size();
+		return result == 0;
+	}
 
 	/**
 	 * Cleans the string removing spaces from end and start
@@ -507,40 +534,50 @@ public:
 	static bool createDir(const string &path, uid_t user, size_t pos = 1) { //absolute path
 		pos = pos == 0 ? 1 : pos;
 		Logger::log(LOG_DEBUG, "createDir '%s' user %d pos %u", path.c_str(), user, pos);
-		string curDir;
-		while((pos = path.find('/', pos)) != string::npos) {
-			curDir = path.substr(0, pos);
-			pos++;
-			Logger::log(LOG_DEBUG, "Dir to check or create '%s' user %d", curDir.c_str(), user);
-			if(! dirExists(curDir) ) {
-				if(mkdir(curDir.c_str(), 0700)) {
-					Logger::log(LOG_DEBUG, "Can't create dir '%s'", curDir.c_str());
-					return false;
-				}
-				if (user) {
-					Logger::log(LOG_DEBUG, "Change owner to %d", user);
-					if(lchown(curDir.c_str(), user, user)) {
-						Logger::log(LOG_DEBUG, "Can't lchown dir '%s'", curDir.c_str());
-						return false;
-					}
-				}
-			}
+		int directoryFd = path[0] == '/' ? open("/", O_RDONLY | O_DIRECTORY) :
+			open(".", O_RDONLY | O_DIRECTORY);
+		if (directoryFd < 0) {
+			Logger::log(LOG_DEBUG, "Can't open base directory for '%s'", path.c_str());
+			return false;
 		}
-		Logger::log(LOG_DEBUG, "Dir to check or create '%s'", path.c_str());
-		if(! dirExists(path) ) {
-			Logger::log(LOG_DEBUG, "Create '%s'",path.c_str());
-			if(mkdir(path.c_str(), 0700)) {
-				Logger::log(LOG_DEBUG, "Can't create dir '%s' %m", path.c_str());
+
+		size_t componentStart = path[0] == '/' ? 1 : 0;
+		while (componentStart < path.size()) {
+			size_t separator = path.find('/', componentStart);
+			if (separator == string::npos) separator = path.size();
+			string component = path.substr(componentStart, separator - componentStart);
+			if (component.empty()) {
+				componentStart = separator + 1;
+				continue;
+			}
+
+			bool created = false;
+			if (separator >= pos && mkdirat(directoryFd, component.c_str(), 0700) == 0) {
+				created = true;
+			} else if (separator >= pos && errno != EEXIST) {
+				Logger::log(LOG_DEBUG, "Can't create dir '%s'", path.c_str());
+				close(directoryFd);
 				return false;
 			}
-			if (user) {
-				Logger::log(LOG_DEBUG, "Change owner to %d", user);
-				if(lchown(path.c_str(),user,user)) {
-					Logger::log(LOG_DEBUG, "Can't lchown dir '%s' %m", path.c_str());
-					return false;
-				}
+
+			int nextDirectoryFd = openat(directoryFd, component.c_str(),
+				O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+			if (nextDirectoryFd < 0) {
+				Logger::log(LOG_DEBUG, "Can't open directory component '%s'", component.c_str());
+				close(directoryFd);
+				return false;
 			}
+			if (created && user && fchown(nextDirectoryFd, user, user)) {
+				Logger::log(LOG_DEBUG, "Can't change owner of directory '%s'", path.c_str());
+				close(nextDirectoryFd);
+				close(directoryFd);
+				return false;
+			}
+			close(directoryFd);
+			directoryFd = nextDirectoryFd;
+			componentStart = separator + 1;
 		}
+		close(directoryFd);
 		return true;
 	}
 
@@ -590,6 +627,100 @@ public:
 		return false;
 	}
 
+	static int openFileWithoutSymlinks(const string &name, int flags, mode_t mode = 0) {
+		#if HAVE_LINUX_OPENAT2_H
+		struct open_how how = {};
+		how.flags = flags;
+		how.mode = mode;
+		how.resolve = RESOLVE_NO_SYMLINKS;
+		int fileFd = syscall(SYS_openat2, AT_FDCWD, name.c_str(), &how, sizeof(how));
+		if (fileFd >= 0)
+			return fileFd;
+		Logger::log(LOG_DEBUG, "openat2 failed for '%s': %s (errno=%d); trying openat fallback",
+				name.c_str(), strerror(errno), errno);
+		#endif
+
+		string directory = getDirectory(name);
+		string fileName = directory.size() ? name.substr(directory.size() + 1) : name;
+		int directoryFd = name[0] == '/' ? open("/", O_PATH | O_DIRECTORY) :
+			open(".", O_PATH | O_DIRECTORY);
+		if (directoryFd < 0) {
+			Logger::log(LOG_DEBUG, "Can't open fallback base directory for '%s': %s (errno=%d)",
+					name.c_str(), strerror(errno), errno);
+			return -1;
+		}
+		size_t componentStart = name[0] == '/' ? 1 : 0;
+		while (componentStart < directory.size()) {
+			size_t separator = directory.find('/', componentStart);
+			if (separator == string::npos) separator = directory.size();
+			string component = directory.substr(componentStart, separator - componentStart);
+			if (component.size()) {
+				int nextDirectoryFd = openat(directoryFd, component.c_str(),
+						O_PATH | O_DIRECTORY | O_NOFOLLOW);
+				if (nextDirectoryFd < 0) {
+					Logger::log(LOG_DEBUG, "Can't open fallback directory component '%s' for '%s': %s (errno=%d)",
+							component.c_str(), name.c_str(), strerror(errno), errno);
+					close(directoryFd);
+					return -1;
+				}
+				close(directoryFd);
+				directoryFd = nextDirectoryFd;
+			}
+			componentStart = separator + 1;
+		}
+		int fileFd = openat(directoryFd, fileName.c_str(), flags | O_NOFOLLOW, mode);
+		if (fileFd < 0) {
+			Logger::log(LOG_DEBUG, "openat: Can't open fallback file '%s': %s (errno=%d)",
+					fileName.c_str(), strerror(errno), errno);
+		}
+		close(directoryFd);
+		return fileFd;
+	}
+
+	static int removeDirContents(int directoryFd, uid_t owner, bool force) {
+		struct stat directoryStat;
+		if (fstat(directoryFd, &directoryStat) != 0 || !S_ISDIR(directoryStat.st_mode)) {
+			close(directoryFd);
+			return 0;
+		}
+		bool removeAll = force || directoryStat.st_uid == owner || directoryStat.st_gid == owner;
+		DIR *directory = fdopendir(directoryFd);
+		if (directory == NULL) {
+			close(directoryFd);
+			return 0;
+		}
+		int removed = 0;
+		dirent *entry;
+		while ((entry = readdir(directory)) != NULL) {
+			string name(entry->d_name);
+			if (name == "." || name == "..") continue;
+
+			int childFd = openat(dirfd(directory), name.c_str(),
+					O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+			if (childFd >= 0) {
+				struct stat childStat;
+				if (fstat(childFd, &childStat) == 0 && S_ISDIR(childStat.st_mode)) {
+					bool removeChild = removeAll || childStat.st_uid == owner || childStat.st_gid == owner;
+					removed += removeDirContents(childFd, owner, removeAll);
+					if (removeChild && unlinkat(dirfd(directory), name.c_str(), AT_REMOVEDIR) == 0)
+						removed++;
+				} else {
+					close(childFd);
+				}
+				continue;
+			}
+
+			struct stat childStat;
+			if (fstatat(dirfd(directory), name.c_str(), &childStat, AT_SYMLINK_NOFOLLOW) != 0)
+				continue;
+			bool remove = removeAll || childStat.st_uid == owner || childStat.st_gid == owner;
+			if (remove && unlinkat(dirfd(directory), name.c_str(), 0) == 0)
+				removed++;
+		}
+		closedir(directory);
+		return removed;
+	}
+
 	/**
 	 * Writes to a file, creating or replacing it if it already exists.
 	 * Directories are created as needed from a specified position.
@@ -614,29 +745,38 @@ public:
 			Logger::log(LOG_ERR, "Trying go out of base directory with file '%s'", name.c_str());
 			throw HttpException(internalServerErrorCode, "I can't write file");
 		}
-		// TODO when C++17 => use canonical or weakly_canonical from std::filesystem
-		FILE *fd = fopen(name.c_str(), "wb");
-		if (fd == NULL) {
-			string dir = getDirectory(name);
+		string dir = getDirectory(name);
+		if (dir.size()) {
 			Logger::log(LOG_DEBUG, "path '%s' dir '%s'", name.c_str(), dir.c_str());
-			if (dir.size())
+			if (!dirExists(dir))
 				createDir(dir, user, pos);
-			fd = fopen(name.c_str(), "wb");
-			if (fd == NULL)
-				throw HttpException(internalServerErrorCode, "I can't write file");
 		}
-		if (data.size() > 0 && fwrite(data.data(), data.size(), 1, fd) != 1) {
-			fclose(fd);
-			throw HttpException(internalServerErrorCode, "I can't write to file");
+		int fileFd = openFileWithoutSymlinks(name, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+		if (fileFd < 0) {
+			Logger::log(LOG_ERR, "Can't open file '%s' for writing: %s (errno=%d)",
+					name.c_str(), strerror(errno), errno);
+			throw HttpException(internalServerErrorCode, "I can't write file");
 		}
-		fclose(fd);
+		const char *writeData = data.data();
+		size_t remaining = data.size();
+		while (remaining > 0) {
+			ssize_t written = write(fileFd, writeData, remaining);
+			if (written < 0 && errno == EINTR) continue;
+			if (written <= 0) {
+				close(fileFd);
+				throw HttpException(internalServerErrorCode, "I can't write to file");
+			}
+			writeData += written;
+			remaining -= written;
+		}
 		if (user) {
-			if (lchown(name.c_str(), user, user))
+			if (fchown(fileFd, user, user))
 				Logger::log(LOG_WARNING, "Can't change file owner %m");
 		}
 		bool isScript = name.size() >= 4 && name.substr(name.size() - 3) == ".sh";
-		if (chmod(name.c_str(), isScript ? 0700 : 0600))
+		if (fchmod(fileFd, isScript ? 0700 : 0600))
 			Logger::log(LOG_ERR, "Can't change file perm %m");
+		close(fileFd);
 	}
 
 	/**
@@ -649,8 +789,8 @@ public:
 				throw HttpException(internalServerErrorCode, "I can't read file");
 			return "";
 		}
-		FILE *fd = fopen(name.c_str(),"rb");
-		if(fd==NULL){
+		int fileFd = openFileWithoutSymlinks(name, O_RDONLY);
+		if(fileFd < 0){
 			if(throwError)
 				throw HttpException(internalServerErrorCode
 						,"I can't read file");
@@ -660,10 +800,10 @@ public:
 		const int sbuffer=1024;
 		char buffer[sbuffer];
 		size_t read;
-		while((read=fread(buffer,1,sbuffer,fd))>0){
-			res+=string(buffer,read);
+		while((read=::read(fileFd, buffer, sbuffer))>0){
+			res+=string(buffer, read);
 		}
-		fclose(fd);
+		close(fileFd);
 		return res;
 	}
 
@@ -674,21 +814,28 @@ public:
 	 *            directories before this position are not checked.
 	 */
 	static void deleteFile(string fileNamePath, size_t pos = 0){
-		if (dirExists(fileNamePath)) {
-			Logger::log(LOG_ERR,"Can't unlink \"%s\": is a directory", fileNamePath.c_str());
-			return;
-		}
+		if (!correctPath(fileNamePath)) return;
 		string dirPath = getDirectory(fileNamePath);
 		if (pathChanged(dirPath, pos)) {
 			Logger::log(LOG_ERR,"Can't unlink \"%s\": is under symlink directory?", fileNamePath.c_str());
 			return;
 		}
-		if (Util::fileExists(fileNamePath)) {
-			Logger::log(LOG_DEBUG,"Delete \"%s\"", fileNamePath.c_str());
-			if (unlink(fileNamePath.c_str())) {
-				Logger::log(LOG_ERR,"Can't unlink \"%s\": %m", fileNamePath.c_str());
+		int parentFd = openFileWithoutSymlinks(dirPath.empty() ? "." : dirPath,
+			O_RDONLY | O_DIRECTORY);
+		if (parentFd < 0) return;
+		string fileName = dirPath.empty() ? fileNamePath :
+			fileNamePath.substr(dirPath.size() + 1);
+		struct stat fileStat;
+		if (fstatat(parentFd, fileName.c_str(), &fileStat, AT_SYMLINK_NOFOLLOW) == 0) {
+			if (S_ISDIR(fileStat.st_mode)) {
+				Logger::log(LOG_ERR,"Can't unlink \"%s\": is a directory", fileNamePath.c_str());
+			} else if (S_ISREG(fileStat.st_mode)) {
+				Logger::log(LOG_DEBUG,"Delete \"%s\"", fileNamePath.c_str());
+				if (unlinkat(parentFd, fileName.c_str(), 0))
+					Logger::log(LOG_ERR,"Can't unlink \"%s\": %m", fileNamePath.c_str());
 			}
 		}
+		close(parentFd);
 	}
 
 	/**
@@ -698,53 +845,33 @@ public:
 	 * and complete directories owned by prisoner (all files and directories owns by prisoner or not)
 	 */
 	static int removeDir(string dir, uid_t owner, bool force) {
-		if (! dirExists(dir)) {
+		if (dir == "/") {
 			return 0;
 		}
-		const string parent(".."), me(".");
-		int nunlinks = 0;
-		struct stat filestat;
-		lstat(dir.c_str(), &filestat);
-		bool removeAll = force || (filestat.st_uid == owner || filestat.st_gid == owner);
-		dirent *ent;
-		DIR *dirfd = opendir(dir.c_str());
-		if(dirfd==NULL){
+		string parent = getDirectory(dir);
+		string name = parent.size() ? dir.substr(parent.size() + 1) : dir;
+		if (parent.empty()) parent = ".";
+		int parentFd = openFileWithoutSymlinks(parent, O_RDONLY | O_DIRECTORY);
+		if (parentFd < 0) {
+			return 0;
+		}
+		int directoryFd = openat(parentFd, name.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+		if(directoryFd < 0){
+			close(parentFd);
 			Logger::log(LOG_ERR, "Can't open dir \"%s\": %m", dir.c_str());
 			return 0;
 		}
-		while((ent = readdir(dirfd)) != NULL) {
-			const string name(ent->d_name);
-			const string fullname = dir + "/" + name;
-			lstat(fullname.c_str(), &filestat);
-			if(S_ISDIR(filestat.st_mode)){
-				if(name != parent && name != me){
-					nunlinks += removeDir(fullname, owner, removeAll);
-				}
-			} else {
-				bool remove = removeAll;
-				if ( ! remove ) {
-					lstat(fullname.c_str(), &filestat);
-					remove = filestat.st_uid == owner || filestat.st_gid == owner;
-				}
-				if ( remove ) {
-					Logger::log(LOG_DEBUG,"Delete \"%s\"", fullname.c_str());
-					if( unlink(fullname.c_str()) ){
-						Logger::log(LOG_ERR,"Can't unlink \"%s\": %m",fullname.c_str());
-					} else {
-						nunlinks++;
-					}
-				}
-			}
+		struct stat directoryStat;
+		if (fstat(directoryFd, &directoryStat) != 0) {
+			close(directoryFd);
+			close(parentFd);
+			return 0;
 		}
-		closedir(dirfd);
-		if (removeAll) {
-			Logger::log(LOG_DEBUG,"rmdir \"%s\"",dir.c_str());
-			if ( rmdir(dir.c_str()) ) {
-				Logger::log(LOG_ERR,"Can't rmdir \"%s\": %m",dir.c_str());
-			} else {
-				nunlinks++;
-			}
-		}
+		bool removeAll = force || directoryStat.st_uid == owner || directoryStat.st_gid == owner;
+		int nunlinks = removeDirContents(directoryFd, owner, removeAll);
+		if (removeAll && unlinkat(parentFd, name.c_str(), AT_REMOVEDIR) == 0)
+			nunlinks++;
+		close(parentFd);
 		return nunlinks;
 	}
 	/**
@@ -855,74 +982,6 @@ public:
 		}
 		return clean;
     }
-	/**
-	 * Find cgroup filesystem mount point by reading /proc/mounts
-	 * Returns the base path where cgroup controllers are mounted
-	 * 
-	 * @return string path to cgroup filesystem root (e.g., "/sys/fs/cgroup")
-	 */
-	static string findCgroupFilesystem() {
-		const string DEFAULT_PATH = "/sys/fs/cgroup";
-		ifstream mounts("/proc/mounts");
-		
-		if (!mounts.is_open()) {
-			Logger::log(LOG_WARNING, "Cannot open /proc/mounts, using default cgroup path: %s", DEFAULT_PATH.c_str());
-			return DEFAULT_PATH;
-		}
-		
-		string line;
-		string cgroupv2Path;
-		string cgroupv1BasePath;
-		map<string, string> controllerPaths;
-		
-		while (getline(mounts, line)) {
-			stringstream ss(line);
-			string device, mountpoint, fstype, options;
-			ss >> device >> mountpoint >> fstype >> options;
-			
-			if (fstype == "cgroup2") {
-				// cgroup v2 - unified hierarchy (preferred)
-				cgroupv2Path = mountpoint;
-				Logger::log(LOG_DEBUG, "Found cgroup v2 at: %s", mountpoint.c_str());
-			} else if (fstype == "cgroup") {
-				// cgroup v1 - per-controller hierarchies
-				Logger::log(LOG_DEBUG, "Found cgroup v1 controller at: %s", mountpoint.c_str());
-				controllerPaths[mountpoint] = mountpoint;
-				
-				// Extract base path (parent directory of controller mounts)
-				size_t lastSlash = mountpoint.find_last_of('/');
-				if (lastSlash != string::npos && lastSlash > 0) {
-					string basePath = mountpoint.substr(0, lastSlash);
-					if (cgroupv1BasePath.empty() || basePath.length() < cgroupv1BasePath.length()) {
-						cgroupv1BasePath = basePath;
-					}
-				}
-			}
-		}
-		
-		mounts.close();
-		
-		// Prefer cgroup v2 if available
-		if (!cgroupv2Path.empty()) {
-			Logger::log(LOG_INFO, "Using cgroup v2 filesystem at: %s", cgroupv2Path.c_str());
-			return cgroupv2Path;
-		}
-		
-		// Use cgroup v1 base path
-		if (!cgroupv1BasePath.empty()) {
-			Logger::log(LOG_INFO, "Using cgroup v1 filesystem at: %s", cgroupv1BasePath.c_str());
-			return cgroupv1BasePath;
-		}
-		
-		// Check if standard path exists
-		if (fileExists(DEFAULT_PATH)) {
-			Logger::log(LOG_INFO, "Using default cgroup path: %s", DEFAULT_PATH.c_str());
-			return DEFAULT_PATH;
-		}
-		
-		Logger::log(LOG_WARNING, "No cgroup filesystem found, using default: %s", DEFAULT_PATH.c_str());
-		return DEFAULT_PATH;
-	}
 };
 
 #endif
