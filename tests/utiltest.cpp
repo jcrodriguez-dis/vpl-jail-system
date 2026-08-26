@@ -57,6 +57,26 @@ class UtilTest: public BaseTest {
 		assert(Util::itos(-2038911111) == "-2038911111");
 	}
 
+	void testCompareConstantTime() {
+		assert(Util::compareConstantTime("", ""));
+		assert(Util::compareConstantTime("same", "same"));
+		assert(!Util::compareConstantTime("same", "different"));
+		assert(!Util::compareConstantTime("same", "sam"));
+
+		string thirtyOneA(31, 'a');
+		string thirtyTwoA(32, 'a');
+		string thirtyThreeA(33, 'a');
+		assert(Util::compareConstantTime(thirtyOneA, thirtyOneA));
+		assert(Util::compareConstantTime(thirtyTwoA, thirtyTwoA));
+		assert(Util::compareConstantTime(thirtyThreeA, thirtyThreeA));
+		assert(!Util::compareConstantTime(thirtyOneA, thirtyTwoA));
+		assert(!Util::compareConstantTime(thirtyTwoA, thirtyThreeA));
+
+		string differentAtBlockEnd = thirtyTwoA;
+		differentAtBlockEnd[31] = 'b';
+		assert(!Util::compareConstantTime(thirtyTwoA, differentAtBlockEnd));
+	}
+
 	void testToUppercase(){
 		assert(Util::toUppercase("") == "");
 		assert(Util::toUppercase("a") == "A");
@@ -259,16 +279,30 @@ class UtilTest: public BaseTest {
 			assert(false);
 		}
 		catch (HttpException) {}
-		// Check that symlink is not followed and create file
+		// Check symlink is not followed even when the prefix is outside validation.
 		assert(! Util::fileExists(fileName));
 		Util::deleteFile("/tmp/nada");
 		// Check create directory checking not from root
 		assert(Util::createDir(baseDir + "/algo/nada", getuid(), baseDir.size()));
-		// Check create file checking not from root followinf symlinks
-		Util::writeFile(fileName, "mi texto único", getuid(), symDir.size() + 1);
-		assert(Util::fileExists(fileName));
-		// Check delete file following symlinks checking not from root
-		Util::deleteFile(fileName, 10000);
+		Util::deleteFile("/tmp/algo");
+		try {
+			Util::writeFile(fileName, "mi texto único", getuid(), symDir.size() + 1);
+			assert(false);
+		}
+		catch (HttpException) {}
+		assert(! Util::fileExists("/tmp/algo"));
+		assert(! Util::fileExists(fileName));
+		string outsideDir = "/tmp/vpl-util-created-outside";
+		Util::removeDir(outsideDir, getuid(), true);
+		assert(!Util::createDir(symDir + "/vpl-util-created-outside/subdir",
+			getuid(), symDir.size() + 1));
+		assert(!Util::dirExists(outsideDir));
+		string outsideFile = "/tmp/algo";
+		Util::writeFile(outsideFile, "must remain", getuid());
+		Util::deleteFile(fileName, symDir.size() + 1);
+		assert(Util::fileExists(outsideFile));
+		assert(Util::readFile(outsideFile) == "must remain");
+		Util::deleteFile(outsideFile);
 		Util::removeDir(baseDir, getuid(), false);
 		assert(! Util::fileExists(fileName));
 		assert(! Util::dirExists(baseDir));
@@ -400,6 +434,7 @@ public:
 		testBase64Decode();
 		testTrim();
 		testItos();
+		testCompareConstantTime();
 		testToUppercase();
 		testCorrectFileName();
 		testCorrectFilePath();
