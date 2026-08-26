@@ -3,6 +3,8 @@ services:
   vpl-jail:
     image: "jail-${VPL_BASE_DISTRO:?error}-${VPL_INSTALL_LEVEL:?error}"
     privileged: "${VPL_RUN_PRIVILEGED:?error}"
+    environment:
+      VPL_JAIL_USE_NAMESPACE: "${VPL_RUN_PRIVILEGED:?error}"
     restart: always
     build:
       context: .
