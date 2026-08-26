@@ -91,10 +91,10 @@ function showMessageIfError() {
 function checkDockerRunContainer() {
     local CONTAINER_NAME=$1
     local PRIVILEGED=$2
-    local RUNOPTION="-e VPL_JAIL_JAILPATH=/"
+    local RUNOPTION="-e VPL_JAIL_JAILPATH=/ -e VPL_JAIL_USE_NAMESPACE=false"
     local result=
 
-    [ "$PRIVILEGED" = "privileged" ] && RUNOPTION="-e VPL_JAIL_JAILPATH=/jail --privileged"
+    [ "$PRIVILEGED" = "privileged" ] && RUNOPTION="-e VPL_JAIL_JAILPATH=/jail -e VPL_JAIL_USE_NAMESPACE=true --privileged"
     [ "$VPL_DEBUG" != "" ] && RUNOPTION="$RUNOPTION -e VPL_JAIL_LOGLEVEL=8"
     chekPortInUse $PLAIN_PORT
     chekPortInUse $SECURE_PORT
@@ -130,17 +130,23 @@ function checkDockerRunContainer() {
     showMessageIfError $result "Container '$CONTAINER_NAME' fail for correct URL: $URL"
     [[ $result -ne 0 ]] && return 4
     writeCorrect "Correct response for OK URL $URL" "$CHECK_MARK"
+
+    python3 ./tests/daemonExecutionTest.py "http://localhost:$PLAIN_PORT/" &>> $ERRORS_LOG_FILE
+    showMessageIfError $? "Container '$CONTAINER_NAME' failed to compile and run a program in the jail"
+    [[ $? -ne 0 ]] && return 5
+    writeCorrect "Correct response for compiled and ran a program in container '$CONTAINER_NAME'" "$CHECK_MARK"
+
     writeInfo "Container '$CONTAINER_NAME' running logs"
     docker logs $CONTAINER_NAME
     # Stop container
     docker stop -t 3 $CONTAINER_NAME &>> $ERRORS_LOG_FILE
     showMessageIfError $? "Error stopping '$CONTAINER_NAME'"
-    [[ $? -ne 0 ]] && return 5
+    [[ $? -ne 0 ]] && return 6
     if [ "$3" == "" ] ; then
         # Remove container
         docker container rm -f $CONTAINER_NAME &>> $ERRORS_LOG_FILE
         showMessageIfError $? "Error removing container '$CONTAINER_NAME'"
-        [[ $? -ne 0 ]] && return 6
+        [[ $? -ne 0 ]] && return 7
         writeInfo "Container '$CONTAINER_NAME' removed"
     else
         writeInfo "Container '$CONTAINER_NAME' was kept at user request"
