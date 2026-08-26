@@ -168,7 +168,24 @@ void Jail::saveParseFiles(processMonitor &pm, RPC &rpc) {
 				pm.writeFile(name, data);
 			}
 		}
+		catch(HttpException &e) {
+			Logger::log(LOG_ERR, "Error saving files: %s", e.getLog().c_str());
+			_exit(EXIT_FAILURE);
+		}
+		catch(std::exception &e) {
+			Logger::log(LOG_ERR, "Error saving files: %s", e.what());
+			_exit(EXIT_FAILURE);
+		}
+		catch(string &e) {
+			Logger::log(LOG_ERR, "Error saving files: %s", e.c_str());
+			_exit(EXIT_FAILURE);
+		}
+		catch(const char *e) {
+			Logger::log(LOG_ERR, "Error saving files: %s", e);
+			_exit(EXIT_FAILURE);
+		}
 		catch(...) {
+			Logger::log(LOG_ERR, "Error saving files: unknown error");
 			_exit(EXIT_FAILURE);
 		}
 		_exit(EXIT_SUCCESS);
@@ -186,17 +203,39 @@ void Jail::saveParseFiles(processMonitor &pm, RPC &rpc) {
 void Jail::deleteFilesMarkedForDeletion(processMonitor &pm, RPC &rpc) {
 	pid_t pid=fork();
 	if(pid==0) { //new process
-		pm.becomePrisoner();
-		mapstruct filestodelete = rpc.getFileToDelete();
-		mapstruct files = rpc.getFiles();
-		for (mapstruct::iterator i = filestodelete.begin(); i != filestodelete.end(); i++) {
-			string name = i->first;
-			if (files.find(name) == files.end()) {
-				Logger::log(LOG_INFO, "File '%s' not in upload list then not deleted", name.c_str());
-				continue; // File not in the upload list so skip
+		try {
+			pm.becomePrisoner();
+			mapstruct filestodelete = rpc.getFileToDelete();
+			mapstruct files = rpc.getFiles();
+			for (mapstruct::iterator i = filestodelete.begin(); i != filestodelete.end(); i++) {
+				string name = i->first;
+				if (files.find(name) == files.end()) {
+					Logger::log(LOG_INFO, "File '%s' not in upload list then not deleted", name.c_str());
+					continue; // File not in the upload list so skip
+				}
+				Logger::log(LOG_INFO, "Delete file %s", name.c_str());
+				pm.deleteFile(name);
 			}
-			Logger::log(LOG_INFO, "Delete file %s", name.c_str());
-			pm.deleteFile(name);
+		}
+		catch(HttpException &e) {
+			Logger::log(LOG_ERR, "Error deleting files: %s", e.getLog().c_str());
+			_exit(EXIT_FAILURE);
+		}
+		catch(std::exception &e) {
+			Logger::log(LOG_ERR, "Error deleting files: %s", e.what());
+			_exit(EXIT_FAILURE);
+		}
+		catch(string &e) {
+			Logger::log(LOG_ERR, "Error deleting files: %s", e.c_str());
+			_exit(EXIT_FAILURE);
+		}
+		catch(const char *e) {
+			Logger::log(LOG_ERR, "Error deleting files: %s", e);
+			_exit(EXIT_FAILURE);
+		}
+		catch(...) {
+			Logger::log(LOG_ERR, "Error deleting files: unknown error");
+			_exit(EXIT_FAILURE);
 		}
 		_exit(EXIT_SUCCESS);
 	} else {
@@ -909,7 +948,6 @@ void Jail::setupNamespaces() {
 		Logger::log(LOG_DEBUG, "Namespace isolation disabled in configuration");
 		return;
 	}
-	
 	// Create new namespaces to isolate the process
 	// Using only PID and IPC namespaces
 	// CLONE_NEWPID: PID namespace - isolated process IDs
@@ -917,13 +955,13 @@ void Jail::setupNamespaces() {
 	// CLONE_NEWIPC: IPC namespace - isolated System V IPC, POSIX message queues
 	int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC;
 	if (unshare(flags) != 0) {
-		// If unshare fails, log but continue (some kernels may not support all namespaces)
-		Logger::log(LOG_WARNING, "Failed to create namespaces: %s (errno=%d). Continuing without full namespace isolation.", strerror(errno), errno);
-		return;
+		Logger::log(LOG_ERR, "Failed to create namespaces: %s (errno=%d)", strerror(errno), errno);
+		throw HttpException(internalServerErrorCode, "I can't create namespaces");
 	}
-	// Prevent mount events from propagating back to the host (best-effort)
+	// Prevent mount events from propagating back to the host.
 	if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL) != 0) {
-		Logger::log(LOG_WARNING, "Failed to make mount tree private: %s (errno=%d)", strerror(errno), errno);
+		Logger::log(LOG_ERR, "Failed to make mount tree private: %s (errno=%d)", strerror(errno), errno);
+		throw HttpException(internalServerErrorCode, "I can't isolate mount namespace");
 	}
 	// Fork to apply the new PID namespace
 	pid_t pid = fork();
@@ -1173,11 +1211,21 @@ void Jail::setupCgroup(processMonitor &pm){
 	if (!configuration->getUseCGroup()) {
 		return;
 	}
+	if (configuration->isRunningInContainer() && !Cgroup::isAvailable()) {
+		Logger::log(LOG_WARNING,
+				"Cgroup hierarchy is unavailable in the container; skipping cgroup setup");
+		return;
+	}
+	if (!Cgroup::isAvailable()) {
+		Logger::log(LOG_ERR, "Cgroup hierarchy is unavailable; refusing to continue");
+		throw HttpException(internalServerErrorCode, "Cgroup hierarchy is unavailable");
+	}
 	
 	try {
 		string cgroupName = "p" + Util::itos(pm.getPrisonerID());
 		Cgroup cgroup(cgroupName);
 		cgroup.removeCgroup(); // Clean previous cgroups if exist
+		cgroup.createCgroup();
 		// Add current process to cgroup controllers
 		pid_t pid = getpid();
 		// cgroup.setCPUProcs(pid);
@@ -1192,14 +1240,21 @@ void Jail::setupCgroup(processMonitor &pm){
 		}
 		
 		Logger::log(LOG_INFO, "Process %d added to cgroup %s", pid, cgroupName.c_str());
+	} catch (HttpException &e) {
+		Logger::log(LOG_ERR, "Failed to setup cgroup: %s", e.getLog().c_str());
+		throw;
 	} catch (const std::exception &e) {
-		Logger::log(LOG_WARNING, "Failed to setup cgroup: %s", e.what());
+		Logger::log(LOG_ERR, "Failed to setup cgroup: %s", e.what());
+		throw;
 	} catch (const char *s) {
-		Logger::log(LOG_WARNING, "Failed to setup cgroup: %s", s);
+		Logger::log(LOG_ERR, "Failed to setup cgroup: %s", s);
+		throw;
 	} catch (const string &s) {
-		Logger::log(LOG_WARNING, "Failed to setup cgroup: %s", s.c_str());
+		Logger::log(LOG_ERR, "Failed to setup cgroup: %s", s.c_str());
+		throw;
 	} catch (...) {
-		Logger::log(LOG_WARNING, "Failed to setup cgroup: unknown error");
+		Logger::log(LOG_ERR, "Failed to setup cgroup: unknown error");
+		throw;
 	}
 }
 
@@ -1352,6 +1407,12 @@ void Jail::executeInJail(processMonitor &pm, string name, const char *detail){
 		setLimits(pm);
 		// exec program (never returns)
 		transferExecution(pm, name);
+	} catch(HttpException &e) {
+		Logger::log(LOG_ERR, "Error running %s: %s", detail, e.getLog().c_str());
+		printf("\nJail error: %s\n", e.getMessage().c_str());
+	} catch(std::exception &e) {
+		Logger::log(LOG_ERR, "Error running %s: %s", detail, e.what());
+		printf("\nJail error: %s\n", e.what());
 	} catch(const char *s) {
 		Logger::log(LOG_ERR, "Error running %s: %s", detail, s);
 		printf("\nJail error: %s\n",s);
