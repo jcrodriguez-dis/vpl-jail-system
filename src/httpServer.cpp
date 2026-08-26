@@ -39,7 +39,7 @@ void HttpJailServer::validateRequest(string expected_path){
 	string URLPath = socket->getURLPath();
 	if(URLPath == "")
 		URLPath = "/";
-	if(expected_path != URLPath){
+	if(!Util::compareConstantTime(expected_path, URLPath)){
 		Logger::log(LOG_DEBUG, "http request URL path unexpected '%s'", URLPath.c_str());
 		throw HttpException(notFoundCode, "http request URL path not found");
 	}
