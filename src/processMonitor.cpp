@@ -57,6 +57,8 @@ void processMonitor::becomePrisoner(int prisoner) {
 	if (getuid() == 0 || geteuid() == 0)
 		throw HttpException(internalServerErrorCode,
 				"I can't change to prisoner user 2", Util::itos(prisoner));
+	Logger::log(LOG_DEBUG, "Prisoner credentials uid=%d euid=%d gid=%d egid=%d",
+			(int)getuid(), (int)geteuid(), (int)getgid(), (int)getegid());
 	
 	// Reject all unnecessary privileges and prevent privilege escalation
 	// Set NO_NEW_PRIVS to prevent gaining privileges through execve
