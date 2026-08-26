@@ -26,6 +26,11 @@ private:
 	static string baseCgroupFileSystem;
 	static bool baseCgroupFileSystemOverridden;
 	static bool isV2;
+	static bool initialized;
+	static string initializedBase;
+	static bool availabilityChecked;
+	static bool cachedAvailable;
+	static string checkedBase;
 	string cgroupDirectory;
 	string groupName;
 	static string joinPath(const string &a, const string &b) {
@@ -35,6 +40,10 @@ private:
 		return a + "/" + b;
 	}
 	static bool isCgroupV2Base(string base);
+	static string findCgroupFilesystem();
+	static bool isReadOnlyFilesystem(const string &path);
+	static bool canOpenForWriting(const string &path);
+	static bool probeFilesystem(const string &base, bool v2);
 	string v1Path(const char *relative) const {
 		return cgroupDirectory + relative;
 	}
@@ -42,7 +51,7 @@ private:
 		return joinPath(cgroupDirectory, relative);
 	}
 	void createV2Cgroup();
-	static void enableV2Controllers();
+	static void enableV2Controllers(const string &parent);
 	void attachPidV2(int pid);
 	static vplregex regUser;
 	static vplregex regSystem;
@@ -78,11 +87,15 @@ public:
 	static void setBaseCgroupFileSystem(string _baseCgroupFileSystem){
 		baseCgroupFileSystemOverridden = true;
 		baseCgroupFileSystem = _baseCgroupFileSystem;
+		initialized = false;
+		availabilityChecked = false;
 	}
 
 	static string getBaseCgroupFileSystem(){
 		return baseCgroupFileSystem;
 	}
+
+	static bool isAvailable();
 
 	Cgroup(string name){
 		init();
@@ -124,4 +137,5 @@ public:
 	 * @throws exception if cgroup cannot be removed (e.g., processes still in it)
 	 */
 	void removeCgroup();
+	void createCgroup();
 };

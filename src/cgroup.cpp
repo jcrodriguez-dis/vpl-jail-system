@@ -6,11 +6,17 @@
 
 #include "cgroup.h"
 #include "util.h"
+#include <sys/statvfs.h>
 
 using namespace std;
 
-string Cgroup::baseCgroupFileSystem= Util::findCgroupFilesystem();
+string Cgroup::baseCgroupFileSystem;
 bool Cgroup::baseCgroupFileSystemOverridden = false;
+bool Cgroup::initialized = false;
+string Cgroup::initializedBase;
+bool Cgroup::availabilityChecked = false;
+bool Cgroup::cachedAvailable = false;
+string Cgroup::checkedBase;
 vplregex Cgroup::regUser("(^|\n)user ([0-9]+)(\n|$)");
 vplregex Cgroup::regSystem("(^|\n)system ([0-9]+)(\n|$)");
 vplregex Cgroup::regPeriods("(^|\n)nr_periods ([0-9]+)(\n|$)");
@@ -45,20 +51,149 @@ const char* Cgroup::FILE_MEM_OOM_CONTROL = "memory/memory.oom_control";
 bool Cgroup::isV2 = false;
 
 void Cgroup::init() {
-    static bool initialized = false;
-    if (!initialized) {
-        if (!Cgroup::baseCgroupFileSystemOverridden) {
-            Cgroup::baseCgroupFileSystem = Util::findCgroupFilesystem();
-        }
-        Cgroup::isV2 = Cgroup::isCgroupV2Base(Cgroup::baseCgroupFileSystem);
-        Cgroup::enableV2Controllers();
-        initialized = true;
+    if (initialized && initializedBase == baseCgroupFileSystem) {
+        return;
     }
+    if (!baseCgroupFileSystemOverridden) {
+        baseCgroupFileSystem = findCgroupFilesystem();
+    }
+    isV2 = !baseCgroupFileSystem.empty() && isCgroupV2Base(baseCgroupFileSystem);
+    initializedBase = baseCgroupFileSystem;
+    initialized = true;
+    availabilityChecked = false;
+    if (isV2) enableV2Controllers(baseCgroupFileSystem);
 }   
 
 bool Cgroup::isCgroupV2Base(string base) {
     // cgroup v2 has a unified hierarchy and always exposes cgroup.controllers at the mount root.
+    if (base.empty()) return false;
     return Util::fileExists(joinPath(base, "cgroup.controllers"), true);
+}
+
+bool Cgroup::isAvailable() {
+    init();
+    if (availabilityChecked && checkedBase == baseCgroupFileSystem) {
+        return cachedAvailable;
+    }
+    checkedBase = baseCgroupFileSystem;
+    cachedAvailable = probeFilesystem(baseCgroupFileSystem, isV2);
+    availabilityChecked = true;
+    return cachedAvailable;
+}
+
+bool Cgroup::isReadOnlyFilesystem(const string &path) {
+    struct statvfs info;
+    return path.empty() || statvfs(path.c_str(), &info) != 0 || (info.f_flag & ST_RDONLY) != 0;
+}
+
+bool Cgroup::canOpenForWriting(const string &path) {
+    int fd = open(path.c_str(), O_WRONLY | O_CLOEXEC);
+    if (fd < 0) return false;
+    close(fd);
+    return true;
+}
+
+bool Cgroup::probeFilesystem(const string &base, bool v2) {
+    if (base.empty() || isReadOnlyFilesystem(base)) return false;
+    string probeName = ".vpl-cgroup-probe-" + Util::itos(getpid());
+    string probePath;
+    if (v2) {
+        if (!Util::fileExists(joinPath(base, "cgroup.controllers"), true)) return false;
+        probePath = joinPath(base, probeName);
+        if (mkdir(probePath.c_str(), 0700) != 0) return false;
+        bool usable = canOpenForWriting(joinPath(probePath, "cgroup.procs")) &&
+            canOpenForWriting(joinPath(probePath, "memory.max"));
+        if (rmdir(probePath.c_str()) != 0) usable = false;
+        return usable;
+    }
+
+    string memoryPath = joinPath(base, "memory");
+    if (!Util::dirExists(memoryPath) || isReadOnlyFilesystem(memoryPath)) return false;
+    probePath = joinPath(memoryPath, probeName);
+    if (mkdir(probePath.c_str(), 0700) != 0) return false;
+    bool usable = canOpenForWriting(joinPath(probePath, "tasks")) &&
+        canOpenForWriting(joinPath(probePath, "memory.limit_in_bytes"));
+    if (rmdir(probePath.c_str()) != 0) usable = false;
+    return usable;
+}
+
+string Cgroup::findCgroupFilesystem() {
+    const string defaultPath = "/sys/fs/cgroup";
+    ifstream mounts("/proc/mounts");
+    if (!mounts.is_open()) {
+        Logger::log(LOG_WARNING, "Cannot open /proc/mounts, using default cgroup path: %s",
+                defaultPath.c_str());
+        return defaultPath;
+    }
+
+    string line;
+    vector<string> cgroupv2Paths;
+    map<string, bool> v1MemoryMounts;
+    bool foundCgroupMount = false;
+    while (getline(mounts, line)) {
+        stringstream ss(line);
+        string device, mountpoint, fstype, options;
+        ss >> device >> mountpoint >> fstype >> options;
+        bool readOnly = false;
+        stringstream optionList(options);
+        string option;
+        while (getline(optionList, option, ',')) {
+            if (option == "ro") {
+                readOnly = true;
+                break;
+            }
+        }
+        readOnly = readOnly || isReadOnlyFilesystem(mountpoint);
+
+        if (fstype == "cgroup2") {
+            foundCgroupMount = true;
+            if (!readOnly) {
+                cgroupv2Paths.push_back(mountpoint);
+                Logger::log(LOG_DEBUG, "Found writable cgroup v2 at: %s", mountpoint.c_str());
+            } else {
+                Logger::log(LOG_WARNING, "Ignoring read-only cgroup v2 at: %s", mountpoint.c_str());
+            }
+        } else if (fstype == "cgroup") {
+            foundCgroupMount = true;
+            size_t lastSlash = mountpoint.find_last_of('/');
+            if (lastSlash != string::npos && lastSlash > 0) {
+                string basePath = mountpoint.substr(0, lastSlash);
+                string controller = mountpoint.substr(lastSlash + 1);
+                if (controller == "memory") {
+                    v1MemoryMounts[basePath] = !readOnly;
+                }
+                Logger::log(LOG_DEBUG, "Found %s cgroup v1 controller at: %s",
+                        readOnly ? "read-only" : "writable", mountpoint.c_str());
+            }
+        }
+    }
+
+    for (vector<string>::const_iterator i = cgroupv2Paths.begin(); i != cgroupv2Paths.end(); ++i) {
+        enableV2Controllers(*i);
+        if (probeFilesystem(*i, true)) {
+            Logger::log(LOG_INFO, "Using cgroup v2 filesystem at: %s", i->c_str());
+            return *i;
+        }
+        Logger::log(LOG_WARNING, "Ignoring unavailable cgroup v2 filesystem at: %s", i->c_str());
+    }
+    string cgroupv1BasePath;
+    for (map<string, bool>::iterator i = v1MemoryMounts.begin(); i != v1MemoryMounts.end(); ++i) {
+        if (i->second && probeFilesystem(i->first, false) &&
+                (cgroupv1BasePath.empty() || i->first.length() < cgroupv1BasePath.length())) {
+            cgroupv1BasePath = i->first;
+        }
+    }
+    if (!cgroupv1BasePath.empty()) {
+        Logger::log(LOG_INFO, "Using cgroup v1 filesystem at: %s", cgroupv1BasePath.c_str());
+        return cgroupv1BasePath;
+    }
+    if (foundCgroupMount) {
+        Logger::log(LOG_WARNING, "No available cgroup filesystem found");
+        return "";
+    }
+    if (Util::dirExists(defaultPath)) return defaultPath;
+    Logger::log(LOG_WARNING, "No cgroup filesystem found, using default: %s", defaultPath.c_str());
+    return defaultPath;
 }
 
 static long long parseCpuStatValue(const string &stat, const string &key) {
@@ -78,20 +213,20 @@ void Cgroup::createV2Cgroup() {
         return;
     }
     if (mkdir(cgroupDirectory.c_str(), 0755) != 0) {
-        if (errno != EEXIST) {
-            Logger::log(LOG_WARNING, "Failed to create cgroup v2 directory %s: %s (errno=%d)",
-                    cgroupDirectory.c_str(), strerror(errno), errno);
-        }
+        if (errno == EEXIST) return;
+        Logger::log(LOG_ERR, "Failed to create cgroup v2 directory %s: %s (errno=%d)",
+                cgroupDirectory.c_str(), strerror(errno), errno);
+        throw runtime_error("Unable to create cgroup");
     }
 }
 
-void Cgroup::enableV2Controllers() {
-    if (!isV2) {
-        return;
-    }
+void Cgroup::createCgroup() {
+    createV2Cgroup();
+}
+
+void Cgroup::enableV2Controllers(const string &parent) {
     // Best-effort: try to enable controllers in the parent so files exist for children.
     // This can legitimately fail on systemd-managed or busy hierarchies; we continue anyway.
-    const string parent = Cgroup::getBaseCgroupFileSystem();
     const string controllersFile = parent + "/cgroup.controllers";
     const string subtreeFile = parent + "/cgroup.subtree_control";
     string controllers;
@@ -408,10 +543,10 @@ void Cgroup::setNetProcs(int pid){
     Logger::log(LOG_DEBUG,"Writing to the file '%s'", path.c_str());
     ofstream file;
     file.open(path, fstream::app);
-    if (file.is_open()){
-        file << Util::itos(pid) + '\n';
-        Logger::log(LOG_DEBUG,"'%s' has been successfully written", path.c_str());
-    }
+    if (!file.is_open()) throw runtime_error("Unable to attach process to net cgroup");
+    file << Util::itos(pid) + '\n';
+    if (!file) throw runtime_error("Unable to attach process to net cgroup");
+    Logger::log(LOG_DEBUG,"'%s' has been successfully written", path.c_str());
     file.close();
 }
 /**
@@ -427,13 +562,11 @@ void Cgroup::setCPUProcs(int pid){
     Logger::log(LOG_DEBUG,"Writing to the file '%s'", path.c_str());
     ofstream file;
     file.open(path, fstream::app);
-    if (file.is_open()){
-        file << Util::itos(pid) + '\n';
-        Logger::log(LOG_DEBUG,"'%s' has been successfully written", path.c_str());
-        file.close();
-    } else {
-        Logger::log(LOG_ERR, "Failed to open file '%s' for writing", path.c_str());
-    }
+    if (!file.is_open()) throw runtime_error("Unable to attach process to CPU cgroup");
+    file << Util::itos(pid) + '\n';
+    if (!file) throw runtime_error("Unable to attach process to CPU cgroup");
+    Logger::log(LOG_DEBUG,"'%s' has been successfully written", path.c_str());
+    file.close();
 }
 
 /**
@@ -448,10 +581,10 @@ void Cgroup::setMemoryProcs(int pid){
     Logger::log(LOG_DEBUG,"Writing to the file '%s'", path.c_str());
     ofstream file;
     file.open(path, fstream::app);
-    if (file.is_open()){
-        file << Util::itos(pid) + '\n';
-        Logger::log(LOG_DEBUG,"'%s' has been successfully written", path.c_str());
-    }
+    if (!file.is_open()) throw runtime_error("Unable to attach process to memory cgroup");
+    file << Util::itos(pid) + '\n';
+    if (!file) throw runtime_error("Unable to attach process to memory cgroup");
+    Logger::log(LOG_DEBUG,"'%s' has been successfully written", path.c_str());
     file.close();
 }
 
