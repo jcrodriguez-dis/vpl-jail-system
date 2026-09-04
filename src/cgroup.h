@@ -44,6 +44,8 @@ private:
 	static bool isReadOnlyFilesystem(const string &path);
 	static bool canOpenForWriting(const string &path);
 	static bool probeFilesystem(const string &base, bool v2);
+	static bool writeControlFile(const string &path, const string &value);
+	static bool moveProcessesToLeaf(const string &parent);
 	string v1Path(const char *relative) const {
 		return cgroupDirectory + relative;
 	}
@@ -96,6 +98,10 @@ public:
 	}
 
 	static bool isAvailable();
+
+	static bool isCgroupV2(){
+		return isV2;
+	}
 
 	Cgroup(string name){
 		init();

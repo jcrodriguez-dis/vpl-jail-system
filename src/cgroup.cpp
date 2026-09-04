@@ -227,36 +227,95 @@ void Cgroup::createCgroup() {
 void Cgroup::enableV2Controllers(const string &parent) {
     // Best-effort: try to enable controllers in the parent so files exist for children.
     // This can legitimately fail on systemd-managed or busy hierarchies; we continue anyway.
-    const string controllersFile = parent + "/cgroup.controllers";
-    const string subtreeFile = parent + "/cgroup.subtree_control";
+    const string controllersFile = joinPath(parent, "cgroup.controllers");
+    const string subtreeFile = joinPath(parent, "cgroup.subtree_control");
     string controllers;
     try {
         controllers = Util::readFile(controllersFile, false);
     } catch (...) {
         controllers = "";
     }
-    if (!controllers.empty()) {
-        const char *want[] = {"memory", "pids", "cpu"};
-        for (int i = 0; i < 3; i++) {
-            string token = want[i];
-            if (controllers.find(token) == string::npos) {
-                continue;
-            }
-            try {
-                // Writing a single token is allowed; kernel merges tokens.
-                Util::writeFile(subtreeFile, "+" + token);
-            } catch (...) {
-                // Non-fatal.
-            }
+    if (controllers.empty()) {
+        Logger::log(LOG_WARNING, "No cgroup v2 controllers available at %s", parent.c_str());
+        return;
+    }
+    const char *want[] = {"memory", "pids", "cpu"};
+    bool moved = false;
+    for (int i = 0; i < 3; i++) {
+        string token = want[i];
+        if (controllers.find(token) == string::npos) {
+            continue;
+        }
+        // Writing a single token is allowed; kernel merges tokens.
+        if (writeControlFile(subtreeFile, "+" + token)) {
+            continue;
+        }
+        // EBUSY means the cgroup holds processes ("no internal processes" rule).
+        if (errno == EBUSY && !moved) {
+            moved = moveProcessesToLeaf(parent);
+            if (moved) writeControlFile(subtreeFile, "+" + token);
         }
     }
+}
+
+/**
+ * Write a value to a cgroup control file. Returns false and keeps errno on failure.
+ */
+bool Cgroup::writeControlFile(const string &path, const string &value) {
+    int fd = open(path.c_str(), O_WRONLY | O_CLOEXEC);
+    if (fd < 0) {
+        Logger::log(LOG_DEBUG, "Can't open cgroup file '%s': %s (errno=%d)",
+                path.c_str(), strerror(errno), errno);
+        return false;
+    }
+    ssize_t written;
+    do {
+        written = write(fd, value.data(), value.size());
+    } while (written < 0 && errno == EINTR);
+    int savedErrno = errno;
+    close(fd);
+    if (written != (ssize_t) value.size()) {
+        errno = savedErrno;
+        Logger::log(LOG_DEBUG, "Can't write '%s' to cgroup file '%s': %s (errno=%d)",
+                value.c_str(), path.c_str(), strerror(savedErrno), savedErrno);
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Move the processes of a cgroup to a leaf subgroup.
+ * Only a cgroup without processes of its own can delegate controllers to its children,
+ * which is not the case of the root cgroup seen inside a container.
+ */
+bool Cgroup::moveProcessesToLeaf(const string &parent) {
+    const string leaf = joinPath(parent, "vpl-jail-system.init");
+    if (mkdir(leaf.c_str(), 0755) != 0 && errno != EEXIST) {
+        Logger::log(LOG_WARNING, "Can't create cgroup '%s': %s (errno=%d)",
+                leaf.c_str(), strerror(errno), errno);
+        return false;
+    }
+    ifstream procs(joinPath(parent, "cgroup.procs").c_str());
+    if (!procs.is_open()) return false;
+    const string leafProcs = joinPath(leaf, "cgroup.procs");
+    string pid;
+    int moved = 0;
+    while (getline(procs, pid)) {
+        if (pid.empty()) continue;
+        if (writeControlFile(leafProcs, pid)) moved++;
+    }
+    if (moved == 0) return false;
+    Logger::log(LOG_INFO, "Moved %d processes to cgroup '%s' to allow controller delegation",
+            moved, leaf.c_str());
+    return true;
 }
 
 void Cgroup::attachPidV2(int pid) {
     const string path = v2Path("cgroup.procs");
     Logger::log(LOG_DEBUG, "Writing to the file '%s'", path.c_str());
-    // Overwrite is fine; kernel interprets the number and moves the process.
-    Util::writeFile(path, Util::itos(pid));
+    if (!writeControlFile(path, Util::itos(pid))) {
+        throw runtime_error("Unable to attach process to cgroup");
+    }
 }
 
 string Cgroup::regFound(vplregex &reg, string input){
@@ -599,7 +658,9 @@ void Cgroup::setMemoryLimitInBytes(long int bytes){
         path = v1Path(FILE_MEM_LIMIT);
     }
     Logger::log(LOG_DEBUG,"Writing to the file '%s'", path.c_str());
-    Util::writeFile(path, Util::itos(bytes));
+    if (!writeControlFile(path, Util::itos(bytes))) {
+        throw runtime_error("Unable to set the cgroup memory limit");
+    }
     Logger::log(LOG_DEBUG,"'%s' has been successfully written", path.c_str());
 }
 
