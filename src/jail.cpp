@@ -601,32 +601,41 @@ void Jail::commandExecute(string executeticket, Socket *s){
 		throw "Internal server error";
 	}
 	Logger::log(LOG_INFO,"Start executing");
-	if (pm.getState() == beforeRunning) { 
-		pm.setRunner();
-		if (pm.FileExists(VPL_EXECUTION)) {
-			string program;
-			if (pm.installScript(".vpl_launcher.sh", "vpl_terminal_launcher.sh")) {
-				program = ".vpl_launcher.sh";
-			} else {
-				program = VPL_EXECUTION;
-			}
-			runTerminal(pm, ws, program);
-		} else if (pm.FileExists(VPL_WEBEXECUTION)) {
-			string program;
-			if (pm.installScript(".vpl_launcher.sh", "vpl_web_launcher.sh")) {
-				program = ".vpl_launcher.sh";
-			} else {
-				program = VPL_WEBEXECUTION;
-			}
-			runTerminal(pm, ws, program);
-		} else if (pm.FileExists(VPL_WEXECUTION)) {
-			if (pm.installScript(".vpl_launcher.sh", "vpl_vnc_launcher.sh"))
-				runVNC(pm, ws, ".vpl_launcher.sh");
-			else
-				Logger::log(LOG_ERR, "%s:Error: vpl_vnc_launcher.sh not installed", IP.c_str());
+	// The client may request the execution before the preparation/compilation ends.
+	processState state = pm.getState();
+	time_t waitLimit = time(NULL) + pm.getMaxTime() + JAIL_HARVEST_TIMEOUT;
+	while ((state == starting || state == compiling) && time(NULL) < waitLimit) {
+		Util::sleep(100000);
+		state = pm.getState();
+	}
+	if (state != beforeRunning) {
+		Logger::log(LOG_ERR, "%s: Nothing to execute, task state %d", IP.c_str(), (int) state);
+		return;
+	}
+	pm.setRunner();
+	if (pm.FileExists(VPL_EXECUTION)) {
+		string program;
+		if (pm.installScript(".vpl_launcher.sh", "vpl_terminal_launcher.sh")) {
+			program = ".vpl_launcher.sh";
 		} else {
-			Logger::log(LOG_ERR, "%s:Error: nothing to run", IP.c_str());
+			program = VPL_EXECUTION;
 		}
+		runTerminal(pm, ws, program);
+	} else if (pm.FileExists(VPL_WEBEXECUTION)) {
+		string program;
+		if (pm.installScript(".vpl_launcher.sh", "vpl_web_launcher.sh")) {
+			program = ".vpl_launcher.sh";
+		} else {
+			program = VPL_WEBEXECUTION;
+		}
+		runTerminal(pm, ws, program);
+	} else if (pm.FileExists(VPL_WEXECUTION)) {
+		if (pm.installScript(".vpl_launcher.sh", "vpl_vnc_launcher.sh"))
+			runVNC(pm, ws, ".vpl_launcher.sh");
+		else
+			Logger::log(LOG_ERR, "%s:Error: vpl_vnc_launcher.sh not installed", IP.c_str());
+	} else {
+		Logger::log(LOG_ERR, "%s:Error: nothing to run", IP.c_str());
 	}
 }
 
