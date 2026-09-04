@@ -534,10 +534,12 @@ public:
 	static bool createDir(const string &path, uid_t user, size_t pos = 1) { //absolute path
 		pos = pos == 0 ? 1 : pos;
 		Logger::log(LOG_DEBUG, "createDir '%s' user %d pos %u", path.c_str(), user, pos);
-		int directoryFd = path[0] == '/' ? open("/", O_RDONLY | O_DIRECTORY) :
-			open(".", O_RDONLY | O_DIRECTORY);
+		// O_PATH is used to walk the path with execute permission only.
+		int directoryFd = path[0] == '/' ? open("/", O_PATH | O_DIRECTORY) :
+			open(".", O_PATH | O_DIRECTORY);
 		if (directoryFd < 0) {
-			Logger::log(LOG_DEBUG, "Can't open base directory for '%s'", path.c_str());
+			Logger::log(LOG_DEBUG, "Can't open base directory for '%s': %s (errno=%d)",
+					path.c_str(), strerror(errno), errno);
 			return false;
 		}
 
@@ -555,21 +557,26 @@ public:
 			if (separator >= pos && mkdirat(directoryFd, component.c_str(), 0700) == 0) {
 				created = true;
 			} else if (separator >= pos && errno != EEXIST) {
-				Logger::log(LOG_DEBUG, "Can't create dir '%s'", path.c_str());
+				Logger::log(LOG_DEBUG, "Can't create dir '%s': %s (errno=%d)",
+						path.c_str(), strerror(errno), errno);
 				close(directoryFd);
 				return false;
 			}
 
-			int nextDirectoryFd = openat(directoryFd, component.c_str(),
-				O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
-			if (nextDirectoryFd < 0) {
-				Logger::log(LOG_DEBUG, "Can't open directory component '%s'", component.c_str());
+			if (created && user
+					&& fchownat(directoryFd, component.c_str(), user, user, AT_SYMLINK_NOFOLLOW)) {
+				Logger::log(LOG_DEBUG, "Can't change owner of directory '%s': %s (errno=%d)",
+						path.c_str(), strerror(errno), errno);
 				close(directoryFd);
 				return false;
 			}
-			if (created && user && fchown(nextDirectoryFd, user, user)) {
-				Logger::log(LOG_DEBUG, "Can't change owner of directory '%s'", path.c_str());
-				close(nextDirectoryFd);
+
+			// Symlinks are only rejected in the untrusted part of the path.
+			int nextDirectoryFd = openat(directoryFd, component.c_str(),
+				O_PATH | O_DIRECTORY | (separator >= pos ? O_NOFOLLOW : 0));
+			if (nextDirectoryFd < 0) {
+				Logger::log(LOG_DEBUG, "Can't open directory component '%s' of '%s': %s (errno=%d)",
+						component.c_str(), path.c_str(), strerror(errno), errno);
 				close(directoryFd);
 				return false;
 			}
@@ -627,29 +634,51 @@ public:
 		return false;
 	}
 
-	static int openFileWithoutSymlinks(const string &name, int flags, mode_t mode = 0) {
-		#if HAVE_LINUX_OPENAT2_H
-		struct open_how how = {};
-		how.flags = flags;
-		how.mode = mode;
-		how.resolve = RESOLVE_NO_SYMLINKS;
-		int fileFd = syscall(SYS_openat2, AT_FDCWD, name.c_str(), &how, sizeof(how));
-		if (fileFd >= 0)
-			return fileFd;
-		Logger::log(LOG_DEBUG, "openat2 failed for '%s': %s (errno=%d); trying openat fallback",
-				name.c_str(), strerror(errno), errno);
-		#endif
-
-		string directory = getDirectory(name);
-		string fileName = directory.size() ? name.substr(directory.size() + 1) : name;
-		int directoryFd = name[0] == '/' ? open("/", O_PATH | O_DIRECTORY) :
-			open(".", O_PATH | O_DIRECTORY);
-		if (directoryFd < 0) {
-			Logger::log(LOG_DEBUG, "Can't open fallback base directory for '%s': %s (errno=%d)",
-					name.c_str(), strerror(errno), errno);
+	/**
+	 * Open a file rejecting symlinks in the path components after "pos".
+	 * The path prefix before "pos" is trusted, so it may contain symlinks
+	 * (e.g. /usr/sbin or /proc/self in some systems).
+	 */
+	static int openFileWithoutSymlinks(const string &name, int flags, mode_t mode = 0, size_t pos = 0) {
+		string base = name.substr(0, pos);
+		string relative = name.substr(base.size());
+		while (relative.size() && relative[0] == '/') relative.erase(0, 1);
+		while (base.size() > 1 && base[base.size() - 1] == '/') base.erase(base.size() - 1);
+		if (pos == 0 || relative.empty()) { // The whole path is trusted.
+			int trustedFd = open(name.c_str(), flags, mode);
+			if (trustedFd < 0) {
+				Logger::log(LOG_DEBUG, "Can't open trusted path '%s': %s (errno=%d)",
+						name.c_str(), strerror(errno), errno);
+			}
+			return trustedFd;
+		}
+		if (base.empty()) base = name[0] == '/' ? "/" : ".";
+		int baseFd = open(base.c_str(), O_PATH | O_DIRECTORY);
+		if (baseFd < 0) {
+			Logger::log(LOG_DEBUG, "Can't open base directory '%s' for '%s': %s (errno=%d)",
+					base.c_str(), name.c_str(), strerror(errno), errno);
 			return -1;
 		}
-		size_t componentStart = name[0] == '/' ? 1 : 0;
+		#if HAVE_LINUX_OPENAT2_H
+		{
+			struct open_how how = {};
+			how.flags = flags;
+			how.mode = mode;
+			how.resolve = RESOLVE_NO_SYMLINKS;
+			int openat2Fd = syscall(SYS_openat2, baseFd, relative.c_str(), &how, sizeof(how));
+			if (openat2Fd >= 0) {
+				close(baseFd);
+				return openat2Fd;
+			}
+			Logger::log(LOG_DEBUG, "openat2 failed for '%s': %s (errno=%d); trying openat fallback",
+					name.c_str(), strerror(errno), errno);
+		}
+		#endif
+
+		string directory = getDirectory(relative);
+		string fileName = directory.size() ? relative.substr(directory.size() + 1) : relative;
+		int directoryFd = baseFd;
+		size_t componentStart = 0;
 		while (componentStart < directory.size()) {
 			size_t separator = directory.find('/', componentStart);
 			if (separator == string::npos) separator = directory.size();
@@ -751,7 +780,7 @@ public:
 			if (!dirExists(dir))
 				createDir(dir, user, pos);
 		}
-		int fileFd = openFileWithoutSymlinks(name, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+		int fileFd = openFileWithoutSymlinks(name, O_WRONLY | O_CREAT | O_TRUNC, 0600, pos);
 		if (fileFd < 0) {
 			Logger::log(LOG_ERR, "Can't open file '%s' for writing: %s (errno=%d)",
 					name.c_str(), strerror(errno), errno);
@@ -789,7 +818,7 @@ public:
 				throw HttpException(internalServerErrorCode, "I can't read file");
 			return "";
 		}
-		int fileFd = openFileWithoutSymlinks(name, O_RDONLY);
+		int fileFd = openFileWithoutSymlinks(name, O_RDONLY, 0, pos);
 		if(fileFd < 0){
 			if(throwError)
 				throw HttpException(internalServerErrorCode
@@ -821,7 +850,7 @@ public:
 			return;
 		}
 		int parentFd = openFileWithoutSymlinks(dirPath.empty() ? "." : dirPath,
-			O_RDONLY | O_DIRECTORY);
+			O_RDONLY | O_DIRECTORY, 0, pos <= dirPath.size() ? pos : 0);
 		if (parentFd < 0) return;
 		string fileName = dirPath.empty() ? fileNamePath :
 			fileNamePath.substr(dirPath.size() + 1);
