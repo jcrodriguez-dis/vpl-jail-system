@@ -6,6 +6,8 @@ USER root:root
 
 # Set default install levels: minimum < basic < standard < full
 ARG VPL_INSTALL_LEVEL=standard
+# Language servers to install: empty (none), "all" or a space separated list of languages
+ARG VPL_INSTALL_LS=
 ARG VPL_JAIL_JAILPATH=/
 ARG VPL_JAIL_PORT=80
 ARG VPL_JAIL_SECURE_PORT
@@ -29,6 +31,11 @@ RUN /vpl-jail-system/install-bash-sh
 
 # Run VPL installer
 RUN /vpl-jail-system/install-vpl-sh noninteractive ${VPL_INSTALL_LEVEL}
+
+# Install the language servers and their launchers
+RUN if [ -n "${VPL_INSTALL_LS}" ] ; then \
+        /vpl-jail-system/install-vpl-ls-sh ${VPL_INSTALL_LS} ; \
+    fi
 
 # Remove installer
 WORKDIR /

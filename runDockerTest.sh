@@ -167,6 +167,7 @@ function checkDockerBuild() {
     docker build \
         --build-arg VPL_BASE_DISTRO=$VPL_BASE_DISTRO \
         --build-arg VPL_INSTALL_LEVEL=$VPL_INSTALL_LEVEL \
+        --build-arg VPL_INSTALL_LS="$VPL_INSTALL_LS" \
         --progress=plain -t $IMAGE_NAME . 2>&1 | tee $ERRORS_LOG_FILE | show_progress
     showMessageIfError $? "Build $IMAGE_NAME fail"
     [[ $? -ne 0 ]] && return 1
@@ -194,10 +195,12 @@ function checkParameter() {
 }
 
 function runTests() {
-    # Parameters:
-    #    $1 Ditro name [Optional] default [alpine ubuntu debian fedora]
-    #    $2 Install level [Optional] [minimum basic standard full]
-    #    $3 keep [Optional] Indicate do not delete the image and container after the test.
+    # Parameters (all optional and in any order):
+    #    Distro name, default [alpine ubuntu debian fedora]
+    #    Install level [minimum basic standard full]
+    #    keep: Indicate do not delete the image and container after the test.
+    #    languageservers[=LIST]: Install the language servers in the image.
+    #        LIST is a comma separated list of languages, default all.
     local n=0
 	local DISTROS=( alpine ubuntu debian fedora )
     local INSTALL_LEVELS=( minimum basic standard full )
@@ -212,10 +215,20 @@ function runTests() {
             keep=$param
             continue
         fi
+        if [[ $param == "languageservers" || $param == "languageservers="* ]] ; then
+            if [[ $param == *"="* ]] ; then
+                VPL_INSTALL_LS=$(echo "${param#*=}" | tr ',' ' ')
+            else
+                VPL_INSTALL_LS="all"
+            fi
+            continue
+        fi
         DISTROS=( $param )
     done
+    export VPL_INSTALL_LS
     rm vpl-jail-system-*.tar.gz &> /dev/null
     local matrix="[ ${DISTROS[@]} ] X [ ${INSTALL_LEVELS[@]} ] $keep"
+    [ -n "$VPL_INSTALL_LS" ] && matrix="$matrix + language servers [ $VPL_INSTALL_LS ]"
     writeHeading "$matrix" "Test Matrix "
     writeHeading "Building distribution package"
     (
@@ -263,5 +276,5 @@ function runTests() {
     return $nfails
 }
 echo "$(date) Running tests for vpl-jail-system in Docker" > "$ERRORS_LOG_FILE"
-writeHeading "vpl-jail-system running in Docker $1 $2 $3" "TESTING "
-runTests $1 $2 $3
+writeHeading "vpl-jail-system running in Docker $*" "TESTING "
+runTests "$@"
