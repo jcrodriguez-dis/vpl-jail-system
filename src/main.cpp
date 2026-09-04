@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include "vpl-jail-server.h"
 #include "configuration.h"
+#include "cgroup.h"
 #include "log.h"
 
 using namespace std;
@@ -271,6 +272,26 @@ public:
 			Logger::setLogLevel(logLevel, foreground);
 		}
 	}
+
+	/**
+	 * Report cgroup availability at startup, as the per task setup runs in a child
+	 * process whose log goes to syslog only.
+	 */
+	static void checkCgroupAvailability(const Configuration *conf) {
+		if (!conf->getUseCGroup()) {
+			Logger::log(LOG_NOTICE, "Cgroup use is disabled by configuration (USE_CGROUP)");
+			return;
+		}
+		if (Cgroup::isAvailable()) {
+			Logger::log(LOG_NOTICE, "Cgroup %s available at '%s'",
+					Cgroup::isCgroupV2() ? "v2" : "v1", Cgroup::getBaseCgroupFileSystem().c_str());
+		} else {
+			Logger::log(LOG_WARNING, "Cgroup hierarchy unavailable: tasks will run without"
+					" cgroup memory control. Mount a writable cgroup filesystem"
+					" (e.g. run the container with --privileged or"
+					" -v /sys/fs/cgroup:/sys/fs/cgroup:rw)");
+		}
+	}
 };
 const char * Main::pidFile = "/run/vpl-jail-server.pid";
 const char * Main::readyFile = "/run/vpl-jail-server.ready";
@@ -344,6 +365,7 @@ int main(int const argc, const char ** const argv) {
 	conf->setInContainer(runningInContainer || foreground);
 	Main::checkSecurityConfiguration(conf);
 	Main::checkPrivateNetwork();
+	Main::checkCgroupAvailability(conf);
 	int exitStatus = static_cast<int>(internalError);
 	try{
 		Daemon* runner = Daemon::getRunner();
