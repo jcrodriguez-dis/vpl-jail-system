@@ -141,7 +141,7 @@ function vpl_detect_service_manager(){
 			echo "systemctl [start|stop|status] vpl-jail-system"
 		}
 		SMANAGER="1"
-	elif [ -x /sbin/init ] ; then
+	elif [ -x /sbin/init ] && [ -d /etc/init.d ] ; then
 		echo "Using system V service manager"	 
 		function vpl_install_service {
 			cp vpl-jail-system.initd $VPL_PROGRAMS_DIR/vpl-jail-system
