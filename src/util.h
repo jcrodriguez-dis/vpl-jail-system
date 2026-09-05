@@ -623,6 +623,10 @@ public:
 	 */
 	static int openFileWithinTrustedPath(const string &name, int flags, mode_t mode = 0,
 			size_t pos = 0, bool allowFinalSymlink = false) {
+		// Next code avoid "warning: unused parameter ‘allowFinalSymlink’"
+		#if !HAVE_LINUX_OPENAT2_H
+		(void) allowFinalSymlink;
+		#endif
 		string base = name.substr(0, pos);
 		string relative = name.substr(base.size());
 		while (relative.size() && relative[0] == '/') relative.erase(0, 1);
