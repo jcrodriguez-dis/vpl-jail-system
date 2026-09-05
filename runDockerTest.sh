@@ -176,8 +176,7 @@ function checkDockerBuild() {
     writeCorrect "Image '$IMAGE_NAME' created" "$CHECK_MARK"
 
     # Run container in privileged and non-privileged mode
-    checkDockerRunContainer "$CONTAINER_NAME" "noprivileged" $3
-    checkDockerRunContainer "$CONTAINER_NAME-privileged" "privileged" $3
+    checkDockerImage "$IMAGE_NAME" "$3"
 
     # Remove image
     if [ "$3" == "" ] ; then
@@ -190,6 +189,21 @@ function checkDockerBuild() {
     fi
 }
 
+function checkDockerImage() {
+    export IMAGE_NAME=$1
+    export CONTAINER_NAME="check-$(echo "$IMAGE_NAME" | sed 's/[^a-zA-Z0-9_.-]/./g')"
+
+    docker image inspect "$IMAGE_NAME" &>> "$ERRORS_LOG_FILE"
+    showMessageIfError $? "Image '$IMAGE_NAME' was not found"
+    [[ $? -ne 0 ]] && return 1
+    writeCorrect "Using existing image '$IMAGE_NAME'" "$CHECK_MARK"
+
+    checkDockerRunContainer "$CONTAINER_NAME" "noprivileged" "$2"
+    local result=$?
+    [[ $result -ne 0 ]] && return $result
+    checkDockerRunContainer "$CONTAINER_NAME-privileged" "privileged" "$2"
+}
+
 function checkParameter() {
     local parameter
 }
@@ -199,12 +213,14 @@ function runTests() {
     #    Distro name, default [alpine ubuntu debian fedora]
     #    Install level [minimum basic standard full]
     #    keep: Indicate do not delete the image and container after the test.
+    #    image: Test existing Docker images instead of building images.
     #    languageservers[=LIST]: Install the language servers in the image.
     #        LIST is a comma separated list of languages, default all.
     local n=0
 	local DISTROS=( alpine ubuntu debian fedora )
     local INSTALL_LEVELS=( minimum basic standard full )
     local param=
+    local USE_EXISTING_IMAGES=
     local keep=
     for param in "$@"; do
         if printf '%s\n' "${INSTALL_LEVELS[@]}" | grep -q -x "$param" ; then
@@ -213,6 +229,10 @@ function runTests() {
         fi
         if [[ $param == "keep" ]] ; then
             keep=$param
+            continue
+        fi
+        if [[ $param == "image" || $param == "--image" ]] ; then
+            USE_EXISTING_IMAGES=1
             continue
         fi
         if [[ $param == "languageservers" || $param == "languageservers="* ]] ; then
@@ -226,31 +246,34 @@ function runTests() {
         DISTROS=( $param )
     done
     export VPL_INSTALL_LS
-    rm vpl-jail-system-*.tar.gz &> /dev/null
+
     local matrix="[ ${DISTROS[@]} ] X [ ${INSTALL_LEVELS[@]} ] $keep"
     [ -n "$VPL_INSTALL_LS" ] && matrix="$matrix + language servers [ $VPL_INSTALL_LS ]"
     writeHeading "$matrix" "Test Matrix "
-    writeHeading "Building distribution package"
-    (
-        autoreconf -i
-        ./configure
-        make distcheck
-     ) >> $ERRORS_LOG_FILE
-    if [ $? -ne 0 ] ; then
-        writeError "Package build fails. See '$ERRORS_LOG_FILE' file"
-        exit 1
-    fi
-    [ -f ./config.h ] && VERSION=$(grep -E "PACKAGE_VERSION" ./config.h | sed -e "s/[^\"]\+\"\([^\"]\+\).*/\1/")
-    PACKAGE="vpl-jail-system-$VERSION"
-    TARPACKAGE="$PACKAGE.tar.gz"
-    if [ ! -s $TARPACKAGE ] ; then 
-        writeError "Package file not found"
-        exit 1
-    fi
+    if [[ -z "$USE_EXISTING_IMAGES" ]] ; then
+        rm vpl-jail-system-*.tar.gz &> /dev/null
+        writeHeading "Building distribution package"
+        (
+            autoreconf -i
+            ./configure
+            make distcheck
+         ) >> $ERRORS_LOG_FILE
+        if [ $? -ne 0 ] ; then
+            writeError "Package build fails. See '$ERRORS_LOG_FILE' file"
+            exit 1
+        fi
+        [ -f ./config.h ] && VERSION=$(grep -E "PACKAGE_VERSION" ./config.h | sed -e "s/[^\"]\+\"\([^\"]\+\).*/\1/")
+        PACKAGE="vpl-jail-system-$VERSION"
+        TARPACKAGE="$PACKAGE.tar.gz"
+        if [ ! -s $TARPACKAGE ] ; then 
+            writeError "Package file not found"
+            exit 1
+        fi
 
-    writeHeading "Unpacking distribution $VERSION"
-    tar xvf "$PACKAGE.tar.gz" > /dev/null
-    cd $PACKAGE
+        writeHeading "Unpacking distribution $VERSION"
+        tar xvf "$PACKAGE.tar.gz" > /dev/null
+        cd $PACKAGE
+    fi
     local nfails=0
     for VPL_INSTALL_LEVEL in "${INSTALL_LEVELS[@]}"
     do
@@ -259,7 +282,13 @@ function runTests() {
             SECONDS=0
             ((n=n+1))
             writeHeading "Testing vpl-jail-system in $VPL_BASE_DISTRO install $VPL_INSTALL_LEVEL" "Test $n: "
-            checkDockerBuild $VPL_BASE_DISTRO $VPL_INSTALL_LEVEL $keep
+            if [[ -n "$USE_EXISTING_IMAGES" ]] ; then
+                CLEAN_BASE_NAME=$(echo "$VPL_BASE_DISTRO" | sed 's/:/./g' | sed 's/\//./g')
+                IMAGE_NAME="jail-$CLEAN_BASE_NAME-$VPL_INSTALL_LEVEL"
+                checkDockerImage "$IMAGE_NAME" "$keep"
+            else
+                checkDockerBuild $VPL_BASE_DISTRO $VPL_INSTALL_LEVEL $keep
+            fi
             [ $? -ne 0 ] && ((nfails++))
             ELT=$SECONDS
             writeHeading "Test took $(($ELT / 60)) minutes and $(($ELT % 60)) seconds"
@@ -270,9 +299,11 @@ function runTests() {
     else
         writeInfo "$X_MARK $nfails of $n tests failed"
     fi
-    cd ..
-    rm -R $PACKAGE
-    rm $TARPACKAGE
+    if [[ -z "$USE_EXISTING_IMAGES" ]] ; then
+        cd ..
+        rm -R $PACKAGE
+        rm $TARPACKAGE
+    fi
     return $nfails
 }
 echo "$(date) Running tests for vpl-jail-system in Docker" > "$ERRORS_LOG_FILE"
