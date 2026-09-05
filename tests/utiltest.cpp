@@ -189,29 +189,6 @@ class UtilTest: public BaseTest {
 		assert(Util::correctPath("b"));
 		assert(Util::correctPath("fichero con/espacios. y/varios . puntos"));
 	}
-	void testPathChanged() {
-		assert(!Util::pathChanged("files.test/dis", 0));
-		assert(!Util::pathChanged("files.test/dis", 12));
-		assert(!Util::pathChanged("files.test/a", 12));
-		assert(!Util::pathChanged("files.test/a/b", 12));
-		assert(!Util::pathChanged("files.test/a/b", 14));
-		assert(!Util::pathChanged("correcto/a/b", 9));
-		assert(!Util::pathChanged("a/b/c/s", 2));
-		assert(Util::pathChanged("files.test/a/l1", 12));
-		assert(Util::pathChanged("files.test/a/l1", 14));
-		assert(Util::pathChanged("files.test/a/l1/b/c", 12));
-		assert(Util::pathChanged("files.test/a/l1/vv", 14));
-		assert(Util::pathChanged("files.test/a/l2", 12));
-		assert(Util::pathChanged("files.test/a/l2", 14));
-		assert(Util::pathChanged("files.test/a/l2/b/c", 12));
-		assert(Util::pathChanged("files.test/a/l2/vv", 14));
-		assert(Util::pathChanged("files.test/a/b/l3", 12));
-		assert(Util::pathChanged("files.test/a/b/l3", 14));
-		assert(Util::pathChanged("files.test/a/b/l3", 16));
-		assert(Util::pathChanged("files.test/a/b/l3/b/c", 12));
-		assert(Util::pathChanged("files.test/a/b/l3/vv", 14));
-		assert(Util::pathChanged("files.test/a/b/l3/vv", 16));
-	}
 	void testTimeOfFileModification() {
 		string fileName = "timeOfFileModification.test_file";
 		time_t now = time(NULL);
@@ -286,20 +263,38 @@ class UtilTest: public BaseTest {
 		assert(Util::createDir(baseDir + "/algo/nada", getuid(), baseDir.size()));
 		Util::deleteFile("/tmp/algo");
 		try {
-			Util::writeFile(fileName, "mi texto único", getuid(), symDir.size() + 1);
+			Util::writeFile(fileName, "mi texto único", getuid(), 1);
 			assert(false);
 		}
 		catch (HttpException) {}
 		assert(! Util::fileExists("/tmp/algo"));
 		assert(! Util::fileExists(fileName));
+		string safeTarget = baseDir + "/safe-target";
+		string safeLink = baseDir + "/safe-link";
+		assert(Util::createDir(safeTarget, getuid(), baseDir.size()));
+		assert(symlink("safe-target", safeLink.c_str()) == 0);
+		string safeFile = safeLink + "/inside";
+#if HAVE_LINUX_OPENAT2_H
+		Util::writeFile(safeFile, "safe", getuid(), 1);
+		assert(Util::readFile(safeFile, true, 1) == "safe");
+		Util::deleteFile(safeFile, 1);
+#else
+		try {
+			Util::writeFile(safeFile, "safe", getuid(), 1);
+			assert(false);
+		}
+		catch (HttpException) {}
+#endif
+		Util::deleteFile(safeLink, 1);
+		Util::removeDir(safeTarget, getuid(), true);
 		string outsideDir = "/tmp/vpl-util-created-outside";
 		Util::removeDir(outsideDir, getuid(), true);
 		assert(!Util::createDir(symDir + "/vpl-util-created-outside/subdir",
-			getuid(), symDir.size() + 1));
+			getuid(), baseDir.size()));
 		assert(!Util::dirExists(outsideDir));
 		string outsideFile = "/tmp/algo";
 		Util::writeFile(outsideFile, "must remain", getuid());
-		Util::deleteFile(fileName, symDir.size() + 1);
+		Util::deleteFile(fileName, 1);
 		assert(Util::fileExists(outsideFile));
 		assert(Util::readFile(outsideFile) == "must remain");
 		Util::deleteFile(outsideFile);
@@ -439,7 +434,6 @@ public:
 		testCorrectFileName();
 		testCorrectFilePath();
 		testDeleteFileOK();
-		testPathChanged();
 		testWriteReadRemoveFile();
 		testWriteReadRemoveBadFile();
 		testTimeOfFileModification();

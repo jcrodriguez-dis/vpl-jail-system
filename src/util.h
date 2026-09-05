@@ -615,31 +615,14 @@ public:
 		}
 	}
 
-	static bool pathChanged(const string& filePath, size_t pos) {
-		if (pos) {
-			size_t found;
-			string dn;
-			struct stat info;
-			while((found = filePath.find('/', pos)) != string::npos) {
-				if (filePath.substr(pos, found - pos) == "..") return true;
-				dn = filePath.substr(0, found);
-				if (lstat(dn.c_str(), &info) == 0) {
-					if (S_ISLNK(info.st_mode)) return true;
-				}
-				pos = found + 1;
-			}
-			if (lstat(filePath.c_str(), &info) != 0) return false;
-			if (S_ISLNK(info.st_mode)) return true;
-		}
-		return false;
-	}
-
 	/**
-	 * Open a file rejecting symlinks in the path components after "pos".
-	 * The path prefix before "pos" is trusted, so it may contain symlinks
-	 * (e.g. /usr/sbin or /proc/self in some systems).
+	 * Open a path beneath the trusted prefix before "pos".
+	 * The prefix may contain symlinks, while openat2 constrains the remaining
+	 * path to that directory. The final symlink is rejected unless explicitly
+	 * allowed and openat2 is available to enforce the containment check.
 	 */
-	static int openFileWithoutSymlinks(const string &name, int flags, mode_t mode = 0, size_t pos = 0) {
+	static int openFileWithinTrustedPath(const string &name, int flags, mode_t mode = 0,
+			size_t pos = 0, bool allowFinalSymlink = false) {
 		string base = name.substr(0, pos);
 		string relative = name.substr(base.size());
 		while (relative.size() && relative[0] == '/') relative.erase(0, 1);
@@ -662,9 +645,9 @@ public:
 		#if HAVE_LINUX_OPENAT2_H
 		{
 			struct open_how how = {};
-			how.flags = flags;
+			how.flags = flags | (allowFinalSymlink ? 0 : O_NOFOLLOW);
 			how.mode = mode;
-			how.resolve = RESOLVE_NO_SYMLINKS;
+			how.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
 			int openat2Fd = syscall(SYS_openat2, baseFd, relative.c_str(), &how, sizeof(how));
 			if (openat2Fd >= 0) {
 				close(baseFd);
@@ -766,21 +749,13 @@ public:
 			Logger::log(LOG_ERR, "Trying to write an incorrect filename '%s'", name.c_str());
 			throw HttpException(internalServerErrorCode, "I can't write file");
 		}
-		if (dirExists(name)) {
-			Logger::log(LOG_ERR, "Trying to replace a dir with a file '%s'", name.c_str());
-			throw HttpException(internalServerErrorCode, "I can't write file");
-		}
-		if (pathChanged(name, pos)) {
-			Logger::log(LOG_ERR, "Trying go out of base directory with file '%s'", name.c_str());
-			throw HttpException(internalServerErrorCode, "I can't write file");
-		}
 		string dir = getDirectory(name);
 		if (dir.size()) {
 			Logger::log(LOG_DEBUG, "path '%s' dir '%s'", name.c_str(), dir.c_str());
-			if (!dirExists(dir))
+			if (!dirExistsFollowingSymLink(dir))
 				createDir(dir, user, pos);
 		}
-		int fileFd = openFileWithoutSymlinks(name, O_WRONLY | O_CREAT | O_TRUNC, 0600, pos);
+		int fileFd = openFileWithinTrustedPath(name, O_WRONLY | O_CREAT | O_TRUNC, 0600, pos);
 		if (fileFd < 0) {
 			Logger::log(LOG_ERR, "Can't open file '%s' for writing: %s (errno=%d)",
 					name.c_str(), strerror(errno), errno);
@@ -812,13 +787,13 @@ public:
 	 * Read a file
 	 */
 	static string readFile(string name, bool throwError = true, size_t pos = 0) {
-		if (!correctPath(name) || pathChanged(name, pos)) {
+		if (!correctPath(name)) {
 			Logger::log(LOG_ERR,"Trying to read an incorrect filename '%s'", name.c_str());
 			if(throwError)
 				throw HttpException(internalServerErrorCode, "I can't read file");
 			return "";
 		}
-		int fileFd = openFileWithoutSymlinks(name, O_RDONLY, 0, pos);
+		int fileFd = openFileWithinTrustedPath(name, O_RDONLY, 0, pos, true);
 		if(fileFd < 0){
 			if(throwError)
 				throw HttpException(internalServerErrorCode
@@ -845,12 +820,8 @@ public:
 	static void deleteFile(string fileNamePath, size_t pos = 0){
 		if (!correctPath(fileNamePath)) return;
 		string dirPath = getDirectory(fileNamePath);
-		if (pathChanged(dirPath, pos)) {
-			Logger::log(LOG_ERR,"Can't unlink \"%s\": is under symlink directory?", fileNamePath.c_str());
-			return;
-		}
-		int parentFd = openFileWithoutSymlinks(dirPath.empty() ? "." : dirPath,
-			O_RDONLY | O_DIRECTORY, 0, pos <= dirPath.size() ? pos : 0);
+		int parentFd = openFileWithinTrustedPath(dirPath.empty() ? "." : dirPath,
+			O_RDONLY | O_DIRECTORY, 0, pos <= dirPath.size() ? pos : 0, true);
 		if (parentFd < 0) return;
 		string fileName = dirPath.empty() ? fileNamePath :
 			fileNamePath.substr(dirPath.size() + 1);
@@ -880,7 +851,7 @@ public:
 		string parent = getDirectory(dir);
 		string name = parent.size() ? dir.substr(parent.size() + 1) : dir;
 		if (parent.empty()) parent = ".";
-		int parentFd = openFileWithoutSymlinks(parent, O_RDONLY | O_DIRECTORY);
+		int parentFd = openFileWithinTrustedPath(parent, O_RDONLY | O_DIRECTORY);
 		if (parentFd < 0) {
 			return 0;
 		}
