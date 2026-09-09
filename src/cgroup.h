@@ -122,20 +122,20 @@ public:
 	}
 
 	map<string, int> getCPUAcctStat();
-	long int getCPUUsage();
+	long long getCPUUsage();
 	map<string, int> getCPUStat();
 	vector<int> getCPUProcs();
 	vector<int> getPIDs();
 	vector<int> getNetProcs();
 	vector<int> getMemoryProcs();
-	long int getMemoryLimitInBytes();
-	map<string, long int> getMemoryStat();
-	long int getMemoryUsageInBytes();
+	long long getMemoryLimitInBytes();
+	map<string, long long> getMemoryStat();
+	long long getMemoryUsageInBytes();
 	map<string, int> getMemoryOOMControl();
 	void setNetProcs(int pid);
 	void setCPUProcs(int pid);
 	void setMemoryProcs(int pid);
-	void setMemoryLimitInBytes(long int bytes);
+	void setMemoryLimitInBytes(long long bytes);
 	
 	/**
 	 * Remove this cgroup from all controllers

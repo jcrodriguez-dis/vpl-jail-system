@@ -138,6 +138,49 @@ function Unit_tests() {
 	return 1
 }
 
+function Unit_tests_32bit() {
+	local result
+	local compiler=${CXX:-g++}
+	local cxxflags="-m32 -g -O0 -std=c++11 -DHAVE_CONFIG_H -I.."
+	cd tests
+	if ! printf 'int main() { return 0; }\n' | "$compiler" -m32 -x c++ -fsyntax-only - >/dev/null 2>&1 ; then
+		writeInfo "   " "Skipping 32-bit tests: compiler or 32-bit development libraries are unavailable"
+		cd ..
+		return 111
+	fi
+	make program-test CXXFLAGS="$cxxflags" 1>/dev/null
+	if test -f program-test && file program-test | grep -q "ELF 32-bit" ; then
+		rm -R cgroup.test 2> /dev/null
+		cp -a cgroup cgroup.test
+		rm -R files.test 2> /dev/null
+		mkdir files.test
+		mkdir files.test/a
+		mkdir files.test/b
+		mkdir files.test/a/b
+		ln -s c files.test/a/l1
+		ln -s ../a/b files.test/a/l2
+		ln -s ../../b files.test/a/b/l3
+		./program-test 2> run-32bit.log
+		result=$?
+		rm -R cgroup.test 2> /dev/null
+		rm -R files.test 2> /dev/null
+		rm program-test
+		if [ "$result" != "0" -o "$SHOW_LOG" != "" ] ; then
+			cat run-32bit.log
+		fi
+		rm run-32bit.log
+		cd ..
+		if [ "$result" != "0" ] ; then
+			return 1
+		else
+			return 111
+		fi
+	fi
+	rm -f program-test
+	cd ..
+	return 1
+}
+
 function WebSocket_tests() {
 	local result
 	local running
@@ -185,5 +228,5 @@ if [ "$1" != "" ] ; then
 	runTests $1
 else
 	writeHeading "Tests of the vpl-jail-system $VERSION"
-	runTests Autotools_execution Packaging_for_distribution Unit_tests WebSocket_tests Check_scripts
+	runTests Autotools_execution Packaging_for_distribution Unit_tests Unit_tests_32bit WebSocket_tests Check_scripts
 fi

@@ -360,7 +360,7 @@ map<string, int> Cgroup::getCPUAcctStat(){
 }
 
 
-long int Cgroup::getCPUUsage(){
+long long Cgroup::getCPUUsage(){
     if (isV2) {
         // v2: cpu.stat usage_usec. cpuacct.usage is nanoseconds; convert usec->nsec.
         const string path = v2Path("cpu.stat");
@@ -368,10 +368,10 @@ long int Cgroup::getCPUUsage(){
         string cpu = Util::readFile(path);
         long long usageUsec = parseCpuStatValue(cpu, "usage_usec");
         long long nsec = usageUsec * 1000LL;
-        if (nsec > std::numeric_limits<long int>::max()) {
-            return std::numeric_limits<long int>::max();
+        if (nsec > std::numeric_limits<long long>::max()) {
+            return std::numeric_limits<long long>::max();
         }
-        return (long int)nsec;
+        return nsec;
 	}
     string path = v1Path(FILE_CPU_USAGE);
     Logger::log(LOG_DEBUG, "Reading from the file '%s'", path.c_str());
@@ -482,7 +482,7 @@ vector<int> Cgroup::getMemoryProcs(){
     return tasks;
 }
 
-long int Cgroup::getMemoryLimitInBytes(){
+long long Cgroup::getMemoryLimitInBytes(){
     string path;
     if (isV2) {
         path = v2Path("memory.max");
@@ -499,8 +499,8 @@ long int Cgroup::getMemoryLimitInBytes(){
     return Util::atol(Util::readFile(path));
 }
 
-map<string, long int> Cgroup::getMemoryStat(){
-    map<string, long int> memStat;
+map<string, long long> Cgroup::getMemoryStat(){
+    map<string, long long> memStat;
     string stat;
     if (isV2) {
         string path = v2Path("memory.stat");
@@ -546,7 +546,7 @@ map<string, long int> Cgroup::getMemoryStat(){
     return memStat;
 }
 
-long int Cgroup::getMemoryUsageInBytes(){
+long long Cgroup::getMemoryUsageInBytes(){
     string path;
     if (isV2) {
         path = v2Path("memory.current");
@@ -650,7 +650,7 @@ void Cgroup::setMemoryProcs(int pid){
 /**
  * Set a limit in bytes for the memory controller
  */
-void Cgroup::setMemoryLimitInBytes(long int bytes){
+void Cgroup::setMemoryLimitInBytes(long long bytes){
     string path;
     if (isV2) {
         path = v2Path("memory.max");

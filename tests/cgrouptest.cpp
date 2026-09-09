@@ -46,7 +46,7 @@ class CGroupTest: public BaseTest {
 		string currentWorkingDir(buff);
 		Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 		Cgroup cgroup("cgroup.test");
-		map<string, long int> result = cgroup.getMemoryStat();
+		map<string, long long> result = cgroup.getMemoryStat();
 		assert(result.find("cache")->second == 1626644480);
 		assert(result.find("shmem")->second == 26406912);
 		assert(result.find("mapped_file")->second == 351842304);
@@ -60,7 +60,7 @@ class CGroupTest: public BaseTest {
 		string currentWorkingDir(buff);
 		Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 		Cgroup cgroup("cgroup.test");
-		long int result = cgroup.getCPUUsage();
+		long long result = cgroup.getCPUUsage();
 		assert(result == 406582887060L);
 	}
 
@@ -118,8 +118,8 @@ class CGroupTest: public BaseTest {
 		string currentWorkingDir(buff);
 		Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 		Cgroup cgroup("cgroup.test");
-		long int limit = cgroup.getMemoryLimitInBytes();
-		assert(limit == 2147483648);
+		long long limit = cgroup.getMemoryLimitInBytes();
+		assert(limit == 2147483648LL);
 	}
 
 	void testGetMemoryUsageInBytes(){
@@ -128,8 +128,8 @@ class CGroupTest: public BaseTest {
 		string currentWorkingDir(buff);
 		Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 		Cgroup cgroup("cgroup.test");
-		long int usage = cgroup.getMemoryUsageInBytes();
-		assert(usage == 3502428160);
+		long long usage = cgroup.getMemoryUsageInBytes();
+		assert(usage == 3502428160LL);
 	}
 
 	void testGetMemoryOOMControl(){
@@ -184,7 +184,7 @@ class CGroupTest: public BaseTest {
 		string currentWorkingDir(buff);
 		Cgroup::setBaseCgroupFileSystem(currentWorkingDir);
 		Cgroup cgroup("cgroup.test");
-		const int memoryLimit = 2147483648;
+		const long long memoryLimit = 2147483648LL;
 		cgroup.setMemoryLimitInBytes(memoryLimit);
 		assert(cgroup.getMemoryLimitInBytes() == memoryLimit);
 	}

@@ -333,7 +333,7 @@ class UtilTest: public BaseTest {
 		int long l1234 = 1234;
 		int long kb1219 = 1219 * 1024;
 		int long mb435 = 435 * 1024 * 1024;
-		int long gb8 = 8l * 1024 * 1024 * 1024;
+		long long gb8 = 8LL * 1024 * 1024 * 1024;
 		assert(Util::memSizeToBytesl("nada") == 0);
 		assert(Util::memSizeToBytesl("-10") == 0);
 		assert(Util::memSizeToBytesl("0") == 0);
