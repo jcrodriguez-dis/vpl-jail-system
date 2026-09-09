@@ -3,9 +3,8 @@
 "Assembler" nasm
 "C#/F#/VisualBasic on DotNet" dotnet-sdk-12.0 dotnet-sdk-11.0 dotnet-sdk-10.0 dotnet-sdk-9.0 dotnet-sdk-8.0 mono-complete
 "Fortran compiler (GNU)" gfortran
-"Haskell" hgc hugs
+"Haskell" ghc hugs
 "JavaScript (Nodejs)" nodejs
-"JavaScript (Nodejs-legacy)" nodejs-legacy
 npm "TypeScript" typescript
 npm "Sass" sass
 "Octave (GNU)" octave
@@ -15,6 +14,6 @@ npm "Sass" sass
 "Ruby interpreter" ruby
 "Rust compiler" rustc
 "Scala programming language" scala
-"Scheme interpreter" plt-scheme racket
+"Scheme interpreter" racket
 "TCL interpreter" tcl
 "Valgrind tool" valgrind

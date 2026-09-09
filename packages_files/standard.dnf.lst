@@ -13,7 +13,6 @@ npm "Sass" sass
 "Prolog" pl
 "Ruby interpreter" ruby
 "Rust compiler" rust
-"Scala programming language" scala
 "Scheme interpreter" racket
 "TCL interpreter" tcl
 "Valgrind tool" valgrind

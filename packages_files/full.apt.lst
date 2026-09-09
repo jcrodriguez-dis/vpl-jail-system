@@ -1,7 +1,7 @@
 # Full additional packages for VPL jail system on Linux using APT (Debian, Ubuntu, etc.)
 "Clisp" clisp
-"Clojure" clojure clojure1.6 clojure1.4
-"Cobol" gnucobol open-cobol
+"Clojure" clojure
+"Cobol" gnucobol
 "CoffeeScript" coffeescript
 "D compiler (GNU)" gdc
 "Erlang" erlang
@@ -14,9 +14,8 @@
 "R statistical computation and graphics system (GNU)" r-base
 "MIPS R2000/R3000 emulator" spim
 "MiniZinc constraint modeling language" minizinc
-"XQuery interpreter" galax
 "Verilog compiler" iverilog
-"VHDL compiler" ghdl freehdl
+"VHDL compiler" ghdl
 "libtool required for VHDL" libtool-bin
 "Groovy programming language" groovy
 "Web browser" firefox firefox-esr

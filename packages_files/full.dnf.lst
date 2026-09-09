@@ -1,8 +1,7 @@
 # Full additional packages for VPL jail system on Linux using DNF (fedora, etc.)
 "Clisp" clisp
-"Clojure" clojure clojure1.6 clojure1.4
+"Clojure" clojure
 "Cobol" gnucobol
-"CoffeeScript" coffee-script
 "D compiler (GNU)" gcc-gdc
 "Erlang" erlang
 "Go programming language compiler" golang
@@ -10,9 +9,9 @@
 "JQuery JavaScript Lib" js-jquery
 "JQuery-UI JavaScript Lib" js-jquery-ui
 "Julia" julia
-"Lua compiler" lua lua5.1
+"Lua compiler" lua
 "R statistical computation and graphics system (GNU)" R
 "MIPS R2000/R3000 emulator" spim
 "Verilog compiler" iverilog
-"VHDL compiler" ghdl freehdl
+"VHDL compiler" ghdl
 "Web browser" firefox
