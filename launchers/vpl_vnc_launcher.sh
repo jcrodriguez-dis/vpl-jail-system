@@ -1,6 +1,10 @@
 #!/bin/bash
 mkdir -p $HOME/.vnc
 
+function vpl_log() {
+    echo "$SECONDS: $1"
+}
+
 function vpl_set_lang() {
     # Set localization and lang
     local NEWLANG
@@ -9,7 +13,7 @@ function vpl_set_lang() {
         [ "$(export LC_ALL=$NEWLANG 2>&1)" != "" ] && continue
         break
     done
-    echo "$SECONDS: LC_ALL => $NEWLANG"
+    vpl_log "LC_ALL => $NEWLANG"
 }
 
 function vpl_vncaccel() {
@@ -22,16 +26,27 @@ function vpl_set_vnc_password() {
     # Create and set VNC password file
     VNCPASSWDFILE=$HOME/.vnc/passwd
     local VNCPASSWDSET="$VPL_VNCPASSWD\n$VPL_VNCPASSWD\nn\n"
-    printf "$VNCPASSWDSET" | vncpasswd -f >$VNCPASSWDFILE
-    [ ! -s $VNCPASSWDFILE ] && 	printf "$VNCPASSWDSET" | vncpasswd
+    if [ -x "$(command -v vncpasswd)" ] ; then
+        printf "$VNCPASSWDSET" | vncpasswd -f >$VNCPASSWDFILE
+        [ ! -s $VNCPASSWDFILE ] && printf "$VNCPASSWDSET" | vncpasswd
+    fi
+    # Fallback: generate VNC password file using Python (VNC passwd = bit-reversed password bytes)
+    if [ ! -s $VNCPASSWDFILE ] && [ -x "$(command -v python3)" ] ; then
+        python3 -c "
+import sys
+password = sys.argv[1][:8].ljust(8, '\x00')
+key = bytes([int(format(ord(c), '08b')[::-1], 2) for c in password])
+open(sys.argv[2], 'wb').write(key)
+" "$VPL_VNCPASSWD" "$VNCPASSWDFILE"
+    fi
     chmod 0600 $VNCPASSWDFILE
-    echo "$SECONDS: Created VNC password file"
+    vpl_log "Created VNC password file"
 }
 
 function vpl_set_XGEOMETRY_default() {
     # Set default XGEOMETRY
     [ "$VPL_XGEOMETRY" == "" ] && VPL_XGEOMETRY="800x600"
-    echo "$SECONDS: VPL_XGEOMETRY => $VPL_XGEOMETRY"
+    vpl_log "VPL_XGEOMETRY => $VPL_XGEOMETRY"
 }
 
 function vpl_select_VNCPORT() {
@@ -54,7 +69,7 @@ function vpl_select_VNCPORT() {
         ((limit++)) && ((limit==VNCPORTSEARCHLIMIT)) && break
     done
     export NDIS=$(($VNCPORT - 5900))
-    echo "$SECONDS: VNCPORT => $VNCPORT"
+    vpl_log "VNCPORT => $VNCPORT"
 }
 
 function vpl_generate_cookie {
@@ -76,14 +91,19 @@ function vpl_is_tigervnc {
 }
 
 function vpl_set_xauth {
-    local COOKIE=$(mcookie)
+    local COOKIE
+    COOKIE=$(mcookie 2>/dev/null)
     [ "$?" != "0" ] && COOKIE=$(vpl_generate_cookie)
     export XAUTHORITY=$HOME/.Xauthority
     touch $XAUTHORITY
-    xauth add :$NDIS . $COOKIE
-    [ $? != 0 ] && printf "add :$NDIS . $COOKIE\n" | xauth
-    [ $? != 0 ] && printf "add :$NDIS . $COOKIE\nexit\n" | xauth
-    echo "$SECONDS: Set xauth"
+    if [ -x "$(command -v xauth)" ] ; then
+        xauth add :$NDIS . $COOKIE
+        [ $? != 0 ] && printf "add :$NDIS . $COOKIE\n" | xauth
+        [ $? != 0 ] && printf "add :$NDIS . $COOKIE\nexit\n" | xauth
+        vpl_log "Set xauth"
+    else
+        vpl_log "xauth not found, skipping X authority setup"
+    fi
 }
 
 function vpl_create_xresources_file {
@@ -96,7 +116,7 @@ Xft.hintstyle: hintslight
 Xft.rgba: rgb
 session.screen0.workspaces: 1
 END_OF_FILE
-    echo "$SECONDS: Created resources file"
+    vpl_log "Created resources file"
 }
 
 function vpl_create_xstartup_file {
@@ -252,7 +272,7 @@ echo $VNCPORT
                 -PasswordFile=$VNCPASSWDFILE \
                 -geometry $VPL_XGEOMETRY \
                 -desktop vpl$NDIS \
-                :$NDIS > $HOME/.vnc/vncserver.log &
+                :$NDIS &> $HOME/.vnc/vncserver.log &
             echo -n "$! $$" > $PIDFILE
         else
             echo "$SECONDS: Using Tightvnc with Xvnc"
@@ -271,9 +291,11 @@ echo $VNCPORT
                 -SecurityTypes=VncAuth \
                 -geometry $VPL_XGEOMETRY \
                 -name vpl$NDIS \
-                :$NDIS > $HOME/.vnc/vncserver.log &
+                :$NDIS &> $HOME/.vnc/vncserver.log &
             echo -n "$! $$" > $PIDFILE
         fi
+    else
+        echo "$SECONDS: No VNC server found (Xvnc or tightvncserver)"
     fi
     echo "$SECONDS: waiting end"
     sleep 1000d

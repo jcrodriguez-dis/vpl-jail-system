@@ -11,4 +11,6 @@
 "Window manager" fluxbox openbox metacity 
 "xterm" xterm
 "xset" xset
-"VNC server" tigervnc-server
+"xauth" xorg-x11-xauth
+"VNC server" tigervnc-server-minimal
+"VNC server tools" tigervnc-server-common

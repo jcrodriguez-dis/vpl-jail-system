@@ -425,10 +425,6 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 		processState newstate = pm.getState();
 		time_t now = time(NULL);
 		time_t timeout = pm.getStartTime() + pm.getMaxTime();
-		if( ! lastMessage.empty() && now != lastMessageTime){
-			ws.send(lastMessage + ": " + Util::itos(now-startTime) + " sec");
-			lastMessageTime = now;
-		}
 		if (newstate != state) {
 			state = newstate;
 			switch(state) {
@@ -505,8 +501,16 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 				ws.send("close:");
 				ws.close();
 				ws.wait(500); //wait client response
+				ws.receive();
 				break;
 			}
+		}
+		if (state == stopped) {
+			break;
+		}
+		if( ! lastMessage.empty() && now != lastMessageTime){
+			ws.send(lastMessage + ": " + Util::itos(now-startTime) + " sec");
+			lastMessageTime = now;
 		}
 		ws.wait(200); // 5 times a second
 		

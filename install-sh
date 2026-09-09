@@ -1,2 +1,5 @@
-./install-bash-sh
-./install-vpl-sh
+#!/bin/bash
+# This script is a wrapper for install-bash-sh and install-vpl-sh.
+
+./install-bash-sh || exit 1
+./install-vpl-sh "$@"
