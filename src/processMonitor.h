@@ -32,6 +32,7 @@ class processMonitor{
 	string httpPassthroughticket;
 	string localwebserver;
 	bool   interactive; //is interactive request
+	bool   cleaning;
 	string lang; //Code of language to use
 	time_t startTime; //Start time of the request
 	ExecutionLimits executionLimits;
@@ -74,6 +75,8 @@ class processMonitor{
 		return Util::itos(Util::random() / salt);
 	}
 	static void removeTicketFile(string ticket);
+	static void cleanPrisonerFilesLocked(string);
+	static bool cleanZombiePrisonerFiles(string, time_t, bool, bool);
 	static void cleanPrisonerFiles(string);
 public:
 	processMonitor(string & adminticket, string & monitorticket, string & executionticket);

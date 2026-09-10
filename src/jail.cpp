@@ -551,9 +551,10 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 			ws.send(lastMessage + ": " + Util::itos(now-startTime) + " sec");
 			lastMessageTime = now;
 		}
-		ws.wait(200); // 5 times a second
-		
-		string rec = ws.receive();
+		string rec;
+		if (!ws.wait(200)) {
+			rec = ws.receive();
+		}
 		if (ws.isClosed()) {
 			if (state == retrieve && timeout >= time(NULL)) {
 				continue;

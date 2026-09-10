@@ -142,12 +142,15 @@ function Unit_tests_32bit() {
 	local result
 	local compiler=${CXX:-g++}
 	local cxxflags="-m32 -g -O0 -std=c++11 -DHAVE_CONFIG_H -I.."
+	local probe="program-test-32bit-probe.$$"
 	cd tests
-	if ! printf 'int main() { return 0; }\n' | "$compiler" -m32 -x c++ -fsyntax-only - >/dev/null 2>&1 ; then
+	if ! printf '#include <string>\n#include <sys/types.h>\nint main() { std::string value; return 0; }\n' | "$compiler" -m32 -x c++ -o "$probe" - >/dev/null 2>&1 ; then
 		writeInfo "   " "Skipping 32-bit tests: compiler or 32-bit development libraries are unavailable"
+		rm -f "$probe"
 		cd ..
 		return 111
 	fi
+	rm -f "$probe"
 	make program-test CXXFLAGS="$cxxflags" 1>/dev/null
 	if test -f program-test && file program-test | grep -q "ELF 32-bit" ; then
 		rm -R cgroup.test 2> /dev/null

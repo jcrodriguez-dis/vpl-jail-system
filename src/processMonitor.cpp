@@ -232,7 +232,7 @@ void processMonitor::selectPrisoner() {
 		throw HttpException(internalServerErrorCode,
 				"Prisoner range out of limits, minPrisoner");
 	}
-	Lock lock(configuration->getControlPath());
+	GlobalLock lock;
 
 	for (int i = 0; i < ntry; i++) {
 		setPrisonerID(firstPrisoner + abs(Util::random() + i) % range);
@@ -293,6 +293,7 @@ void processMonitor::writeInfo(ConfigData data) {
 	data["MONITORTICKET"] = monitorticket;
 	data["HTTPPASSTHROUGHTTICKET"] = httpPassthroughticket;
 	data["LOCALWEBSERVER"] = localwebserver;
+	data["CLEANING"] = cleaning ? "1" : "0";
 
 	data["STARTTIME"] = Util::itos(startTime);
 	data["INTERACTIVE"] = interactive?"1":"0";
@@ -319,6 +320,7 @@ ConfigData processMonitor::readInfo() {
 	monitorticket = data["MONITORTICKET"];
 	httpPassthroughticket = data["HTTPPASSTHROUGHTTICKET"];
 	localwebserver = data["LOCALWEBSERVER"];
+	cleaning = data["CLEANING"] == "1";
 
 	startTime = atoi(data["STARTTIME"].c_str());
 	interactive = atoi(data["INTERACTIVE"].c_str());
@@ -326,6 +328,9 @@ ConfigData processMonitor::readInfo() {
 	compiler_pid = atoi(data["COMPILER_PID"].c_str());
 	runner_pid = atoi(data["RUNNER_PID"].c_str());
 	monitor_pid = atoi(data["MONITOR_PID"].c_str());
+	if (cleaning) {
+		throw HttpException(internalServerErrorCode, "Task is being cleaned");
+	}
 	return data;
 }
 
@@ -337,6 +342,7 @@ ConfigData processMonitor::readInfo() {
  */
 processMonitor::processMonitor(string & adminticket, string & monitorticket, string & executionticket) {
 	prisoner = -1; // Not selected
+	cleaning = false;
 	configuration = Configuration::getConfiguration();
 	security = admin;
 	string cp = configuration->getControlPath();
@@ -348,7 +354,8 @@ processMonitor::processMonitor(string & adminticket, string & monitorticket, str
 	monitorticket += getPartialTicket();
 	adminticket += getPartialTicket();
 	{
-		Lock lock(cp);
+		GlobalLock lock;
+		TaskLock taskLock(getPrisonerID());
 		while (Util::fileExists(cp + "/" + monitorticket) ||
 		       Util::fileExists(cp + "/" + executionticket) ||
 			   Util::fileExists(cp + "/" + adminticket)) {
@@ -392,6 +399,7 @@ processMonitor::processMonitor(string & adminticket, string & monitorticket, str
  */
 processMonitor::processMonitor(string & adminticket, string & executionticket) {
 	prisoner = -1; // Not selected
+	cleaning = false;
 	configuration = Configuration::getConfiguration();
 	security = admin;
 	string cp = configuration->getControlPath();
@@ -401,7 +409,8 @@ processMonitor::processMonitor(string & adminticket, string & executionticket) {
 	executionticket += getPartialTicket();
 	adminticket += getPartialTicket();
 	{
-		Lock lock(cp);
+		GlobalLock lock;
+		TaskLock taskLock(getPrisonerID());
 		while (Util::fileExists(cp + "/" + executionticket) ||
 			   Util::fileExists(cp + "/" + adminticket)) {
 			adminticket = getPartialTicket();
@@ -439,12 +448,13 @@ processMonitor::processMonitor(string & adminticket, string & executionticket) {
  */
 processMonitor::processMonitor(string ticket) {
 	prisoner = -1; // Not selected
+	cleaning = false;
 	configuration = Configuration::getConfiguration();
 	Util::trimAndRemoveQuotes(ticket);
 	static const vplregex reg("^[0-9]+$");
 	vplregmatch match(1);
 	if (reg.search(ticket, match)) {
-		Lock lock(configuration->getControlPath());
+		GlobalLock lock;
 		string fileName = configuration->getControlPath() + "/" + ticket;
 		if (Util::fileExists(fileName)) {
 			ConfigData data;
@@ -460,15 +470,15 @@ processMonitor::processMonitor(string ticket) {
 				Util::deleteFile(fileName); // Remove tikect
 			}
 			string configFile = getProcessConfigFile();
-			if (Util::fileExists(configFile)) {
-				readInfo();
-				if (security == monitor) {
-					monitorize();
+			{
+				TaskLock taskLock(getPrisonerID());
+				if (!Util::fileExists(configFile)) {
+					throw "Ticket invalid: task configuration lost";
 				}
-				return;
-			} else {
-				throw "Ticket invalid: task configuration lost";
+				readInfo();
 			}
+			if (security == monitor) monitorize();
+			return;
 		} else {
 			throw "Ticket not found";
 		}
@@ -549,7 +559,7 @@ processState processMonitor::getState() {
 	if ( ! Util::dirExists(getProcessControlPath())) return stopped;
 	string fileName = getProcessConfigFile();
 	{
-		Lock lock(getProcessControlPath());
+		TaskLock lock(getPrisonerID());
 		if ( ! Util::fileExists(fileName))	return stopped;
 		readInfo();
 	}
@@ -598,7 +608,7 @@ processState processMonitor::getState() {
  */
 void processMonitor::setRunner() {
 	if (security == monitor) return;
-	Lock lock(getProcessControlPath());
+	TaskLock lock(getPrisonerID());
 	readInfo();
 	runner_pid = getpid();
 	writeInfo();
@@ -609,7 +619,7 @@ void processMonitor::setRunner() {
  */
 void processMonitor::setCompiler() {
 	if (security == monitor) return;
-	Lock lock(getProcessControlPath());
+	TaskLock lock(getPrisonerID());
 	readInfo();
 	startTime = time(NULL);
 	compiler_pid = getpid();
@@ -622,8 +632,8 @@ void processMonitor::setCompiler() {
 bool processMonitor::isMonitored() {
 	if ( ! Util::dirExists(getProcessControlPath())) return false;
 	{
-		Lock lock(getProcessControlPath());
-		if ( monitor_pid == 0 ) readInfo();
+		TaskLock lock(getPrisonerID());
+		readInfo();
 		if (this->monitorticket != "NO_MONITOR") {
 			if ( monitor_pid == 0 ) return false;
 			return Util::processExists(monitor_pid);
@@ -638,7 +648,7 @@ bool processMonitor::isMonitored() {
  */
 void processMonitor::monitorize() {
 	if ( security != monitor ) return;
-	Lock lock(getProcessControlPath());
+	TaskLock lock(getPrisonerID());
 	readInfo();
 	if (monitor_pid != 0)
 		throw string("Process already monitorized");
@@ -653,7 +663,7 @@ void processMonitor::monitorize() {
  * @param lang Language code
  */
 void processMonitor::setExtraInfo(ExecutionLimits el, bool ri, string lang) {
-	Lock lock(getProcessControlPath());
+	TaskLock lock(getPrisonerID());
 	readInfo();
 	executionLimits = el;
 	interactive = ri;
@@ -688,7 +698,7 @@ void processMonitor::getResult(string &compilation, string &execution, bool &exe
 		throw HttpException(internalServerErrorCode, "Security: process in bad state");
 	{
 		string fileName;
-		Lock lock(getProcessControlPath());
+		TaskLock lock(getPrisonerID());
 		compilation = "";
 		execution = "";
 		executed = false;
@@ -718,7 +728,7 @@ string processMonitor::getCompilation() {
 		throw HttpException(internalServerErrorCode, "Security: required monitor ticket for getCompilation");
 	{
 		Logger::log(LOG_DEBUG, "Getting compilation output");
-		Lock lock(getProcessControlPath());
+		TaskLock lock(getPrisonerID());
 		string fileName = getProcessControlPath("compilation");
 		if (Util::fileExists(fileName))
 			return Util::readFile(fileName);
@@ -732,7 +742,8 @@ string processMonitor::getCompilation() {
 void processMonitor::setCompilationOutput(const string &compilation) {
 	Logger::log(LOG_DEBUG, "Saving compilation output %d bytes", compilation.size());
 	string fileName;
-	Lock lock(getProcessControlPath());
+	TaskLock lock(getPrisonerID());
+	readInfo();
 	fileName = getProcessControlPath("compilation");
 	if (Util::fileExists(fileName))
 		throw "Compilation already saved";
@@ -744,7 +755,8 @@ void processMonitor::setCompilationOutput(const string &compilation) {
  */
 void processMonitor::setExecutionOutput(const string &execution, bool executed) {
 	string fileName;
-	Lock lock(getProcessControlPath());
+	TaskLock lock(getPrisonerID());
+	readInfo();
 	fileName = getProcessControlPath("compilation");
 	if ( ! Util::fileExists(fileName))
 		throw "Compilation not saved";
@@ -759,22 +771,21 @@ void processMonitor::setExecutionOutput(const string &execution, bool executed) 
  * Return HTTP passthrough ticket
  */
 string processMonitor::getHttpPassthroughTicket() {
+	GlobalLock globalLock;
+	TaskLock taskLock(getPrisonerID());
 	readInfo();
 	if ( httpPassthroughticket == "" ) {
 		string cp = configuration->getControlPath();
-		{
+		httpPassthroughticket = getPartialTicket() + getPartialTicket();
+		while (Util::fileExists(cp + "/" + httpPassthroughticket)) {
 			httpPassthroughticket = getPartialTicket() + getPartialTicket();
-			Lock lock(cp);
-			while (Util::fileExists(cp + "/" + httpPassthroughticket)) {
-				httpPassthroughticket = getPartialTicket() + getPartialTicket();
-			}
-			//Write ticket
-			ConfigData data;
-			data["USER_ID"] = Util::itos(prisoner);
-			data["SECURITY"] = Util::itos(httppassthrough);
-			ConfigurationFile::writeConfiguration(cp + "/" + httpPassthroughticket, data);
-			writeInfo();
 		}
+		//Write ticket
+		ConfigData data;
+		data["USER_ID"] = Util::itos(prisoner);
+		data["SECURITY"] = Util::itos(httppassthrough);
+		ConfigurationFile::writeConfiguration(cp + "/" + httpPassthroughticket, data);
+		writeInfo();
 	}
 	return httpPassthroughticket;
 }
@@ -783,12 +794,12 @@ string processMonitor::getHttpPassthroughTicket() {
  * Return local web server address
  */
 string processMonitor::getLocalWebServer() {
-	if ( localwebserver == "" ) {
-		readInfo();
-		if (localwebserver == "" && FileExists(VPL_LOCALSERVERADDRESSFILE)) {
-			localwebserver = readFile(VPL_LOCALSERVERADDRESSFILE);
-			writeInfo();
-		}
+	TaskLock lock(getPrisonerID());
+	readInfo();
+	if (localwebserver == "" &&
+		Util::fileExists(getHomePath() + "/" + VPL_LOCALSERVERADDRESSFILE)) {
+		localwebserver = Util::readFile(getHomePath() + "/" + VPL_LOCALSERVERADDRESSFILE);
+		writeInfo();
 	}
 	return localwebserver;
 }
@@ -829,6 +840,27 @@ void processMonitor::cleanTask() {
 		return; //No prisoner to clean
 	}
 	Logger::log(LOG_INFO, "Cleaning task");
+	{
+		GlobalLock globalLock;
+		TaskLock taskLock(userid);
+		cleaning = true;
+		ConfigData data;
+		if (Util::fileExists(getProcessConfigFile())) {
+			try {
+				data = ConfigurationFile::readConfiguration(getProcessConfigFile(), data);
+				data["CLEANING"] = "1";
+				ConfigurationFile::writeConfiguration(getProcessConfigFile(), data);
+			} catch (...) {}
+		}
+		removeTicketFile(data["ADMINTICKET"]);
+		removeTicketFile(data["EXECUTIONTICKET"]);
+		removeTicketFile(data["MONITORTICKET"]);
+		removeTicketFile(data["HTTPPASSTHROUGHTTICKET"]);
+		removeTicketFile(adminticket);
+		removeTicketFile(executionticket);
+		removeTicketFile(monitorticket);
+		removeTicketFile(httpPassthroughticket);
+	}
 	stopPrisonerProcess(userid, true);
 	Util::sleep(sleepTime);
 	int retry = 0;
@@ -859,10 +891,6 @@ void processMonitor::cleanTask() {
 		} catch (...) {
 			Logger::log(LOG_DEBUG, "Failed to remove cgroup for prisoner %d", userid);
 		}
-	}
-	if (processes == 0) {
-		removeTicketFile(adminticket);
-		removeTicketFile(monitorticket);
 	}
 }
 
@@ -984,6 +1012,13 @@ vector<string> processMonitor::getPrisonersFromDir(string dir) {
 
 void processMonitor::cleanPrisonerFiles(string pdir) {
 	Logger::log(LOG_INFO, "Cleaning prisoner files");
+	int uid = Util::atoi(pdir.substr(1));
+	GlobalLock globalLock;
+	TaskLock taskLock(uid);
+	cleanPrisonerFilesLocked(pdir);
+}
+
+void processMonitor::cleanPrisonerFilesLocked(string pdir) {
 	const Configuration* configuration = Configuration::getConfiguration();
 	const string controlDir = configuration->getControlPath();
 	const string jailPath = configuration->getJailPath();
@@ -993,16 +1028,17 @@ void processMonitor::cleanPrisonerFiles(string pdir) {
 	const string configFile = configDir + "/" + "config";
 	ConfigData data;
 	int uid = Util::atoi(pdir.substr(1));
-	Lock lock(controlDir);
 	if (Util::fileExists(configFile)) {
 		try {
 			data = ConfigurationFile::readConfiguration(configFile, data);
-			removeTicketFile( data["ADMINTICKET"] );
-			removeTicketFile( data["EXECUTIONTICKET"] );
-			removeTicketFile( data["MONITORTICKET"] );
-			removeTicketFile( data["HTTPPASSTHROUGHTTICKET"] );
+			data["CLEANING"] = "1";
+			ConfigurationFile::writeConfiguration(configFile, data);
 		} catch(...) {}
 	}
+	removeTicketFile( data["ADMINTICKET"] );
+	removeTicketFile( data["EXECUTIONTICKET"] );
+	removeTicketFile( data["MONITORTICKET"] );
+	removeTicketFile( data["HTTPPASSTHROUGHTTICKET"] );
 	// Remove home dir content owned by prisoner, if log level < 8.
 	if (configuration->getLogLevel() <= LOG_DEBUG) {
 		try {
@@ -1015,6 +1051,37 @@ void processMonitor::cleanPrisonerFiles(string pdir) {
 	try {
 		Util::removeDir(configDir, 0, true);
 	}catch(...) {}
+}
+
+bool processMonitor::cleanZombiePrisonerFiles(string pdir, time_t maxAge,
+		bool checkControlDir, bool requireNoHome) {
+	const Configuration* configuration = Configuration::getConfiguration();
+	const string controlDir = configuration->getControlPath();
+	const string jailPath = configuration->getJailPath();
+	const string phome = jailPath + "/home/" + pdir;
+	const string configDir = controlDir + "/" + pdir;
+	const string configFile = configDir + "/" + "config";
+	const int uid = Util::atoi(pdir.substr(1));
+	GlobalLock globalLock;
+	TaskLock taskLock(uid);
+	struct stat statbuf;
+
+	if (checkControlDir) {
+		if (stat(configDir.c_str(), &statbuf) != 0 ||
+			statbuf.st_mtime + maxAge >= time(NULL) ||
+			(requireNoHome && Util::dirExists(phome))) {
+			return false;
+		}
+	} else {
+		if (Util::fileExists(configFile) ||
+			stat(phome.c_str(), &statbuf) != 0 ||
+			statbuf.st_mtime + maxAge >= time(NULL)) {
+			return false;
+		}
+	}
+
+	cleanPrisonerFilesLocked(pdir);
+	return true;
 }
 
 void processMonitor::cleanZombieTasks() {
@@ -1033,23 +1100,22 @@ void processMonitor::cleanZombieTasks() {
 		string configDir = controlDir + "/" + tasks[i];
 		string configFile = configDir + "/" + "config";
 		struct stat statbuf;
-		try {
-			stat(configDir.c_str(), &statbuf);
-			if ( statbuf.st_mtime + JAIL_MONITORSTART_TIMEOUT < time(NULL) ) {
-				if ( ! Util::dirExists(homeDir + "/" + tasks[i]) ) {
-					cleanPrisonerFiles(tasks[i]);
-				} else {
-					data = ConfigurationFile::readConfiguration(configFile, data);
-					processMonitor pm(data["ADMINTICKET"]);
-					pm.getState();	
-				}
-			}
-		}catch(...) {
-			time_t tlimit = statbuf.st_mtime;
-			tlimit += Configuration::getConfiguration()->getLimits().maxtime;
-			tlimit += JAIL_HARVEST_TIMEOUT;
-			if ( tlimit < time(NULL) ) {
-				cleanPrisonerFiles(tasks[i]);
+		if (stat(configDir.c_str(), &statbuf) != 0 ||
+			statbuf.st_mtime + JAIL_MONITORSTART_TIMEOUT >= time(NULL)) {
+			continue;
+		}
+		if ( ! Util::dirExists(homeDir + "/" + tasks[i]) ) {
+			cleanZombiePrisonerFiles(tasks[i], JAIL_MONITORSTART_TIMEOUT,
+					true, true);
+		} else {
+			try {
+				data = ConfigurationFile::readConfiguration(configFile, data);
+				processMonitor pm(data["ADMINTICKET"]);
+				pm.getState();
+			} catch(...) {
+				time_t maxAge = Configuration::getConfiguration()->getLimits().maxtime;
+				maxAge += JAIL_HARVEST_TIMEOUT;
+				cleanZombiePrisonerFiles(tasks[i], maxAge, true, false);
 			}
 		}
 	}
@@ -1059,11 +1125,8 @@ void processMonitor::cleanZombieTasks() {
 		string configFile = controlDir + "/" + homes[i] + "/" + "config";
 		string phome = homeDir + "/" + homes[i];
 		if ( Util::dirExists(phome) && ! Util::fileExists(configFile)) {
-			struct stat statbuf;
-			stat(phome.c_str(), &statbuf);
-			if ( statbuf.st_mtime + (JAIL_MONITORSTART_TIMEOUT * 2) < time(NULL) ) {
-				cleanPrisonerFiles( homes[i] );
-			}
+			cleanZombiePrisonerFiles(homes[i], JAIL_MONITORSTART_TIMEOUT * 2,
+					false, false);
 		}
 	}
 }

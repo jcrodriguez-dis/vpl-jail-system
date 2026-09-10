@@ -641,7 +641,7 @@ function vpl_install_update_extra_files() {
 
 	# Create default control dir
 	mkdir -p /var/vpl-jail-system
-	chmod 0600 /var/vpl-jail-system
+	chmod 0700 /var/vpl-jail-system
 }
 
 function vpl_process_packages_file() {
