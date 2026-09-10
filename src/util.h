@@ -861,8 +861,12 @@ public:
 		}
 		int directoryFd = openat(parentFd, name.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
 		if(directoryFd < 0){
+			int savedErrno = errno;
 			close(parentFd);
-			Logger::log(LOG_ERR, "Can't open dir \"%s\": %m", dir.c_str());
+			if (savedErrno != ENOENT && savedErrno != ENOTDIR) {
+				errno = savedErrno;
+				Logger::log(LOG_ERR, "Can't open dir \"%s\": %m", dir.c_str());
+			}
 			return 0;
 		}
 		struct stat directoryStat;
