@@ -1,4 +1,5 @@
 #!/bin/bash
+echo -n 'vpl-jail' > /proc/$$/comm 2>/dev/null || :
 {
 	. vpl_environment.sh
 	for NEWLANG in $VPL_LANG en_US.UTF-8 C.utf8 POSIX C
@@ -18,8 +19,11 @@
 	if [ "$UID" == "" ] ; then
 		echo "Error: UID not set"
 	fi
-	export serverPort=$((10000+$RANDOM%50000))
-	export serverIP="127.$((1+$UID/1024%64)).$((1+$UID/16%64)).$((10+$UID%16))"
+	if [ "$serverPort" == "" ] ; then
+		export serverPort=$((10000+$RANDOM%50000))
+	fi
+	if [ "$serverIP" == "" ] ; then
+		export serverIP="127.$((1+$UID/1024%64)).$((1+$UID/16%64)).$((10+$UID%16))"
+	fi
 } &>/dev/null
-./vpl_webexecution
-exit $?
+exec -a 'vpl-jail' ./vpl_webexecution

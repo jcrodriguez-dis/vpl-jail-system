@@ -15,5 +15,4 @@
 	export TERM=xterm
 	stty sane iutf8 erase ^?
 } &>/dev/null
-./vpl_execution
-exit $?
+exec -a 'vpl-jail' ./vpl_execution

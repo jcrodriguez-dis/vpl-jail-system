@@ -1,4 +1,5 @@
 #!/bin/bash
+echo -n 'vpl-jail'  > /proc/$$/comm 2>/dev/null || :
 # Kill vncserver
 PIDFILE=$(ls $HOME/.vnc/*.pid)
 if [ -x "$(command -v tightvncserver)" ] ; then

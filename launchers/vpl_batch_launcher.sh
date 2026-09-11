@@ -1,4 +1,5 @@
 #!/bin/bash
+echo -n 'vpl-jail' > /proc/$$/comm 2>/dev/null || :
 {
 	. vpl_environment.sh
 	for NEWLANG in $VPL_LANG en_US.UTF-8 C.utf8 POSIX C
@@ -15,5 +16,4 @@
 	export TERM=dumb
 	stty raw -echo iutf8 nl
 } &>/dev/null
-./vpl_execution
-exit $?
+exec -a 'vpl-jail' ./vpl_execution
