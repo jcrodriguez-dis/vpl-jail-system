@@ -23,6 +23,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pty.h>
+#include <utmp.h>
 #include <termios.h>
 #include <sched.h>
 #include <sys/mount.h>
@@ -1314,16 +1315,6 @@ void Jail::transferExecution(processMonitor &pm, string fileName){
 	char *command= new char[fullname.size() + 1];
 	strcpy(command, fullname.c_str());
 	const bool wantJobControl = (pm.isInteractive() && pm.getState() == processState::running);
-	if (setsid() != 0) {
-		// setsid() commonly fails with EPERM if we are already a process-group leader.
-		Logger::log(LOG_DEBUG, "setsid() failed (non-fatal): %s (errno=%d)", strerror(errno), errno);
-	}
-	if (wantJobControl) {
-		// Best-effort: (re)acquire controlling TTY on stdin.
-		if (ioctl(STDIN_FILENO, TIOCSCTTY, 0) != 0) {
-			Logger::log(LOG_DEBUG, "TIOCSCTTY failed (non-fatal): %s (errno=%d)", strerror(errno), errno);
-		}
-	}
 	// Create a dedicated process group for the executed program (and its children).
 	// This enables job control and group signaling.
 	if (setpgid(0, 0) != 0) {
@@ -1399,7 +1390,7 @@ void Jail::setLimits(processMonitor &pm){
  * @param name program to execute
  * @param detail detail string for error messages
  */
-void Jail::executeInJail(processMonitor &pm, string name, const char *detail){
+void Jail::executeInJail(processMonitor &pm, string name, const char *detail, int fdslave){
 	Logger::setForeground(false);
 	try {
 		// All privileged operations first (require root)
@@ -1407,7 +1398,12 @@ void Jail::executeInJail(processMonitor &pm, string name, const char *detail){
 		setupCgroup(pm);	
 		// Setup namespace isolation to hide unnecessary information
 		setupNamespaces();
-		 // pivot_root isolation or chroot
+		if (login_tty(fdslave) != 0) {
+			int error = errno;
+			close(fdslave);
+			throw string("Cannot establish controlling terminal: ") + strerror(error);
+		}
+		// pivot_root isolation or chroot
 		setupFilesystemIsolation(pm);
 		// setuid to prisoner (drops root)
 		// setupNamespaceUser(pm); STILL NEEDS TESTING
@@ -1449,16 +1445,29 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 	else
 		maxtime = pm.getMaxTime();
 	int fdmaster = -1;
+	int fdslave = -1;
 	signal(SIGTERM, SIG_IGN);
 	signal(SIGKILL, SIG_IGN);
-	newpid = forkpty(&fdmaster, NULL, NULL, NULL);
-	if (newpid == -1) { //forkpty error
-		Logger::log(LOG_INFO, "Jail: forkpty error %m");
-		return "Jail: forkpty error";
+	if (openpty(&fdmaster, &fdslave, NULL, NULL, NULL) == -1) {
+		if (fdmaster != -1)
+			close(fdmaster);
+		if (fdslave != -1)
+			close(fdslave);
+		Logger::log(LOG_INFO, "Jail: openpty error %m");
+		return "Jail: openpty error";
+	}
+	newpid = fork();
+	if (newpid == -1) {
+		close(fdmaster);
+		close(fdslave);
+		Logger::log(LOG_INFO, "Jail: fork error %m");
+		return "Jail: fork error";
 	}
 	if (newpid == 0) { //new process
-		executeInJail(pm, name, (VNCLaunch ? "VNCLaunch" : "run")); // Never returns
+		close(fdmaster);
+		executeInJail(pm, name, (VNCLaunch ? "VNCLaunch" : "run"), fdslave); // Never returns
 	}
+	close(fdslave);
 	Logger::log(LOG_INFO, "child pid %d",newpid);
 	RedirectorTerminalBatch redirector(fdmaster);
 	time_t startTime = time(NULL);
@@ -1496,6 +1505,9 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 			break;
 		}
 		if (wret == 0){ //Process running
+			if (VNCLaunch && redirector.getOutputSize() > 0) {
+				break;
+			}
 			time_t now=time(NULL);
 			if(lastTime != now){
 				int elapsedTime = now - startTime;
@@ -1512,10 +1524,7 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 							,maxtime);
 					kill(newpid, stopSignal);
 					stopSignal = SIGKILL; //Second try
-				} else if(VNCLaunch && redirector.getOutputSize() > 0){
-					redirector.advance();
-					break;
-				}else if(pm.isOutOfMemory()){
+				} else if(pm.isOutOfMemory()){
 					string ml = pm.getMemoryLimit();
 					if(stopSignal != SIGKILL)
 						redirector.addMessage("\r\nJail: out of memory (" + ml + ")\n");
@@ -1527,7 +1536,7 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 		}
 	}
 	//wait until 5sg for redirector to read and send program output
-	int max_iter = VNCLaunch ? 5 : 50;
+	int max_iter = VNCLaunch ? 0 : 50;
 	for(int i=0; redirector.isActive() && i < max_iter; i++){
 		redirector.advance();
 		Util::sleep(100000); // 1/10 sec
@@ -1542,18 +1551,32 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
  */
 void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 	int fdmaster = -1;
+	int fdslave = -1;
 	ExecutionLimits executionLimits = pm.getLimits();
 	signal(SIGTERM, SIG_IGN);
 	// Note: SIGKILL cannot be caught or ignored; removed misleading signal(SIGKILL, SIG_IGN)
-	newpid = forkpty(&fdmaster, NULL, NULL, NULL);
-	if (newpid == -1) { //fork error
+	if (openpty(&fdmaster, &fdslave, NULL, NULL, NULL) == -1) {
+		if (fdmaster != -1)
+			close(fdmaster);
+		if (fdslave != -1)
+			close(fdslave);
+		Logger::log(LOG_INFO, "Jail: openpty error %m");
+		pm.cleanTask();
+		return;
+	}
+	newpid = fork();
+	if (newpid == -1) {
+		close(fdmaster);
+		close(fdslave);
 		Logger::log(LOG_INFO, "Jail: fork error %m");
 		pm.cleanTask();
 		return;
 	}
 	if (newpid == 0) { //new process
-		executeInJail(pm, name, "terminal"); // Never returns
+		close(fdmaster);
+		executeInJail(pm, name, "terminal", fdslave); // Never returns
 	}
+	close(fdslave);
 	Logger::log(LOG_INFO, "child pid %d", newpid);
 	RedirectorTerminal redirector(fdmaster, &ws);
 	Logger::log(LOG_INFO, "Redirector start terminal control");

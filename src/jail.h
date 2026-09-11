@@ -46,7 +46,7 @@ protected:
 	void remountProc();
 	void setupPrivateWritableDirs(processMonitor &pm);
 	void setLimits(processMonitor &pm);
-	void executeInJail(processMonitor &pm, string name, const char *detail);
+	void executeInJail(processMonitor &pm, string name, const char *detail, int fdslave);
 	void transferExecution(processMonitor &pm,string fileName);
 	void saveParseFiles(processMonitor &pm, RPC &rpc);
 	void deleteFilesMarkedForDeletion(processMonitor &pm, RPC &rpc);
