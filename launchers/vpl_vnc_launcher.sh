@@ -1,8 +1,21 @@
 #!/bin/bash
 mkdir -p $HOME/.vnc
 
+function vpl_now_ms() {
+    local current_time=$(date +%s%3N 2>/dev/null)
+    case "$current_time" in
+        ''|*[!0-9]*) current_time=$(date +%s); echo $((current_time * 1000)) ;;
+        *) echo "$current_time" ;;
+    esac
+}
+
+start_time=$(vpl_now_ms)
+export VPL_START_TIME=$start_time
+
 function vpl_log() {
-    echo "$SECONDS: $1"
+    local current_time=$(vpl_now_ms)
+    local elapsed=$((current_time - start_time))
+    echo "$elapsed: $1"
 }
 
 function vpl_set_lang() {
@@ -90,6 +103,37 @@ function vpl_is_tigervnc {
     return 1
 }
 
+function vpl_wait_for_vnc {
+    local VNCSTARTUPTIMEOUT=8
+    local VNCSTARTUPATTEMPTS=$((VNCSTARTUPTIMEOUT * 10))
+    local VNCSTARTUPATTEMPT=0
+    local VNC_PORT_CHECK_RESULT
+    vpl_log "Waiting for VNC server on port $VNCPORT"
+    while [ $VNCSTARTUPATTEMPT -lt $VNCSTARTUPATTEMPTS ] ; do
+        if [ -n "$(command -v nc)" ] ; then
+            nc -z 127.0.0.1 "$VNCPORT" &>/dev/null
+            VNC_PORT_CHECK_RESULT=$?
+        elif [ -n "$(command -v lsof)" ] ; then
+            lsof -n -P -iTCP:"$VNCPORT" -sTCP:LISTEN &>/dev/null
+            VNC_PORT_CHECK_RESULT=$?
+        else
+            (echo >/dev/tcp/127.0.0.1/"$VNCPORT") &>/dev/null
+            VNC_PORT_CHECK_RESULT=$?
+        fi
+        if [ $VNC_PORT_CHECK_RESULT -eq 0 ] ; then
+            vpl_log "VNC server is listening on port $VNCPORT"
+            return 0
+        fi
+        ((VNCSTARTUPATTEMPT++))
+        if (( VNCSTARTUPATTEMPT % 10 == 0 )) ; then
+            vpl_log "VNC port not ready after ${VNCSTARTUPATTEMPT}00 ms"
+        fi
+        sleep 0.1
+    done
+    vpl_log "VNC server did not listen after ${VNCSTARTUPTIMEOUT} seconds"
+    return 1
+}
+
 function vpl_set_xauth {
     local COOKIE
     COOKIE=$(mcookie 2>/dev/null)
@@ -129,6 +173,21 @@ unset SESSION_MANAGER
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
 
+function vpl_log() {
+    function vpl_now_ms() {
+        local current_time=$(date +%s%3N 2>/dev/null)
+        case "$current_time" in
+            ''|*[!0-9]*) current_time=$(date +%s); echo $((current_time * 1000)) ;;
+            *) echo "$current_time" ;;
+        esac
+    }
+    local current_time=$(vpl_now_ms)
+    local elapsed=$((current_time - VPL_START_TIME))
+    echo "$elapsed: $1"
+}
+
+vpl_log "X startup script initiated"
+
 FONTPATHS=( '/usr/share/X11/fonts' '/usr/share/fonts/X11/' '/usr/lib/X11/fonts'
             '/usr/X11/lib/X11/fonts' '/usr/X11R6/lib/X11/fonts' '/usr/X11/lib/X11/fonts' )
 FTYPES=( 'misc' '75dpi' '100dpi' 'Speedo' 'Type1' )
@@ -145,47 +204,61 @@ for FONTPATH in "${FONTPATHS[@]}" ; do
 done
 
 # Waits until X server is running
-echo "$SECONDS: Waiting X start up"
+vpl_log "Waiting X start up"
 if [ -x "$(command -v xmodmap)" ] ; then
     while true ; do
-        echo "$SECONDS: Checking X with xmodmap"
+        vpl_log "Checking X with xmodmap"
         timeout 1 xmodmap &> /dev/null
         [ $? = 0 ] && break
-        sleep 1
+        sleep 0.1
         ((nwait++))
         [ $nwait -gt 20 ] && break
     done
 else
-    echo "$SECONDS: Waiting 5 seconds"
+    vpl_log "Waiting 5 seconds"
     sleep 5
 fi
-echo "$SECONDS: X running"
+vpl_log "X running"
 
 # Configure X setting
 [ -x "$(command -v xset)" ] && xset fp= $FONTS &> /dev/null
 [ -x "$(command -v xrdb)" ] && xrdb -merge $HOME/.Xresources &> /dev/null
 [ -x "$(command -v xsetroot)" ] && xsetroot -solid MidnightBlue &> /dev/null
 
-echo "$SECONDS: X options set"
+vpl_log "X options set"
 
 # Activate clipboard
 [ -x "$(command -v vncconfig)" ] && vncconfig -iconic 2>/dev/null &
-echo "$SECONDS: vncconfig running if available"
-# Start window manager
-if [ -x "$(command -v icewm)" ] ; then
-    mkdir -p .icewm
-    echo "Theme=SilverXP/default.theme" > .icewm/theme
-    icewm &
-elif [ -x "$(command -v fluxbox)" ] ; then
-    fluxbox &
-elif [ -x "$(command -v openbox)" ] ; then
-    openbox &
-elif [ -x "$(command -v metacity)" ] ; then
-    metacity &
-else
+vpl_log "vncconfig running if available"
+# Start window manager, falling back if a candidate exits during startup.
+function vpl_start_window_manager {
+    local WINDOW_MANAGER
+    local WINDOW_MANAGER_PID
+    for WINDOW_MANAGER in icewm openbox fluxbox metacity ; do
+        if [ ! -x "$(command -v "$WINDOW_MANAGER")" ] ; then
+            continue
+        fi
+        if [ "$WINDOW_MANAGER" = "icewm" ] ; then
+            mkdir -p .icewm
+            echo "Theme=SilverXP/default.theme" > .icewm/theme
+        fi
+        "$WINDOW_MANAGER" &
+        WINDOW_MANAGER_PID=$!
+        sleep 0.2
+        if kill -0 "$WINDOW_MANAGER_PID" 2>/dev/null ; then
+            vpl_log "$WINDOW_MANAGER started with PID $WINDOW_MANAGER_PID"
+            return 0
+        fi
+        wait "$WINDOW_MANAGER_PID" 2>/dev/null
+        vpl_log "$WINDOW_MANAGER exited during startup; trying next window manager"
+    done
     [ -x "$(command -v xmessage)" ] && xmessage "Window Manager not found"
-fi
-echo "$SECONDS: window manager starting"
+    vpl_log "No window manager started"
+    return 1
+}
+
+vpl_start_window_manager
+vpl_log "Window manager startup check completed"
 
 # Runs task
 OUTPUTFILE=$HOME/.std_output
@@ -226,27 +299,32 @@ fi
 exit
 END_OF_SCRIPT
     chmod 0755 $XSTARTUPFILE
-    echo "$SECONDS: Created xstatup file"
+    vpl_log "Created xstartup file"
 }
 {
+    vpl_log "VNC setup started"
     . vpl_environment.sh
+    vpl_log "VPL environment loaded"
     vpl_set_lang
+    vpl_log "VNC acceleration setup started"
     vpl_vncaccel
+    vpl_log "VNC acceleration setup finished"
     vpl_set_vnc_password
     vpl_set_XGEOMETRY_default
     vpl_select_VNCPORT
     vpl_set_xauth
     vpl_create_xresources_file
     vpl_create_xstartup_file
+    vpl_log "VNC setup finished"
 } &>$HOME/.vnc/starting.log
 
-# IMPORTANT: Do not remove next line
-echo $VNCPORT
-
+exec 3>&1
 {
     PIDFILE=$HOME/.vnc/vncserver.pid
+    VNC_SERVER_STARTED=0
+    vpl_log "VNC server startup started on port $VNCPORT"
     if [ -x "$(command -v tightvncserver)" ] ; then
-        echo "$SECONDS: Using tightvncserver"
+        vpl_log "Using tightvncserver"
         tightvncserver \
             -rfbport $VNCPORT \
             -geometry $VPL_XGEOMETRY \
@@ -254,10 +332,15 @@ echo $VNCPORT
             -nevershared \
             -name vpl \
             :$NDIS &> $HOME/.vnc/vncserver.log &
+        VNC_PID=$!
+        VNC_SERVER_STARTED=1
+        vpl_log "tightvncserver started with PID $VNC_PID"
     elif [ -x "$(command -v Xvnc)" ] ; then
         if vpl_is_tigervnc ; then
-            echo "$SECONDS: Using TigerVNC with Xvnc"
+            vpl_log "Using TigerVNC with Xvnc"
             $XSTARTUPFILE &
+            XSTARTUP_PID=$!
+            vpl_log "X startup script started with PID $XSTARTUP_PID"
             {
                 echo "rfbport=$VNCPORT"
                 echo "geometry $VPL_XGEOMETRY"
@@ -273,10 +356,15 @@ echo $VNCPORT
                 -geometry $VPL_XGEOMETRY \
                 -desktop vpl$NDIS \
                 :$NDIS &> $HOME/.vnc/vncserver.log &
-            echo -n "$! $$" > $PIDFILE
+            VNC_PID=$!
+            VNC_SERVER_STARTED=1
+            echo -n "$VNC_PID $$" > $PIDFILE
+            vpl_log "TigerVNC started with PID $VNC_PID"
         else
-            echo "$SECONDS: Using Tightvnc with Xvnc"
+            vpl_log "Using TightVNC-compatible Xvnc"
             $XSTARTUPFILE &
+            XSTARTUP_PID=$!
+            vpl_log "X startup script started with PID $XSTARTUP_PID"
             echo "Xvnc"
             {
                 echo "rfbport=$VNCPORT"
@@ -292,11 +380,21 @@ echo $VNCPORT
                 -geometry $VPL_XGEOMETRY \
                 -name vpl$NDIS \
                 :$NDIS &> $HOME/.vnc/vncserver.log &
-            echo -n "$! $$" > $PIDFILE
+            VNC_PID=$!
+            VNC_SERVER_STARTED=1
+            echo -n "$VNC_PID $$" > $PIDFILE
+            vpl_log "TightVNC-compatible Xvnc started with PID $VNC_PID"
         fi
     else
-        echo "$SECONDS: No VNC server found (Xvnc or tightvncserver)"
+        vpl_log "No VNC server found (Xvnc or tightvncserver)"
     fi
-    echo "$SECONDS: waiting end"
+    if [ $VNC_SERVER_STARTED -eq 1 ] ; then
+        vpl_wait_for_vnc
+    else
+        vpl_log "Skipping VNC readiness check because no server was started"
+    fi
+    vpl_log "VNC server startup commands completed"
+    # IMPORTANT: Do not remove next line
+    echo $VNCPORT >&3
     sleep 1000d
 }  &>> $HOME/.vnc/starting.log
