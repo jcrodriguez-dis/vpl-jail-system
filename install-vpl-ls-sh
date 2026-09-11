@@ -158,7 +158,7 @@ install_python() {
 cd vplproject || exit 1
 if [ ! -f pyrightconfig.json ] ; then
 	cat > pyrightconfig.json <<CONFIG
-{"include": ["."], "extraPaths": ["."]}
+{"include": ["."], "extraPaths": ["."], "typeCheckingMode": "standard"}
 CONFIG
 fi
 exec $path --stdio 2> /dev/null
