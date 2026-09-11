@@ -8,7 +8,7 @@
 "SSL library" openssl		
 "SSL library" openssl-devel	
 "Firewall" iptables
-"Window manager" fluxbox openbox metacity 
+"Window manager" openbox fluxbox metacity
 "xterm" xterm
 "xset" xset
 "xauth" xorg-x11-xauth

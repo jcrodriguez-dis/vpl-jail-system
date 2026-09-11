@@ -13,7 +13,7 @@
 "VNC server" tigervnc-standalone-server tightvncserver
 "Fonts" xfonts-75dpi
 "Fonts" xfonts-100dpi
-"Window manager" fluxbox metacity openbox
+"Window manager" openbox fluxbox metacity
 "Configuration DB system" gconf2
 "xterm" xterm
 "net-tools" net-tools
