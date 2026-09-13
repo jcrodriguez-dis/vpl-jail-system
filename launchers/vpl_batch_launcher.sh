@@ -13,6 +13,7 @@ echo -n 'vpl-jail' > /proc/$$/comm 2>/dev/null || :
 		fi
 	done
 	rm .vpl_set_locale_error
+	export NO_COLOR=1
 	export TERM=dumb
 	stty raw -echo iutf8 nl
 } &>/dev/null
