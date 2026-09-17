@@ -13,9 +13,6 @@ from urllib.request import Request, urlopen
 
 
 EXPECTED_OUTPUT = "daemon-integration-ok\n"
-INTERACTIVE_INPUT = "daemon-interactive-input"
-INTERACTIVE_OUTPUT = "received: " + INTERACTIVE_INPUT
-EXPECTED_INTERACTIVE_OUTPUT = "input: " + INTERACTIVE_INPUT + "\n" + INTERACTIVE_OUTPUT + "\n"
 
 try:
     websockets = importlib.import_module("websockets")
@@ -46,12 +43,13 @@ def request_params(interactive=False):
     if interactive:
         program = (
             "#include <iostream>\n"
-            "#include <string>\n"
             "int main() {\n"
-            "    std::string input;\n"
+            "    int lines;\n"
             "    std::cout << \"input: \" << std::flush;\n"
-            "    std::getline(std::cin, input);\n"
-            "    std::cout << \"received: \" << input << std::endl;\n"
+            "    std::cin >> lines;\n"
+            "    for (int line = 1; line <= lines; ++line) {\n"
+            "        std::cout << \"line \" << line << std::endl;\n"
+            "    }\n"
             "}\n")
     return {
         "maxtime": 15,
@@ -87,6 +85,10 @@ def execute_url(url, executionticket):
     return urlunsplit((scheme, parts.netloc, "/%s/execute" % executionticket, "", ""))
 
 
+def expected_interactive_output(lines):
+    return "input: %d\n%s" % (lines, "".join("line %d\n" % line for line in range(1, lines + 1)))
+
+
 async def monitor_execution(url, monitorticket, timeout):
     if websockets is None:
         raise RuntimeError("the Python websockets package is required for daemon monitoring")
@@ -111,7 +113,7 @@ async def monitor_execution(url, monitorticket, timeout):
     return messages
 
 
-async def run_interactive_test(url, monitorticket, executionticket, timeout):
+async def run_interactive_test(url, monitorticket, executionticket, timeout, lines):
     if websockets is None:
         raise RuntimeError("the Python websockets package is required for interactive execution")
     deadline = time.monotonic() + timeout
@@ -130,14 +132,14 @@ async def run_interactive_test(url, monitorticket, executionticket, timeout):
                     output += await asyncio.wait_for(terminal.recv(), deadline - time.monotonic())
                 if "input: " not in output:
                     raise RuntimeError("interactive terminal did not request input: %r" % output)
-                await terminal.send(INTERACTIVE_INPUT + "\n")
+                await terminal.send("%d\n" % lines)
                 while time.monotonic() < deadline:
                     try:
                         output += await asyncio.wait_for(terminal.recv(), deadline - time.monotonic())
                     except websockets.ConnectionClosed:
                         break
                 output = output.replace("\r\n", "\n").replace("\r", "\n")
-                if output != EXPECTED_INTERACTIVE_OUTPUT:
+                if output != expected_interactive_output(lines):
                     raise RuntimeError("unexpected interactive terminal output: %r" % output)
     except (OSError, asyncio.TimeoutError) as error:
         raise RuntimeError("interactive terminal test failed: %s" % error)
@@ -152,8 +154,9 @@ def run_test(args, iteration):
     monitorticket = request_response["monitorticket"]
     print("Received adminticket: %s" % adminticket)
     if args.interactive:
+        lines = 2 ** iteration
         asyncio.run(run_interactive_test(
-            args.url, monitorticket, request_response["executionticket"], args.timeout))
+            args.url, monitorticket, request_response["executionticket"], args.timeout, lines))
         return
 
     monitor_messages = asyncio.run(
@@ -180,9 +183,10 @@ def main():
     args = parser.parse_args()
     if args.iterations < 1:
         parser.error("--iterations must be at least 1")
-    for iteration in range(1, args.iterations + 1):
+    for iteration in range(args.iterations):
         if args.iterations > 1:
-            print("Iteration %d of %d" % (iteration, args.iterations))
+            print("Testing %d lines (iteration %d of %d)" % (
+                2 ** iteration, iteration + 1, args.iterations))
         run_test(args, iteration)
     return 0
 
