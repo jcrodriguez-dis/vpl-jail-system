@@ -145,12 +145,12 @@ function checkDockerRunContainer() {
     python3 ./tests/daemonExecutionTest.py "http://localhost:$PLAIN_PORT/" --iterations "$DAEMON_TEST_ITERATIONS" &>> $ERRORS_LOG_FILE
     showMessageIfError $? "Container '$CONTAINER_NAME' failed to compile and run a program in the jail"
     [[ $? -ne 0 ]] && return 5
-    writeCorrect "Correct response for compiled and ran a program in container '$CONTAINER_NAME'" "$CHECK_MARK"
+    writeCorrect "Correctly ran "$DAEMON_TEST_ITERATIONS" programs in batch mode" "$CHECK_MARK"
 
     python3 ./tests/daemonExecutionTest.py "http://localhost:$PLAIN_PORT/" --interactive --iterations "$DAEMON_TEST_ITERATIONS" &>> $ERRORS_LOG_FILE
     showMessageIfError $? "Container '$CONTAINER_NAME' failed interactive terminal execution in the jail"
     [[ $? -ne 0 ]] && return 6
-    writeCorrect "Correct interactive terminal response in container '$CONTAINER_NAME'" "$CHECK_MARK"
+    writeCorrect "Correctly ran "$DAEMON_TEST_ITERATIONS" programs in interactive mode" "$CHECK_MARK"
 
     writeInfo "Container '$CONTAINER_NAME' running logs"
     docker logs $CONTAINER_NAME
