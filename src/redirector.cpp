@@ -185,15 +185,15 @@ void RedirectorTerminal::advance() {
 		oldstate = state;
 		switch(state) {
 			case begin:
-				if(fdps<0) {
-					state=error; //fd pseudo terminal error
+				if(fdps < 0) {
+					state = error; //fd pseudo terminal error
 					break;
 				}
-				Util::fdblock(fdps,false);
-				state=connected;
+				Util::fdblock(fdps, false);
+				state = connected;
 				break;
 			case connecting:
-				state=connected;
+				state = connected;
 				break;
 			case connected:
 				{
@@ -201,46 +201,48 @@ void RedirectorTerminal::advance() {
 					if(ws->isReadBuffered())
 						programbuf += ws->receive();
 					struct pollfd devices[2];
-					devices[0].fd=fdps;
-					devices[1].fd=ws->getSocket();
+					devices[0].fd = fdps;
+					devices[1].fd = ws->getSocket();
 					char buf[MAX];
-					if(programbuf.size()) devices[0].events=POLLREAD|POLLOUT;
-					else devices[0].events=POLLREAD;
-					devices[1].events=POLLREAD;
-					int res=poll(devices,2,polltimeout);
-					if(res==-1) { //Error
-						Logger::log(LOG_INFO,"pool error %m");
+					if(programbuf.size()) devices[0].events = POLLREAD|POLLOUT;
+					else devices[0].events = POLLREAD;
+					devices[1].events = POLLREAD;
+					int res = poll(devices, 2, polltimeout);
+					if (res == -1) { //Error
+						Logger::log(LOG_INFO, "pool error %m");
 						state = error;
 						break;
 					}
-					if(res==0) break; //Nothing to do
-					Logger::log(LOG_INFO,"poll: program %d %s",
-							devices[0].revents,eventsToString(devices[0].revents).c_str());
-					if(devices[1].revents & POLLREAD)
-						programbuf += ws->receive();
+					if (res == 0) break; //Nothing to do
+					int eventsOccurred = devices[0].revents;
+					Logger::log(LOG_INFO, "poll: program %d %s", eventsOccurred, eventsToString(eventsOccurred).c_str());
 					if((devices[0].revents & POLLREAD) && !isOutputBufferFull()){ //Read program output
-						int readsize=read(fdps,buf,MAX);
+						int readsize = read(fdps, buf, MAX);
 						if(readsize <= 0){
-							Logger::log(LOG_INFO,"program output read error: %m");
-							state=ending;
+							Logger::log(LOG_INFO, "program output read error: %m");
+							state = ending;
 							break; //program output read error
 						}
-						if(readsize >0) {
-							ws->send(string(buf,readsize));
+						if (readsize > 0) {
+							ws->send(string(buf, readsize));
 						}
 					}
-					if(programbuf.size()>0 && (devices[0].revents & POLLOUT)){ //Write to program
-						int written=write(fdps,programbuf.data(),programbuf.size());
-						if(written <=0) {
-							Logger::log(LOG_INFO,"Write to program error: %m");
-							state=ending;
+					if(devices[1].revents & POLLREAD)
+						programbuf += ws->receive();
+					if (programbuf.size() > 0 && (devices[0].revents & POLLOUT)) { //Write to program
+						int written = write(fdps, programbuf.data(), programbuf.size());
+						if (written <= 0) {
+							Logger::log(LOG_INFO, "Write to program error: %m");
+							state = ending;
 							break;
 						}
-						programbuf.erase(0,written);
+						programbuf.erase(0, written);
 					}
-					if((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)){
-						Logger::log(LOG_INFO,"Program end or I/O error: %m %d %s",devices[0].revents,eventsToString(devices[0].revents).c_str());
-						state=ending;
+					if ((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)) {
+						int eventsOccurred = devices[0].revents;
+						std::string eventsStr = eventsToString(eventsOccurred);
+						Logger::log(LOG_INFO, "Program end or I/O error: %m %d %s", eventsOccurred, eventsStr.c_str());
+						state = ending;
 						break;
 					}
 				}
@@ -347,9 +349,6 @@ void RedirectorVNC::advance() {
 							devices[0].revents,eventsToString(devices[0].revents).c_str());
 					Logger::log(LOG_INFO, "poll: client socket %d %s",
 							devices[1].revents,eventsToString(devices[1].revents).c_str());
-					if (devices[1].revents & POLLREAD) { //Read vnc client data.
-						netbuf += ws->receive();
-					}
 					if (devices[0].revents & POLLREAD) { //Read vncserver data.
 						char buf[MAX];
 						int readsize = read(sock, buf, MAX);
@@ -362,6 +361,9 @@ void RedirectorVNC::advance() {
 							break;
 						}
 						ws->send(string(buf, readsize), BINARY_FRAME);
+					}
+					if (devices[1].revents & POLLREAD) { //Read vnc client data.
+						netbuf += ws->receive();
 					}
 					if (netbuf.size()>0 && (devices[0].revents & POLLOUT)) { //Write to vncserver
 						int written = write(sock, netbuf.data(), netbuf.size());
@@ -490,9 +492,6 @@ void RedirectorWebServer::advance() {
 							devices[0].revents, eventsToString(devices[0].revents).c_str());
 					Logger::log(LOG_INFO, "poll: client socket %d %s",
 							devices[1].revents, eventsToString(devices[1].revents).c_str());
-					if (devices[1].revents & POLLREAD) { //Read message from client navigator
-						netbuf += client->receive();
-					}
 					if ( devices[0].revents & POLLREAD ) { // Read vncserver data
 						int readsize = read(server,buf,MAX);
 						if(readsize <= 0){ //Socket closed or error
@@ -504,6 +503,9 @@ void RedirectorWebServer::advance() {
 							break;
 						}
 						client->send(string(buf, readsize));
+					}
+					if (devices[1].revents & POLLREAD) { //Read message from client navigator
+						netbuf += client->receive();
 					}
 					if (netbuf.size() > 0 && (devices[0].revents & POLLOUT)) { //Write to local server
 						int written = write(server, netbuf.data(), netbuf.size());
