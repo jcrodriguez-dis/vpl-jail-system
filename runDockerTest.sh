@@ -9,6 +9,7 @@ X_MARK="❌"
 ERRORS_LOG_FILE="$(pwd)/.errors.log"
 PLAIN_PORT=8880
 SECURE_PORT=9990
+DAEMON_TEST_ITERATIONS=10
 
 function writeHeading {
 	echo -e "\e[33m$2\e[0m\e[34m$1\e[0m"
@@ -96,6 +97,16 @@ function checkDockerRunContainer() {
 
     [ "$PRIVILEGED" = "privileged" ] && RUNOPTION="-e VPL_JAIL_JAILPATH=/jail -e VPL_JAIL_USE_NAMESPACE=true --privileged"
     [ "$VPL_DEBUG" != "" ] && RUNOPTION="$RUNOPTION -e VPL_JAIL_LOGLEVEL=8"
+    if docker container inspect "$CONTAINER_NAME" &> /dev/null ; then
+        if [[ "$(docker container inspect --format '{{.State.Running}}' "$CONTAINER_NAME")" == "true" ]] ; then
+            writeError "Container '$CONTAINER_NAME' already exists and is running"
+            return 2
+        fi
+        writeInfo "Removing stopped container '$CONTAINER_NAME' from a previous test"
+        docker container rm "$CONTAINER_NAME" &>> "$ERRORS_LOG_FILE"
+        showMessageIfError $? "Error removing stopped container '$CONTAINER_NAME'"
+        [[ $? -ne 0 ]] && return 2
+    fi
     chekPortInUse $PLAIN_PORT
     chekPortInUse $SECURE_PORT
     writeInfo "Starting container '$CONTAINER_NAME'"
@@ -131,22 +142,27 @@ function checkDockerRunContainer() {
     [[ $result -ne 0 ]] && return 4
     writeCorrect "Correct response for OK URL $URL" "$CHECK_MARK"
 
-    python3 ./tests/daemonExecutionTest.py "http://localhost:$PLAIN_PORT/" &>> $ERRORS_LOG_FILE
+    python3 ./tests/daemonExecutionTest.py "http://localhost:$PLAIN_PORT/" --iterations "$DAEMON_TEST_ITERATIONS" &>> $ERRORS_LOG_FILE
     showMessageIfError $? "Container '$CONTAINER_NAME' failed to compile and run a program in the jail"
     [[ $? -ne 0 ]] && return 5
     writeCorrect "Correct response for compiled and ran a program in container '$CONTAINER_NAME'" "$CHECK_MARK"
+
+    python3 ./tests/daemonExecutionTest.py "http://localhost:$PLAIN_PORT/" --interactive --iterations "$DAEMON_TEST_ITERATIONS" &>> $ERRORS_LOG_FILE
+    showMessageIfError $? "Container '$CONTAINER_NAME' failed interactive terminal execution in the jail"
+    [[ $? -ne 0 ]] && return 6
+    writeCorrect "Correct interactive terminal response in container '$CONTAINER_NAME'" "$CHECK_MARK"
 
     writeInfo "Container '$CONTAINER_NAME' running logs"
     docker logs $CONTAINER_NAME
     # Stop container
     docker stop -t 3 $CONTAINER_NAME &>> $ERRORS_LOG_FILE
     showMessageIfError $? "Error stopping '$CONTAINER_NAME'"
-    [[ $? -ne 0 ]] && return 6
+    [[ $? -ne 0 ]] && return 7
     if [ "$3" == "" ] ; then
         # Remove container
         docker container rm -f $CONTAINER_NAME &>> $ERRORS_LOG_FILE
         showMessageIfError $? "Error removing container '$CONTAINER_NAME'"
-        [[ $? -ne 0 ]] && return 7
+        [[ $? -ne 0 ]] && return 8
         writeInfo "Container '$CONTAINER_NAME' removed"
     else
         writeInfo "Container '$CONTAINER_NAME' was kept at user request"
@@ -193,9 +209,11 @@ function checkDockerImage() {
     export IMAGE_NAME=$1
     export CONTAINER_NAME="check-$(echo "$IMAGE_NAME" | sed 's/[^a-zA-Z0-9_.-]/./g')"
 
-    docker image inspect "$IMAGE_NAME" &>> "$ERRORS_LOG_FILE"
-    showMessageIfError $? "Image '$IMAGE_NAME' was not found"
-    [[ $? -ne 0 ]] && return 1
+    writeInfo "Checking existing image '$IMAGE_NAME'"
+    timeout 15s docker image inspect "$IMAGE_NAME" &>> "$ERRORS_LOG_FILE"
+    local result=$?
+    showMessageIfError "$result" "Image '$IMAGE_NAME' was not found or the Docker daemon did not respond within 15 seconds"
+    [[ $result -ne 0 ]] && return 1
     writeCorrect "Using existing image '$IMAGE_NAME'" "$CHECK_MARK"
 
     checkDockerRunContainer "$CONTAINER_NAME" "noprivileged" "$2"
@@ -214,6 +232,7 @@ function runTests() {
     #    Install level [minimum basic standard full]
     #    keep: Indicate do not delete the image and container after the test.
     #    image: Test existing Docker images instead of building images.
+    #    iterations=N: Number of batch and interactive daemon tests per container (default 10).
     #    languageservers[=LIST]: Install the language servers in the image.
     #        LIST is a comma separated list of languages, default all.
     local n=0
@@ -235,6 +254,14 @@ function runTests() {
             USE_EXISTING_IMAGES=1
             continue
         fi
+        if [[ $param == "iterations="* ]] ; then
+            DAEMON_TEST_ITERATIONS=${param#*=}
+            if ! [[ $DAEMON_TEST_ITERATIONS =~ ^[1-9][0-9]*$ ]] ; then
+                writeError "Invalid iterations value '$DAEMON_TEST_ITERATIONS'"
+                exit 1
+            fi
+            continue
+        fi
         if [[ $param == "languageservers" || $param == "languageservers="* ]] ; then
             if [[ $param == *"="* ]] ; then
                 VPL_INSTALL_LS=$(echo "${param#*=}" | tr ',' ' ')
@@ -247,6 +274,9 @@ function runTests() {
     done
     export VPL_INSTALL_LS
 
+    if [[ -n "$USE_EXISTING_IMAGES" ]] ; then
+        writeInfo "Image mode selected: the required Docker images must already exist locally."
+    fi
     local matrix="[ ${DISTROS[@]} ] X [ ${INSTALL_LEVELS[@]} ] $keep"
     [ -n "$VPL_INSTALL_LS" ] && matrix="$matrix + language servers [ $VPL_INSTALL_LS ]"
     writeHeading "$matrix" "Test Matrix "
