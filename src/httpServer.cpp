@@ -168,10 +168,10 @@ void HttpJailServer::sendCode(CodeNumber code, string text){
 		codeText = "Bad Request";
 		break;
 	case notFoundCode:
-		codeText = "Not found";
+		codeText = "Not Found";
 		break;
 	case methodNotAllowedCode:
-		codeText = "Method not allowed";
+		codeText = "Not Allowed";
 		break;
 	case requestTimeoutCode:
 		codeText = "Request Time-out";
@@ -191,10 +191,13 @@ void HttpJailServer::sendCode(CodeNumber code, string text){
 	};
 	string html;
 	if (code != continueCode) {
-		html = "<html><head><title>" + XML::encodeXML(codeText) + "</title></head><body>";
-		html += "<h2>" + XML::encodeXML(codeText) + "</h2>";
-		html += "<h3>" + XML::encodeXML(text) + "</h3>";
-		html += "</body></html>";
+		string status = Util::itos(cnumber) + " " + codeText;
+		html = "<html>\r\n<head><title>" + status + "</title></head>\r\n<body>\r\n";
+		html += "<center><h1>" + status + "</h1></center>\r\n<hr><center>nginx</center>\r\n";
+		if (!text.empty()) {
+			html += "<p>" + text + "</p>\r\n";
+		}
+		html += "</body>\r\n</html>\r\n";
 	}
 	send(cnumber, codeText, html);
 }
