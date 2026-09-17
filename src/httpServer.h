@@ -21,11 +21,13 @@ using namespace std;
 
 class HttpJailServer {
 	Socket *socket;
+	bool authenticated;
 public:
-	HttpJailServer(Socket *s):socket(s){}
+	HttpJailServer(Socket *s):socket(s), authenticated(false){}
 	void validateRequest(string path);
+	void setAuthenticated(){ authenticated = true; }
 	string receive();
-	static string prepare_HTTP(int code, const string &codeText, const string &response, const bool headMethod = false, const string extraHeader = "");
+	string prepare_HTTP(int code, const string &codeText, const string &response, const bool headMethod = false, const string extraHeader = "");
 	void send(int code, const string &codeText, const string &response, const bool headMethod = false, const string extraHeader = "");
 	void sendRaw(const string &);
 	void send200(const string &, const bool headMethod = false, const string extraHeader = "");

@@ -88,7 +88,9 @@ string HttpJailServer::prepare_HTTP(int code, const string &codeText, const stri
 	string output;
 	output +="HTTP/1.1 "+ Util::itos(code)+" "+codeText+"\r\n";
 	if(code != 100){
-		output += "Server: vpl-jail-system "+string(Util::version())+"\r\n";
+		if (authenticated) {
+			output += "Server: vpl-jail-system "+string(Util::version())+"\r\n";
+		}
 		output += "Connection: close\r\n";
 		if (extraHeader.length()) {
 			output += extraHeader;

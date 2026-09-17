@@ -834,6 +834,7 @@ void Jail::process(Socket *socket){
 				throw HttpException(badRequestCode, "Client not allowed");
 			}
 			server.validateRequest(httpURLPath);
+			server.setAuthenticated();
 			string data = server.receive();
 			RPC *prpc;
 			if (data[0] == '<') {
