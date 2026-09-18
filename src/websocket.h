@@ -33,6 +33,7 @@ public:
 	webSocket(Socket *s);
 	int getSocket(){return socket->getSocket();}
 	void close(string t="");
+	void closeAndWait(int timeout=1000);
 	bool isReadBuffered() { return socket->isReadBuffered() || receiveBuffer.size()>0;}
 	bool isWriteBuffered() { return socket->isWriteBuffered();}
 	bool isClosed(){return socket->isClosed();}

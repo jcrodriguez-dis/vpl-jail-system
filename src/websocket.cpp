@@ -271,6 +271,7 @@ webSocket::webSocket(Socket *s){
 	socket=s;
 	base64 = false;
 	closeSent = false;
+	socket->markWebSocketProtocol();
 	socket->send(getHandshakeAnswer());
 }
 
@@ -364,6 +365,21 @@ void webSocket::close(string t){
 		socket->send(bye);
 		closeSent = true;
 	}
+}
+
+void webSocket::closeAndWait(int timeout){
+	close();
+	const int pollInterval = 50;
+	try {
+		for (int elapsed = 0; elapsed < timeout && !socket->isClosed(); elapsed += pollInterval) {
+			if (!wait(pollInterval)) {
+				receive();
+			}
+		}
+	} catch (...) {
+		// The peer may have disappeared while completing the close handshake.
+	}
+	socket->close();
 }
 
 bool webSocket::wait(const int msec){

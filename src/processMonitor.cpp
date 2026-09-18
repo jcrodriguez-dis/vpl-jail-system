@@ -896,7 +896,7 @@ void processMonitor::cleanTask() {
 			string processPath;
 			Util::getProcessName(pids[i], processName, processPath);
 			Logger::log(LOG_ERR, "Can't stop prisoner UID = %d process = %d '%s' '%s'",
-				        userid, pids[i], processName.c_str(), processPath.c_str());
+			                userid, pids[i], processName.c_str(), processPath.c_str());
 		}
 	}
 	cleanPrisonerFiles("p" + Util::itos(userid));
