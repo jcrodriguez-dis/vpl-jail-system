@@ -133,6 +133,14 @@ string HttpJailServer::prepare_HTTP(int code, const string &codeText, const stri
  */
 void HttpJailServer::send(int code, const string &codeText, const string &load,
                           const bool headMethod, const string extraHeader) {
+	if (socket->isWebSocketProtocol()) {
+		Logger::log(LOG_ERR,
+				"HTTP response blocked on WebSocket connection: %d %s, path '%s', payload %lu bytes",
+				code, codeText.c_str(), socket->getURLPath().c_str(),
+				(unsigned long)load.size());
+		socket->close();
+		return;
+	}
 	Logger::log(LOG_DEBUG, "Sending http %d %s", (int)code, codeText.c_str());		
 	sendRaw(prepare_HTTP(code, codeText, load, headMethod, extraHeader));
 	if(code != 100){ //If code != CONTINUE

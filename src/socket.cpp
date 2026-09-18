@@ -135,9 +135,14 @@ Socket::Socket(int socket){
 	this->maxDataSize = Configuration::getConfiguration()->getRequestMaxSize();
 	this->socket = socket;
 	this->closed = false;
+	this->websocketProtocol = false;
 }
 Socket::~Socket(){
 	close();
+}
+
+void Socket::markWebSocketProtocol(){
+	websocketProtocol = true;
 }
 
 /**

@@ -175,6 +175,7 @@ class Socket{
 	string readBuffer;
 	string writeBuffer;
 	bool closed;
+	bool websocketProtocol;
 	void parseRequestLine(const string &line);
 	void parseHeader(const string &line);
 	void parseCookies(const string &value);
@@ -204,6 +205,8 @@ public:
 	bool isWriteBuffered() { return writeBuffer.size()>0; }
 	virtual bool isSecure() { return false; }
 	bool isClosed(){return closed;}
+	void markWebSocketProtocol();
+	bool isWebSocketProtocol() { return websocketProtocol; }
 	void close();
 	bool wait(const int msec = 50); //Wait for a socket change until milisec time
 	void send(const string &data, bool async = false);
