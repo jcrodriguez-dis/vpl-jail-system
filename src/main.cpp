@@ -246,7 +246,7 @@ public:
 			Logger::setLogLevel(LOG_WARNING, true);
 		}
 		if (conf->getURLPath() == "/") {
-			const char *warningMessage = "URLPATH is not set. URLPATH acts as a password to accept tasks.\n"
+			const char *warningMessage = "URLPATH is set to the insecure default '/'. URLPATH acts as a password to accept tasks.\n"
 										"Without it, any Moodle or similar system can send task requests to this server.";
 			Logger::log(LOG_WARNING, warningMessage);
 			insecure = true;
