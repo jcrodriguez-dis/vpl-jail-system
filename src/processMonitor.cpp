@@ -561,7 +561,14 @@ processState processMonitor::getState() {
 	{
 		TaskLock lock(getPrisonerID());
 		if ( ! Util::fileExists(fileName))	return stopped;
-		readInfo();
+		try {
+			readInfo();
+		} catch (HttpException &exception) {
+			if (exception.getMessage() == "Task is being cleaned") {
+				return stopped;
+			}
+			throw;
+		}
 	}
 	if (compiler_pid == 0) return starting;
 	time_t currentTime = time(NULL);
@@ -641,6 +648,18 @@ bool processMonitor::isMonitored() {
 	}
 	return this->isRunning();
 
+}
+
+bool processMonitor::hasActiveMonitor() {
+	if ( ! Util::dirExists(getProcessControlPath())) return false;
+	TaskLock lock(getPrisonerID());
+	try {
+		readInfo();
+	} catch (HttpException &exception) {
+		if (exception.getMessage() == "Task is being cleaned") return true;
+		throw;
+	}
+	return monitorticket != "NO_MONITOR" && monitor_pid != 0 && Util::processExists(monitor_pid);
 }
 
 /**

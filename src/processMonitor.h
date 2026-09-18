@@ -121,6 +121,7 @@ public:
 	void setCompiler();
 	void setRunner();
 	bool isMonitored();
+	bool hasActiveMonitor();
 	void monitorize();
 	bool isOutOfMemory();
 	long long getMemoryUsedBasedOnProc();

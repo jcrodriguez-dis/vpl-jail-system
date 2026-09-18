@@ -454,150 +454,166 @@ void Jail::commandStop(string adminticket){
 void Jail::commandMonitor(string monitorticket, Socket *s) {
 	processMonitor pm(monitorticket);
 	webSocket ws(s);
-	processState state = prestarting;
-	bool webserver = false;
-	bool runBrowser = false;
-	time_t startTime = 0;
-	time_t lastMessageTime = 0;
-	time_t lastTime = pm.getStartTime();
-	string lastMessage;
-	while (state != stopped) {
-		processState newstate = pm.getState();
-		time_t now = time(NULL);
-		time_t timeout = pm.getStartTime() + pm.getMaxTime();
-		if (newstate != state) {
-			state = newstate;
-			switch(state) {
-			case prestarting:
-				break;
-			case starting:
-				Logger::log(LOG_DEBUG, "Monitor starting");
-				startTime = now;
-				lastMessageTime = now;
-				lastMessage = "message:starting";
-				ws.send(lastMessage);
-				break;
-			case compiling:
-				Logger::log(LOG_DEBUG, "Monitor compiling");
-				timeout = now + pm.getMaxTime();
-				startTime = now;
-				lastMessageTime = now;
-				lastMessage = "message:compilation";
-				ws.send(lastMessage);
-				break;
-			case beforeRunning:
-				Logger::log(LOG_DEBUG, "Monitor beforeRunning");
-				ws.send("compilation:" + pm.getCompilation());
-				timeout = now + JAIL_SOCKET_TIMEOUT;
-				if (pm.FileExists(VPL_EXECUTION)) {
-					Logger::log(LOG_DEBUG, "run:terminal");
-					ws.send("run:terminal");
-				} else if (pm.FileExists(VPL_WEBEXECUTION)) {
-					Logger::log(LOG_DEBUG, "run:webterminal");
-					ws.send("run:webterminal");
-					webserver = true;
-				} else if (pm.FileExists(VPL_WEXECUTION)) {
-					ws.send("run:vnc:" + pm.getVNCPassword());
-				} else {
-					Logger::log(LOG_DEBUG, "No executable to run");
-					usleep(200000); //give time to save compilation output
-					string compilationOutput = pm.getCompilation();
-					if (compilationOutput.empty()) {
-						ws.send("compilation:The compilation process did not generate an executable nor error message.");
+	try {
+		processState state = prestarting;
+		bool webserver = false;
+		bool runBrowser = false;
+		time_t startTime = 0;
+		time_t lastMessageTime = 0;
+		time_t lastTime = pm.getStartTime();
+		string lastMessage;
+		while (state != stopped) {
+			processState newstate = pm.getState();
+			time_t now = time(NULL);
+			time_t timeout = pm.getStartTime() + pm.getMaxTime();
+			if (newstate != state) {
+				state = newstate;
+				switch(state) {
+				case prestarting:
+					break;
+				case starting:
+					Logger::log(LOG_DEBUG, "Monitor starting");
+					startTime = now;
+					lastMessageTime = now;
+					lastMessage = "message:starting";
+					ws.send(lastMessage);
+					break;
+				case compiling:
+					Logger::log(LOG_DEBUG, "Monitor compiling");
+					timeout = now + pm.getMaxTime();
+					startTime = now;
+					lastMessageTime = now;
+					lastMessage = "message:compilation";
+					ws.send(lastMessage);
+					break;
+				case beforeRunning:
+					Logger::log(LOG_DEBUG, "Monitor beforeRunning");
+					timeout = now + JAIL_SOCKET_TIMEOUT;
+					if (pm.FileExists(VPL_EXECUTION)) {
+						Logger::log(LOG_DEBUG, "run:terminal");
+						ws.send("run:terminal");
+					} else if (pm.FileExists(VPL_WEBEXECUTION)) {
+						Logger::log(LOG_DEBUG, "run:webterminal");
+						ws.send("run:webterminal");
+						webserver = true;
+					} else if (pm.FileExists(VPL_WEXECUTION)) {
+						ws.send("run:vnc:" + pm.getVNCPassword());
 					} else {
-						ws.send("compilation:" + compilationOutput);
+						Logger::log(LOG_DEBUG, "No executable to run");
+						usleep(200000); //give time to save compilation output
+						string compilationOutput = pm.getCompilation();
+						if (compilationOutput.empty()) {
+							ws.send("compilation:The compilation process did not generate an executable nor error message.");
+						} else {
+							ws.send("compilation:" + compilationOutput);
+						}
+						ws.send("close:");
+						ws.close();
+						ws.wait(500); //wait client response
+						pm.cleanTask();
+						ws.receive();
+						return;
 					}
+					usleep(200000); //give time to save compilation output
+					ws.send("compilation:" + pm.getCompilation());
+					break;
+				case running:
+					Logger::log(LOG_DEBUG, "Monitor running");
+					startTime = now;
+					timeout = now + pm.getMaxTime() + 6 /* execution cleanup */;
+					lastMessageTime = now;
+					lastMessage = "message:running";
+					ws.send(lastMessage);
+					// TODO Checks if browser with cookie running to remove URL message
+					if ( webserver && !runBrowser && pm.FileExists(VPL_LOCALSERVERADDRESSFILE) ) {
+						runBrowser = true;
+						ws.send("run:browser:" + pm.getHttpPassthroughTicket());
+					}
+					break;
+				case retrieve:
+					Logger::log(LOG_DEBUG, "Monitor retrieve");
+					startTime = now;
+					timeout = now + JAIL_HARVEST_TIMEOUT;
+					ws.send("retrieve:");
+					break;
+				case stopped:
+					Logger::log(LOG_DEBUG, "Monitor stopped");
 					ws.send("close:");
 					ws.close();
 					ws.wait(500); //wait client response
-					pm.cleanTask();
 					ws.receive();
-					return;
+					break;
 				}
-				usleep(200000); //give time to save compilation output
-				ws.send("compilation:" + pm.getCompilation());
+			}
+			if (state == stopped) {
 				break;
-			case running:
-				Logger::log(LOG_DEBUG, "Monitor running");
-				startTime = now;
-				timeout = now + pm.getMaxTime() + 6 /* execution cleanup */;
+			}
+			if( ! lastMessage.empty() && now != lastMessageTime){
+				ws.send(lastMessage + ": " + Util::itos(now-startTime) + " sec");
 				lastMessageTime = now;
-				lastMessage = "message:running";
-				ws.send(lastMessage);
-				// TODO Checks if browser with cookie running to remove URL message
-				if ( webserver && !runBrowser && pm.FileExists(VPL_LOCALSERVERADDRESSFILE) ) {
-					runBrowser = true;
-					ws.send("run:browser:" + pm.getHttpPassthroughTicket());
+			}
+			string rec;
+			if (!ws.wait(200)) {
+				rec = ws.receive();
+			}
+			if (ws.isClosed()) {
+				if (state == retrieve && timeout >= time(NULL)) {
+					continue;
 				}
 				break;
-			case retrieve:
-				Logger::log(LOG_DEBUG, "Monitor retrieve");
-				startTime = now;
-				timeout = now + JAIL_HARVEST_TIMEOUT;
-				ws.send("retrieve:");
+			}
+
+			if (rec.size() > 0) { //Receive client close ws
+				ws.close();
 				break;
-			case stopped:
-				Logger::log(LOG_DEBUG, "Monitor stopped");
+			}
+
+			//Check running timeout
+			if (state != starting && timeout < time(NULL)) {
+				ws.send("message:timeout");
+				Util::sleep(3000000);
 				ws.send("close:");
 				ws.close();
 				ws.wait(500); //wait client response
 				ws.receive();
 				break;
 			}
-		}
-		if (state == stopped) {
-			break;
-		}
-		if( ! lastMessage.empty() && now != lastMessageTime){
-			ws.send(lastMessage + ": " + Util::itos(now-startTime) + " sec");
-			lastMessageTime = now;
-		}
-		string rec;
-		if (!ws.wait(200)) {
-			rec = ws.receive();
-		}
-		if (ws.isClosed()) {
-			if (state == retrieve && timeout >= time(NULL)) {
-				continue;
+
+			if (lastTime != now && pm.isOutOfMemory()) { //Every second check memory usage
+				string ml = pm.getMemoryLimit();
+				Logger::log(LOG_DEBUG, "Out of memory (%s)", ml.c_str());
+				ws.send("message:outofmemory:" + ml);
+				Util::sleep(1500000);
+				ws.send("close:");
+				ws.close();
+				ws.wait(500); //wait client response
+				ws.receive();
+				break;
 			}
-			break;
+			lastTime = now;
 		}
-
-		if (rec.size() > 0) { //Receive client close ws
-			ws.close();
-			break;
+		pm.cleanTask();
+	} catch (const std::exception &e) {
+		Logger::log(LOG_WARNING, "%s: Monitor WebSocket error: %s", IP.c_str(), e.what());
+		try {
+			ws.close("Error");
+		} catch (...) {
 		}
-
-		//Check running timeout
-		if (state != starting && timeout < time(NULL)) {
-			ws.send("message:timeout");
-			Util::sleep(3000000);
-			ws.send("close:");
-			ws.close();
-			ws.wait(500); //wait client response
-			ws.receive();
-			break;
+		s->close();
+	} catch (...) {
+		Logger::log(LOG_WARNING, "%s: Monitor WebSocket error", IP.c_str());
+		try {
+			ws.close("Error");
+		} catch (...) {
 		}
-
-		if (lastTime != now && pm.isOutOfMemory()) { //Every second check memory usage
-			string ml = pm.getMemoryLimit();
-			Logger::log(LOG_DEBUG, "Out of memory (%s)", ml.c_str());
-			ws.send("message:outofmemory:" + ml);
-			Util::sleep(1500000);
-			ws.send("close:");
-			ws.close();
-			ws.wait(500); //wait client response
-			ws.receive();
-			break;
-		}
-		lastTime = now;
+		s->close();
 	}
-	pm.cleanTask();
 }
 
 void Jail::commandExecute(string executeticket, Socket *s){
 	processMonitor pm(executeticket);
 	webSocket ws(s);
+	try {
 	if (pm.getSecurityLevel() != execute){ 
 		Logger::log(LOG_ERR,"%s: Security. Try to execute request with no monitor ticket",IP.c_str());
 		throw "Internal server error";
@@ -638,6 +654,21 @@ void Jail::commandExecute(string executeticket, Socket *s){
 			Logger::log(LOG_ERR, "%s:Error: vpl_vnc_launcher.sh not installed", IP.c_str());
 	} else {
 		Logger::log(LOG_ERR, "%s:Error: nothing to run", IP.c_str());
+	}
+	} catch (const std::exception &e) {
+		Logger::log(LOG_WARNING, "%s: Execute WebSocket error: %s", IP.c_str(), e.what());
+		try {
+			ws.close("Error");
+		} catch (...) {
+		}
+		s->close();
+	} catch (...) {
+		Logger::log(LOG_WARNING, "%s: Execute WebSocket error", IP.c_str());
+		try {
+			ws.close("Error");
+		} catch (...) {
+		}
+		s->close();
 	}
 }
 
@@ -1562,7 +1593,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 		if (fdslave != -1)
 			close(fdslave);
 		Logger::log(LOG_INFO, "Jail: openpty error %m");
-		pm.cleanTask();
+		if (!pm.hasActiveMonitor()) pm.cleanTask();
 		return;
 	}
 	newpid = fork();
@@ -1570,7 +1601,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 		close(fdmaster);
 		close(fdslave);
 		Logger::log(LOG_INFO, "Jail: fork error %m");
-		pm.cleanTask();
+		if (!pm.hasActiveMonitor()) pm.cleanTask();
 		return;
 	}
 	if (newpid == 0) { //new process
@@ -1649,7 +1680,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 		waitpid(newpid, &status, 0);
 		newpid = -1;
 	}
-	pm.cleanTask();
+	if (!pm.hasActiveMonitor()) pm.cleanTask();
 }
 
 /**
@@ -1666,7 +1697,6 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 	Logger::log(LOG_INFO, "Redirector start vncserver control");
 	time_t startTime=time(NULL);
 	time_t lastTime=startTime;
-	bool noMonitor=false;
 	Logger::log(LOG_INFO,"run: start redirector loop");
 	while(redirector.isActive() && !ws.isClosed()){
 		redirector.advance();
@@ -1690,7 +1720,6 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 			if(elapsedTime>JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()){
 				Logger::log(LOG_INFO,"Not monitored");
 				redirector.stop();
-				noMonitor=true;
 				break;
 			}
 		}
@@ -1705,7 +1734,7 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 		output=run(pm, ".vpl_vnc_stopper.sh", 5); //FIXME use constant
 		Logger::log(LOG_DEBUG,"%s",output.c_str());
 	}
-	if(noMonitor){
+	if (!pm.hasActiveMonitor()) {
 		pm.cleanTask();
 	}
 }
