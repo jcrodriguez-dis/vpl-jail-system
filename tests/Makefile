@@ -5,7 +5,7 @@ LIBS = -lssl -lcrypto -lutil
 TESTCPPSRC = ../src/*.cpp
 TESTHSRC = ../src/*.h
 
-all: program-test websocket-echo-test
+all: program-test websocket-echo-test websocket-protocol-test
 
 
 program-test: *test.cpp $(TESTCPPSRC) $(TESTHSRC)
@@ -16,3 +16,9 @@ websocket-echo-test: webSocketEchoTest.cpp ../src/socket.cpp ../src/socket.h \
 	../src/util.cpp ../src/util.h ../src/rpc.h ../src/xml.h ../src/jail_limits.h ../src/lock.h
 	$(COMPILER) $(CXXFLAGS) -o websocket-echo-test  webSocketEchoTest.cpp ../src/configurationFile.cpp ../src/configuration.cpp \
 		../src/socket.cpp ../src/websocket.cpp ../src/util.cpp ../src/log.cpp $(LIBS) 
+
+websocket-protocol-test: webSocketProtocolTest.cpp ../src/socket.cpp ../src/socket.h \
+	../src/websocket.cpp ../src/websocket.h \
+	../src/util.cpp ../src/util.h ../src/rpc.h ../src/xml.h ../src/jail_limits.h ../src/lock.h
+	$(COMPILER) $(CXXFLAGS) -o websocket-protocol-test webSocketProtocolTest.cpp ../src/configurationFile.cpp ../src/configuration.cpp \
+		../src/socket.cpp ../src/websocket.cpp ../src/util.cpp ../src/log.cpp $(LIBS)

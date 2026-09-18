@@ -177,6 +177,7 @@ long long webSocket::frameSize(const string &data
 	if (decodedSize > JAIL_WEBSOCKET_FRAME_SIZE_LIMIT) return -2;
 	if ((rawdata[0] & 0x0f) >= 8 && (rawdata[0] & 0x80) == 0) return -2;
 	if ((rawdata[0] & 0x0f) >= 8 && decodedSize > 125) return -2;
+	if ((rawdata[0] & 0x0f) == CONNECTION_CLOSE_FRAME && decodedSize == 1) return -2;
 	payload_size = (long long) decodedSize;
 	if (data_size < (long long) control_size + mask_size + payload_size) {
 		return -1;
@@ -258,13 +259,8 @@ string webSocket::encodeFrame(const string &rdata, FrameType ft){
 		ret[3] = payload_size & 0XFF;
 	} else {
 		ret[1] = 127;
-		for(int i = 2 ; i < 5 ; i++)
-			ret[i] = 0;
-		ret[5] = (payload_size >> 32) & 0xff;
-		ret[6] = (payload_size >> 24) & 0xff;
-		ret[7] = (payload_size >> 16) & 0xff;
-		ret[8] = (payload_size >> 8) & 0xff;
-		ret[9] = payload_size & 0xff;
+		for(int i = 2; i < 10; i++)
+			ret[i] = (payload_size >> (8 * (9 - i))) & 0xff;
 	}
 	for(int i = 0; i < payload_size; i++)
 		ret[i + control_size] = data[i];
@@ -330,7 +326,7 @@ string webSocket::receive(){
 				}
 			case PING_FRAME:
 				{
-					string pong=encodeFrame("Hello", PONG_FRAME);
+					string pong=encodeFrame(data, PONG_FRAME);
 					socket->send(pong);
 					break;
 				}
@@ -357,7 +353,14 @@ void webSocket::send(const string &s, FrameType ft){
 }
 void webSocket::close(string t){
 	if(!closeSent){
-		string bye = encodeFrame(t, CONNECTION_CLOSE_FRAME);
+		string bye;
+		if (!t.empty()) {
+			const unsigned int statusCode = t == "Error" ? 1002 : 1000;
+			bye.push_back(static_cast<char>(statusCode >> 8));
+			bye.push_back(static_cast<char>(statusCode & 0xff));
+			bye += t;
+		}
+		bye = encodeFrame(bye, CONNECTION_CLOSE_FRAME);
 		socket->send(bye);
 		closeSent = true;
 	}
