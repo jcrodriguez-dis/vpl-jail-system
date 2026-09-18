@@ -195,7 +195,7 @@ void HttpJailServer::sendCode(CodeNumber code, string text){
 		html = "<html>\r\n<head><title>" + status + "</title></head>\r\n<body>\r\n";
 		html += "<center><h1>" + status + "</h1></center>\r\n<hr><center>nginx</center>\r\n";
 		if (!text.empty()) {
-			html += "<p>" + text + "</p>\r\n";
+			html += "<p>" + XML::encodeXML(text) + "</p>\r\n";
 		}
 		html += "</body>\r\n</html>\r\n";
 	}

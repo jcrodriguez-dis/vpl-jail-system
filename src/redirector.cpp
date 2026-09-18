@@ -207,6 +207,7 @@ void RedirectorTerminal::advance() {
 					if(programbuf.size()) devices[0].events = POLLREAD|POLLOUT;
 					else devices[0].events = POLLREAD;
 					devices[1].events = POLLREAD;
+					
 					int res = poll(devices, 2, polltimeout);
 					if (res == -1) { //Error
 						Logger::log(LOG_INFO, "pool error %m");
@@ -283,18 +284,18 @@ void RedirectorVNC::advance() {
 		switch(state){
 			case begin:
 				{
-					sock=socket(AF_INET,SOCK_STREAM,0);//0= IP protocol
-					if(sock<0){
-						state=error; //No socket available
+					sock = socket(AF_INET, SOCK_STREAM, 0); //0= IP protocol
+					if(sock < 0){
+						state = error; //No socket available
 						break;
 					}
-					int on=1;
+					int on = 1;
 					if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ) {
-						Logger::log(LOG_ERR,"setsockopt(SO_REUSEADDR) failed: %m");
+						Logger::log(LOG_ERR, "setsockopt(SO_REUSEADDR) failed: %m");
 					}
 					#ifdef SO_REUSEPORT
 					if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
-						Logger::log(LOG_ERR,"setsockopt(SO_REUSEPORT) failed: %m");
+						Logger::log(LOG_ERR, "setsockopt(SO_REUSEPORT) failed: %m");
 					}
 					#endif
 					//fdblock(sock,false);
@@ -306,7 +307,7 @@ void RedirectorVNC::advance() {
 					struct sockaddr_in sdir;
 					memset(&sdir, 0, sizeof(sdir));
 					sdir.sin_family = AF_INET;
-					inet_pton(AF_INET,"127.0.0.1",&sdir.sin_addr);
+					inet_pton(AF_INET, "127.0.0.1", &sdir.sin_addr);
 					sdir.sin_port = htons( port );
 					if (connect(sock, (const sockaddr*)&sdir, sizeof(sdir))==0) {
 						//fdblock(sock,true);
@@ -340,23 +341,23 @@ void RedirectorVNC::advance() {
 					devices[1].events = POLLREAD;
 					int res = poll(devices, 2, polltimeout);
 					if (res == -1) { //Error
-						Logger::log(LOG_INFO,"pool error %m");
+						Logger::log(LOG_INFO, "pool error %m");
 						state = error;
 						break;
 					}
 					if (res == 0) break; //Nothing to do
 					Logger::log(LOG_INFO, "poll: server socket %d %s",
-							devices[0].revents,eventsToString(devices[0].revents).c_str());
+							devices[0].revents, eventsToString(devices[0].revents).c_str());
 					Logger::log(LOG_INFO, "poll: client socket %d %s",
-							devices[1].revents,eventsToString(devices[1].revents).c_str());
+							devices[1].revents, eventsToString(devices[1].revents).c_str());
 					if (devices[0].revents & POLLREAD) { //Read vncserver data.
 						char buf[MAX];
 						int readsize = read(sock, buf, MAX);
 						if(readsize <= 0){ //Socket closed or error
 							if(readsize < 0)
-								Logger::log(LOG_INFO,"Receive from vncserver error: %m");
+								Logger::log(LOG_INFO, "Receive from vncserver error: %m");
 							else
-								Logger::log(LOG_INFO,"Receive from vncserver size==0: %m");
+								Logger::log(LOG_INFO, "Receive from vncserver size==0: %m");
 							state = ending;
 							break;
 						}
@@ -369,14 +370,14 @@ void RedirectorVNC::advance() {
 						int written = write(sock, netbuf.data(), netbuf.size());
 						if (written <= 0) { //close or error
 							if ( written < 0)
-								Logger::log(LOG_INFO,"Send to vncserver error: %m");
+								Logger::log(LOG_INFO, "Send to vncserver error: %m");
 							state = ending;
 							break;
 						}
 						netbuf.erase(0, written);
 					}
 					if ((devices[0].revents & POLLBAD) && !(devices[0].revents & POLLREAD)) {
-						Logger::log(LOG_INFO,"Vncserver end or I/O error: %m %d %s",devices[0].revents,eventsToString(devices[0].revents).c_str());
+						Logger::log(LOG_INFO, "Vncserver end or I/O error: %m %d %s", devices[0].revents, eventsToString(devices[0].revents).c_str());
 						state=ending;
 						break;
 					}
@@ -493,7 +494,7 @@ void RedirectorWebServer::advance() {
 					Logger::log(LOG_INFO, "poll: client socket %d %s",
 							devices[1].revents, eventsToString(devices[1].revents).c_str());
 					if ( devices[0].revents & POLLREAD ) { // Read vncserver data
-						int readsize = read(server,buf,MAX);
+						int readsize = read(server, buf, MAX);
 						if(readsize <= 0){ //Socket closed or error
 							if(readsize < 0)
 								Logger::log(LOG_INFO,"Receive from vncserver error: %m");
