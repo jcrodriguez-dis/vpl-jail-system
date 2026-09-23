@@ -20,17 +20,18 @@ const int Redirector::POLLBAD = POLLERR | POLLHUP | POLLNVAL;
 const int Redirector::POLLREAD = POLLIN | POLLPRI;
 const int Redirector::polltimeout = 500; //  0.5 sec 
 
-Redirector::Redirector(): bufferSizeLimit(50*1024) {
+Redirector::Redirector(): bufferSizeLimit(JAIL_OUTPUT_BUFFER_SIZE) {
 	state = error;
 	timeout = 0; //Timeout when connecting
-	noOutput = false; //true if program output nothing
+	noOutput = true; //true if program output nothing
+	outputBufferCuted = false; //true if output buffer was cut
 }
 
 /**
  * return if output buffer is full
  */
 bool Redirector::isOutputBufferFull(){
-	return (int) netbuf.size() >= bufferSizeLimit;
+	return ((int) netbuf.size()) >= bufferSizeLimit;
 }
 
 /**
@@ -39,22 +40,22 @@ bool Redirector::isOutputBufferFull(){
  * Cut string if size limit reached
  */
 void Redirector::addOutput(const string &toAdd){
-	if(toAdd.empty()) return;
+	if (toAdd.empty()) return;
 	noOutput = false;
 	//Control netbuf size limit
-	if((int) (netbuf.size()+toAdd.size()) > 2*bufferSizeLimit){ //Buffer too large
-		const char *text="\n=============== output cut to 1Mb =============\n";
-		//take begin and end of netbuf+toAdd to truncate to 1MB
-		string overflow=netbuf+toAdd;
-		size_t ofsize=overflow.size();
-		netbuf=overflow.substr(0,bufferSizeLimit/2)
-						+text
-						+overflow.substr(ofsize-bufferSizeLimit/2,bufferSizeLimit/2);
-		Logger::log(LOG_INFO,"Program output has been cut to 1MB");
-		static bool noLimited=true;
-		if(noLimited){
-			addMessage("\nJail: program output has been limited to 1MB\n");
-			noLimited=false;
+	if ((int) (netbuf.size() + toAdd.size()) > 2 * bufferSizeLimit) { //Buffer too large
+		string limitStr = Util::bytesToMemSize(bufferSizeLimit);
+		string text = "\n=============== output cut to " + limitStr + " =============\n";
+		//take begin and end of netbuf + toAdd to truncate to 1MB
+		string overflow = netbuf + toAdd;
+		size_t ofsize = overflow.size();
+		netbuf = overflow.substr(0,bufferSizeLimit/2)
+						+ text
+						+ overflow.substr(ofsize-bufferSizeLimit/2,bufferSizeLimit/2);
+		Logger::log(LOG_INFO, "Program output has been cut to %s", limitStr.c_str());
+		if (!outputBufferCuted){
+			addMessage("program output has been limited to " + limitStr);
+			outputBufferCuted = true;
 		}
 	}else{
 		netbuf += toAdd;
@@ -66,7 +67,8 @@ void Redirector::addOutput(const string &toAdd){
  * The string is jail information
  */
 void Redirector::addMessage(const string &toAdd){
-	messageBuf += toAdd;
+	if (messageBuf.empty()) messageBuf = "\r\n";
+	messageBuf += "Jail: " + toAdd + "\r\n";
 }
 
 /**
@@ -89,18 +91,18 @@ size_t Redirector::getOutputSize(){
  * Used when debugging
  */
 string Redirector::eventsToString(int events){
-	string ret="(";
-	if(events & POLLIN) ret += "POLLIN ";
-	if(events & POLLPRI) ret += "POLLPRI ";
-	if(events & POLLOUT) ret += "POLLOUT ";
-	if(events & POLLERR) ret += "POLLERR ";
-	if(events & POLLHUP) ret += "POLLHUP ";
-	if(events & POLLNVAL) ret += "POLLNVAL ";
-	if(events & POLLRDNORM) ret += "POLLRDNORM ";
-	if(events & POLLRDBAND) ret += "POLLRDBAND ";
-	if(events & POLLWRNORM) ret += "POLLWRNORM ";
-	if(events & POLLWRBAND) ret += "POLLWRBAND ";
-	//if(events & POLLMSG) ret += "POLLMSG ";
+	string ret = "(";
+	if (events & POLLIN) ret += "POLLIN ";
+	if (events & POLLPRI) ret += "POLLPRI ";
+	if (events & POLLOUT) ret += "POLLOUT ";
+	if (events & POLLERR) ret += "POLLERR ";
+	if (events & POLLHUP) ret += "POLLHUP ";
+	if (events & POLLNVAL) ret += "POLLNVAL ";
+	if (events & POLLRDNORM) ret += "POLLRDNORM ";
+	if (events & POLLRDBAND) ret += "POLLRDBAND ";
+	if (events & POLLWRNORM) ret += "POLLWRNORM ";
+	if (events & POLLWRBAND) ret += "POLLWRBAND ";
+	//if (events & POLLMSG) ret += "POLLMSG ";
 	ret += ")";
 	return ret;
 }
@@ -115,6 +117,7 @@ void RedirectorTerminalBatch::advance() {
 		switch(state) {
 			case begin:
 				if (fdps < 0) {
+					Logger::log(LOG_INFO, "Failed to open pseudo terminal: %s", strerror(errno));
 					state = error; //fd pseudo terminal error
 					break;
 				}
@@ -124,45 +127,63 @@ void RedirectorTerminalBatch::advance() {
 			case connecting:
 				state = connected;
 				break;
-			case connected:{
-				//Poll to read from program
-				struct pollfd devices[1];
-				devices[0].fd = fdps;
-				char buf[MAX];
-				devices[0].events = POLLREAD; //removed |POLLOUT
-				int res = poll(devices, 1, polltimeout);
-				if (res == -1) { //Error
-					state = error;
-					break;
-				}
-				if(res == 0) break; //Nothing to do
-				//Logger::log(LOG_INFO,"poll: program %d %s.",
-				//			devices[0].revents,eventsToString(devices[0].revents).c_str());
-				if (devices[0].revents & POLLREAD) { //Read program output
-					int readsize = read(fdps, buf, MAX);
-					if (readsize == 0) {
-						Logger::log(LOG_INFO, "program output end: %m");
-						state = end;
-						break;		
-					}
-					if (readsize < 0) {
-						Logger::log(LOG_INFO, "program output read error: %m");
+			case connected: {
+					//Poll to read from program
+					struct pollfd devices[1];
+					devices[0].fd = fdps;
+					char buf[MAX];
+					devices[0].events = POLLREAD; //removed |POLLOUT
+					int res = poll(devices, 1, polltimeout);
+					if (res == -1) { //Error
+						Logger::log(LOG_INFO, "poll error: %s", strerror(errno));
 						state = error;
-						break; //program output read error
-					}
-					if (readsize >0) {
-						netbuf += string(buf, readsize);
 						break;
 					}
-				}
-				if (devices[0].revents & POLLBAD) {
-					Logger::log(LOG_INFO, "Program end or I/O error: %m %d %s.",
-							devices[0].revents,eventsToString(devices[0].revents).c_str());
-					state = error;
-					break;
+					if (res == 0) break; //Nothing to do
+					//Logger::log(LOG_INFO,"poll: program %d %s.",
+					//			devices[0].revents,eventsToString(devices[0].revents).c_str());
+					if (devices[0].revents & POLLERR) {
+						Logger::log(LOG_INFO, "PTY I/O error: %s", strerror(errno));
+						state = error;
+						break;
+					}
+					if (devices[0].revents & POLLNVAL) {
+						Logger::log(LOG_INFO, "Invalid PTY file descriptor");
+						state = error;
+						break;
+					}
+
+					if (devices[0].revents & POLLHUP) {
+						// PTY slave closed; normally means the child ended
+						state = end;
+						break;
+					}
+					if (devices[0].revents & POLLREAD)
+					{ // Read program output
+						int readsize = read(fdps, buf, MAX);
+						if (readsize == 0) {
+							Logger::log(LOG_INFO, "program output end: %m");
+							state = end;
+							break;
+						}
+						if (readsize < 0) {
+							if (errno == EIO) {
+								Logger::log(LOG_INFO, "program output end: %m");
+								state = end;
+							} else {
+								Logger::log(LOG_INFO, "program output error: %m");
+								state = error;
+							}
+							break;
+						}
+						if (readsize >0) {
+							noOutput = false;
+							netbuf += string(buf, readsize);
+							break;
+						}
+					}
 				}
 				break;
-			}
 			case ending:
 				state = end;
 				break;
@@ -172,7 +193,7 @@ void RedirectorTerminalBatch::advance() {
 				break;
 		}
 		if(oldstate != state)
-			Logger::log(LOG_INFO,"New redirector state %d => %d",oldstate,state);
+			Logger::log(LOG_INFO, "New redirector state %d => %d", oldstate, state);
 	} while (oldstate != state);
 }
 
@@ -225,6 +246,7 @@ void RedirectorTerminal::advance() {
 							break; //program output read error
 						}
 						if (readsize > 0) {
+							noOutput = false;
 							ws->send(string(buf, readsize));
 						}
 					}
@@ -249,28 +271,28 @@ void RedirectorTerminal::advance() {
 				}
 				break;
 			case ending:
-				{
-					if(isSilent()){
-						Logger::log(LOG_INFO,"Program terminated with no output");
-						ws->send("\nProgram terminated with no output\n");
-					}
-					if(messageBuf.size()>0){
-						Logger::log(LOG_INFO,"Add jail message to output");
-						ws->send(messageBuf);
-						messageBuf="";
-					}
-				}
 				state=end;
 				break;
 			case end:
 			case error:
-				if(ws->isClosed())
+				if (isSilent()) {
+					Logger::log(LOG_INFO, "Program terminated with no output");
+					addMessage("program terminated with no output.");
+				}
+				if (messageBuf.size() > 0) {
+					Logger::log(LOG_INFO, "Add jail message to output");
+					ws->send(messageBuf);
+					messageBuf="";
+				}
+				if (ws->isClosed()) {
 					Util::sleep(50000);
-				else ws->close();
+				} else {
+					ws->close();
+				}
 				break;
 		}
 		if(oldstate != state)
-			Logger::log(LOG_INFO,"New redirector state %d => %d", oldstate, state);
+			Logger::log(LOG_INFO, "New redirector state %d => %d", oldstate, state);
 	} while (oldstate != state);
 }
 

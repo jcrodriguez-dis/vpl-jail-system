@@ -38,8 +38,9 @@ def call(url, method, params, request_id):
     return reply["result"]
 
 
-def request_params(interactive=False):
-    program = "#include <iostream>\nint main() { std::cout << \"daemon-integration-ok\\n\"; }\n"
+def request_params(interactive=False, program=None, maxtime=15, maxmemory=134217728):
+    if program is None:
+        program = "#include <iostream>\nint main() { std::cout << \"daemon-integration-ok\\n\"; }\n"
     if interactive:
         program = (
             "#include <iostream>\n"
@@ -52,9 +53,9 @@ def request_params(interactive=False):
             "    }\n"
             "}\n")
     return {
-        "maxtime": 15,
+        "maxtime": maxtime,
         "maxfilesize": 1048576,
-        "maxmemory": 134217728,
+        "maxmemory": maxmemory,
         "maxprocesses": 10,
         "runscript": "",
         "debugscript": "",
@@ -174,12 +175,38 @@ def run_test(args, iteration):
     print("Daemon compiled and ran the test program.")
 
 
+def run_limit_test(args, name, program, expected_message, maxtime=15, maxmemory=134217728):
+    print("Sending %s limit test to the daemon at %s" % (name, args.url))
+    request_response = call(
+        args.url,
+        "request",
+        request_params(program=program, maxtime=maxtime, maxmemory=maxmemory),
+        "daemon-%s-limit" % name)
+    monitor_messages = asyncio.run(
+        monitor_execution(args.url, request_response["monitorticket"], args.timeout))
+    result = call(args.url, "getresult", {
+        "adminticket": request_response["adminticket"],
+        "pluginversion": 2021052513,
+    }, "daemon-%s-result" % name)
+    output = result.get("execution", "")
+    if "retrieve:" not in monitor_messages:
+        raise RuntimeError("monitor did not report result retrieval for %s test" % name)
+    if result.get("compilation"):
+        raise RuntimeError("%s test compilation failed:\n%s" % (name, result["compilation"]))
+    output_parts = output.rsplit("\n<|--\n", 1)
+    if len(output_parts) != 2 or expected_message not in output_parts[1]:
+        raise RuntimeError("%s test missing jail diagnostic %r in output: %r" % (
+            name, expected_message, output))
+    print("%s limit diagnostic reported in execution output." % name.capitalize())
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("url", nargs='?', default='http://127.0.0.1:8880/', help="daemon JSON-RPC URL")
     parser.add_argument("--timeout", type=int, default=5, help="maximum result wait in seconds")
     parser.add_argument("--iterations", type=int, default=1, help="number of compile/run iterations")
     parser.add_argument("--interactive", action="store_true", help="test terminal input/output over the execution WebSocket")
+    parser.add_argument("--limits", action="store_true", help="test timeout and memory-limit diagnostics")
     args = parser.parse_args()
     if args.iterations < 1:
         parser.error("--iterations must be at least 1")
@@ -188,6 +215,23 @@ def main():
             print("Testing %d lines (iteration %d of %d)" % (
                 2 ** iteration, iteration + 1, args.iterations))
         run_test(args, iteration)
+    if args.limits:
+        maxtime = 4
+        run_limit_test(
+            args,
+            "timeout",
+            "#include <iostream>\nint main() { std::cout << \"before-timeout\\n\" << std::flush; for (;;) {} }\n",
+            "Jail: execution time limit reached (%d seconds)." % maxtime,
+            maxtime=maxtime,
+        )
+        maxmemory = 128
+        run_limit_test(
+            args,
+            "memory",
+            "#include <cstdlib>\n#include <cstring>\n#include <iostream>\nint main() { int maxmemory = " + str(maxmemory) + " * 1024 * 1024; std::cout << \"before-memory-limit\\n\" << std::flush; char *memory = static_cast<char *>(std::malloc(maxmemory * 2)); if (!memory) return 1; std::memset(memory, 1, maxmemory * 2); for (;;) {} }\n",
+            "Jail: out of memory (%dMiB)" % maxmemory,
+            maxmemory=maxmemory * 1024 * 1024,
+        )
     return 0
 
 if __name__ == "__main__":

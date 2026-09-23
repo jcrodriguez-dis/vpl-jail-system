@@ -281,6 +281,19 @@ public:
 	}
 
 	/**
+	 * Check if process exists and is running
+	 */
+	static bool processExistsAndRunning(pid_t pid){
+		if (!processExists(pid)) return false;
+		ifstream statFile("/proc/" + itos(pid) + "/stat");
+		string stat;
+		if (!getline(statFile, stat)) return false;
+		size_t commandEnd = stat.rfind(')');
+		return commandEnd != string::npos && commandEnd + 2 < stat.size()
+				&& stat[commandEnd + 2] != 'Z';
+	}
+
+	/**
 	 * Check if file exists
 	 */
 	static bool fileExists(const string &fileName, bool followLink=false){
@@ -351,7 +364,7 @@ public:
 	}
 
 	/**
-	 * return the value of Kb, Mb or Gb
+	 * From a memory abbreviation (Kb, Mb, Gb) return the value in bytes
 	 */
 	static long long memAbbreviation(const string &abbreviation){
 		const long long kb = 1024;
@@ -372,7 +385,7 @@ public:
 	}
 
 	/**
-	 * return a memory size in Gb, Mb or Kb to as bytes int
+	 * From a memory size in Gb, Mb or Kb return the value in bytes as int
 	 */
 	static int memSizeToBytesi(const string &s){
 		long long value = memSizeToBytesl(s);
@@ -386,7 +399,7 @@ public:
 	static const vplregex regMemSize;
 
 	/**
-	 * return a memory size in Gb, Mb or Kb to as bytes long long
+	 * From a memory size in Gb, Mb or Kb return the value in bytes as long long
 	 */
 	static long long memSizeToBytesl(const string &memSize){
 		const int numberGroup = 1;
@@ -401,6 +414,26 @@ public:
 	}
 
 	/**
+	 * From a long long value in bytes to string in size format in Gb, Mb or Kb
+	 */
+	static string bytesToMemSize(long long bytes){
+		const long long kb = 1024;
+		const long long mb = 1024 * kb;
+		const long long gb = 1024 * mb;
+		char buf[64];
+		if (bytes >= 16 * gb) {
+			sprintf(buf, "%lldG", bytes / gb);
+		} else if (bytes >= 16 *mb) {
+			sprintf(buf, "%lldM", bytes / mb);
+		} else if (bytes >= 16 * kb) {
+			sprintf(buf, "%lldK", bytes / kb);
+		} else {
+			sprintf(buf, "%lldB", bytes);
+		}
+		return buf;
+	}
+
+	/**
 	 * Fix memory size -1 due XML-RPC limits
 	 */
 	static long long fixMemSize(long long memSize){
@@ -412,7 +445,7 @@ public:
 	}
 
 	/**
-	 * return upper case string
+	 * From a string return its upper case version
 	 */
 	static string toUppercase(const string & s){
 		string ret(s);

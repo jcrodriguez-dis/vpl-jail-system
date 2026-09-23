@@ -33,17 +33,18 @@ protected:
 	string messageBuf; //Buffer of messages from Jail system
 	string programbuf; //Buffer from net to program
 	string netbuf;  //Buffer from program to net
+	bool noOutput; //true if program output nothing
+	bool outputBufferCuted; //true if output buffer was cut
 	const int bufferSizeLimit; //Size limit 50Kb
 	enum States {begin, connecting, connected, ending, end, error} state;
-	bool noOutput; //true if program output nothing
 	static string eventsToString(int);
 public:
 	Redirector();
 	void stop() {state=ending;}
 	virtual void advance() = 0;
-	bool isError(){return state == error;}
-	bool isActive(){return state != error && state != end;}
-	bool isSilent(){return noOutput;}
+	bool isError() {return state == error;}
+	bool isActive() {return state != error && state != end;}
+	bool isSilent() {return noOutput;}
 	bool isOutputBufferFull();
 	void addOutput(const string &);
 	void addMessage(const string &);
@@ -59,7 +60,25 @@ public:
 		this->state = begin;
 		this->fdps = fdps;
 	};
+
 	void advance();
+
+	void addMessage(const string &toAdd){
+		messageBuf += "- Jail: " + toAdd + "\n";
+	}
+
+	string getMessage(){
+		if (messageBuf.empty()) return "";
+		return "\n<|--\n" + messageBuf + "--|>\n";
+	}
+
+	string getOutput() {
+		return netbuf + getMessage();
+	}
+
+	size_t getOutputSize() {
+		return netbuf.size() + getMessage().size();
+	}
 };
 
 class RedirectorTerminal: public Redirector {

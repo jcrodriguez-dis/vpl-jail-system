@@ -152,17 +152,22 @@ function checkDockerRunContainer() {
     [[ $? -ne 0 ]] && return 6
     writeCorrect "Correctly ran "$DAEMON_TEST_ITERATIONS" programs in interactive mode" "$CHECK_MARK"
 
+    python3 ./tests/daemonExecutionTest.py "http://localhost:$PLAIN_PORT/" --limits --timeout 15 &>> $ERRORS_LOG_FILE
+    showMessageIfError $? "Container '$CONTAINER_NAME' failed timeout or memory-limit execution diagnostics"
+    [[ $? -ne 0 ]] && return 7
+    writeCorrect "Correctly reported timeout and memory-limit diagnostics" "$CHECK_MARK"
+
     writeInfo "Container '$CONTAINER_NAME' running logs"
     docker logs $CONTAINER_NAME
     # Stop container
     docker stop -t 3 $CONTAINER_NAME &>> $ERRORS_LOG_FILE
     showMessageIfError $? "Error stopping '$CONTAINER_NAME'"
-    [[ $? -ne 0 ]] && return 7
+    [[ $? -ne 0 ]] && return 8
     if [ "$3" == "" ] ; then
         # Remove container
         docker container rm -f $CONTAINER_NAME &>> $ERRORS_LOG_FILE
         showMessageIfError $? "Error removing container '$CONTAINER_NAME'"
-        [[ $? -ne 0 ]] && return 8
+        [[ $? -ne 0 ]] && return 9
         writeInfo "Container '$CONTAINER_NAME' removed"
     else
         writeInfo "Container '$CONTAINER_NAME' was kept at user request"

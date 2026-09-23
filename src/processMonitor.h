@@ -98,6 +98,7 @@ public:
 	time_t getStartTime() { return startTime; }
 	time_t getMaxTime() { return executionLimits.maxtime; }
 	bool isInteractive() { return interactive; }
+	void waitExistFile(string filename, int timeout);
 	ExecutionLimits getLimits() { return executionLimits; }
 	uid_t getPrisonerID() { return prisoner; }
 	securityLevel getSecurityLevel() { return security; }

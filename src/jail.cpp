@@ -304,6 +304,8 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 			bool compiled = pm.FileExists(VPL_EXECUTION) || pm.FileExists(VPL_WEXECUTION) || pm.FileExists(VPL_WEBEXECUTION);
 			if (compiled) {
 				deleteFilesMarkedForDeletion(pm, rpc);
+				executionLimits = getParseExecutionLimits(rpc);
+				pm.setExtraInfo(executionLimits, interactive, vpl_lang);
 				if (!interactive && pm.FileExists(VPL_EXECUTION)) {
 					pm.setRunner();
 					Logger::log(LOG_INFO, "Non interactive execution");
@@ -317,9 +319,7 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 					Logger::log(LOG_INFO, "Write execution result");
 					pm.setExecutionOutput(executionOutput, true);
 				}
-				executionLimits = getParseExecutionLimits(rpc);
-				pm.setExtraInfo(executionLimits, interactive, vpl_lang);
-			}else{
+			} else {
 				Logger::log(LOG_INFO, "Compilation fail");
 				for(int i = 0; !pm.isMonitored() && i < 30; i++){
 					usleep(100000); //wait until monitor start and send compilation output
@@ -460,25 +460,27 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 	time_t startTime = 0;
 	time_t lastMessageTime = 0;
 	time_t lastTime = pm.getStartTime();
+	time_t timeout = lastTime + pm.getMaxTime();
 	string lastMessage;
 	while (state != stopped) {
 		processState newstate = pm.getState();
 		time_t now = time(NULL);
-		time_t timeout = pm.getStartTime() + pm.getMaxTime();
 		if (newstate != state) {
+			Logger::log(LOG_DEBUG, "Monitor state changed from %d to %d", state, newstate);
 			state = newstate;
 			switch(state) {
 			case prestarting:
 				break;
 			case starting:
-				Logger::log(LOG_DEBUG, "Monitor starting");
+				Logger::log(LOG_DEBUG, "Monitor state starting");
 				startTime = now;
+				timeout = now + pm.getMaxTime();
 				lastMessageTime = now;
 				lastMessage = "message:starting";
 				ws.send(lastMessage);
 				break;
 			case compiling:
-				Logger::log(LOG_DEBUG, "Monitor compiling");
+				Logger::log(LOG_DEBUG, "Monitor state compiling");
 				timeout = now + pm.getMaxTime();
 				startTime = now;
 				lastMessageTime = now;
@@ -486,7 +488,7 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 				ws.send(lastMessage);
 				break;
 			case beforeRunning:
-				Logger::log(LOG_DEBUG, "Monitor beforeRunning");
+				Logger::log(LOG_DEBUG, "Monitor state beforeRunning");
 				timeout = now + JAIL_SOCKET_TIMEOUT;
 				if (pm.FileExists(VPL_EXECUTION)) {
 					Logger::log(LOG_DEBUG, "run:terminal");
@@ -515,9 +517,13 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 				ws.send("compilation:" + pm.getCompilation());
 				break;
 			case running:
-				Logger::log(LOG_DEBUG, "Monitor running");
+				Logger::log(LOG_DEBUG, "Monitor state running");
 				startTime = now;
-				timeout = now + pm.getMaxTime() + 6 /* execution cleanup */;
+				timeout = now + pm.getMaxTime();
+				if (!pm.isInteractive()) {
+					// run() owns batch timeout enforcement and needs time to publish execution output.
+					timeout += JAIL_HARVEST_TIMEOUT;
+				}
 				lastMessageTime = now;
 				lastMessage = "message:running";
 				ws.send(lastMessage);
@@ -528,13 +534,13 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 				}
 				break;
 			case retrieve:
-				Logger::log(LOG_DEBUG, "Monitor retrieve");
+				Logger::log(LOG_DEBUG, "Monitor state retrieve");
 				startTime = now;
 				timeout = now + JAIL_HARVEST_TIMEOUT;
 				ws.send("retrieve:");
 				break;
 			case stopped:
-				Logger::log(LOG_DEBUG, "Monitor stopped");
+				Logger::log(LOG_DEBUG, "Monitor state stopped");
 				ws.send("close:");
 				ws.closeAndWait();
 				break;
@@ -557,12 +563,10 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 			}
 			break;
 		}
-
 		if (rec.size() > 0) { //Receive client close ws
 			ws.close();
 			break;
 		}
-
 		//Check running timeout
 		if (state != starting && timeout < time(NULL)) {
 			ws.send("message:timeout");
@@ -572,11 +576,11 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 			break;
 		}
 
-		if (lastTime != now && pm.isOutOfMemory()) { //Every second check memory usage
+		if (pm.isInteractive() && lastTime != now && pm.isOutOfMemory()) { //Every second check memory usage
 			string ml = pm.getMemoryLimit();
 			Logger::log(LOG_DEBUG, "Out of memory (%s)", ml.c_str());
 			ws.send("message:outofmemory:" + ml);
-			Util::sleep(1500000);
+			Util::sleep(3000000);
 			ws.send("close:");
 			ws.closeAndWait();
 			break;
@@ -1452,82 +1456,96 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 		if (fdslave != -1)
 			close(fdslave);
 		Logger::log(LOG_INFO, "Jail: openpty error %m");
-		return "Jail: openpty error";
+		return "- Jail: openpty error";
 	}
 	newpid = fork();
 	if (newpid == -1) {
 		close(fdmaster);
 		close(fdslave);
 		Logger::log(LOG_INFO, "Jail: fork error %m");
-		return "Jail: fork error";
+		return "- Jail: fork error";
 	}
 	if (newpid == 0) { //new process
 		close(fdmaster);
+		signal(SIGTERM, SIG_DFL);
+		signal(SIGINT, SIG_DFL);
+		signal(SIGQUIT, SIG_DFL);
 		executeInJail(pm, name, (VNCLaunch ? "VNCLaunch" : "run"), fdslave); // Never returns
 	}
 	close(fdslave);
-	Logger::log(LOG_INFO, "child pid %d",newpid);
+	Logger::log(LOG_INFO, "child pid %d", newpid);
 	RedirectorTerminalBatch redirector(fdmaster);
 	time_t startTime = time(NULL);
 	time_t lastTime = startTime;
 	int stopSignal = SIGTERM;
 	int status;
-	while(redirector.isActive()) {
+	while (redirector.isActive()) {
 		redirector.advance();
 		pid_t wret = waitpid(newpid, &status, WNOHANG);
 		if (wret == newpid) {
 			if(WIFSIGNALED(status)){
 				int signal = WTERMSIG(status);
 				char buf[1000];
-				sprintf(buf,"\r\nJail: program terminated due to \"%s\" (%d)",
-						strsignal(signal),signal);
+				sprintf(buf, "program terminated due to \"%s\" (%d)",
+						strsignal(signal), signal);
 				redirector.addMessage(buf);
 			}else if(WIFEXITED(status)){
 				int exitcode = WEXITSTATUS(status);
 				if(exitcode != EXIT_SUCCESS){
 					char buf[100];
-					sprintf(buf,"\r\nJail: program terminated normally with exit code %d.\n",exitcode);
+					sprintf(buf, "program terminated normally with exit code %d.", exitcode);
 					redirector.addMessage(buf);
 				}
 			}else{
-				redirector.addMessage("\r\nJail: program terminated but unknown reason.");
+				redirector.addMessage("program terminated but unknown reason.");
 			}
 			newpid = -1;
 			break;
-		} else if(wret > 0){//waitpid error wret != newpid
-			redirector.addMessage("\r\nJail waitpid error: ret>0.\n");
+		} else if(wret > 0) { //waitpid error wret != newpid
+			Logger::log(LOG_INFO, "Jail waitpid error: ret>0 %m");
 			break;
 		} else if(wret == -1) { //waitpid error
-			redirector.addMessage("\r\nJail waitpid error: ret==-1.\n");
-			Logger::log(LOG_INFO,"Jail waitpid error: %m");
+			Logger::log(LOG_INFO, "Jail waitpid error: ret==-1 %m");
 			break;
 		}
-		if (wret == 0){ //Process running
+		if (wret == 0) { //Process running
 			if (VNCLaunch && redirector.getOutputSize() > 0) {
 				break;
 			}
 			time_t now=time(NULL);
-			if(lastTime != now){
-				int elapsedTime = now - startTime;
+			if (lastTime != now) {
+				int elapsedTime = now - pm.getStartTime();
 				lastTime = now;
 				if(elapsedTime > JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()){
-					if(stopSignal != SIGKILL)
-						redirector.addMessage("\r\nJail: browser connection error.\n");
-					Logger::log(LOG_INFO,"Not monitored");
-					kill(newpid, stopSignal);
+					if(stopSignal != SIGKILL) {
+						redirector.addMessage("browser connection error.");
+						Logger::log(LOG_INFO, "Not monitored");
+					} else {
+						redirector.stop();
+					}
+					pm.stopPrisonerProcess(stopSignal);
+					kill(-newpid, stopSignal);
 					stopSignal = SIGKILL; //Second try
-				} else if(elapsedTime > maxtime){
-					redirector.addMessage("\r\nJail: execution time limit reached.\n");
-					Logger::log(LOG_INFO,"Execution time limit (%d) reached"
-							,maxtime);
-					kill(newpid, stopSignal);
+				} else if (elapsedTime >= maxtime) {
+					if(stopSignal != SIGKILL) {
+						redirector.addMessage("execution time limit reached (" + to_string(maxtime) + " seconds).");
+						Logger::log(LOG_INFO, "Execution time limit (%d) reached", maxtime);
+					} else {
+						redirector.stop();
+					}
+					pm.stopPrisonerProcess(stopSignal != SIGKILL);
+					kill(-newpid, stopSignal);
 					stopSignal = SIGKILL; //Second try
-				} else if(pm.isOutOfMemory()){
+				} else if (pm.isOutOfMemory()) {
 					string ml = pm.getMemoryLimit();
-					if(stopSignal != SIGKILL)
-						redirector.addMessage("\r\nJail: out of memory (" + ml + ")\n");
-					Logger::log(LOG_INFO,"Out of memory (%s)", ml.c_str());
-					kill(newpid, stopSignal);
+					if(stopSignal != SIGKILL) {
+						redirector.addMessage("out of memory (" + ml + ")");
+						Logger::log(LOG_INFO, "Out of memory (%s)", ml.c_str());
+					} else {
+						redirector.stop();
+					}
+					pm.stopPrisonerProcess(stopSignal != SIGKILL);
+					kill(-newpid, stopSignal);
 					stopSignal = SIGKILL; //Second try
 				}
 			}
@@ -1535,12 +1553,12 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 	}
 	//wait until 5sg for redirector to read and send program output
 	int max_iter = VNCLaunch ? 0 : 50;
-	for(int i=0; redirector.isActive() && i < max_iter; i++){
+	for (int i=0; redirector.isActive() && i < max_iter; i++) {
 		redirector.advance();
 		Util::sleep(100000); // 1/10 sec
 	}
 	string output = redirector.getOutput();
-	Logger::log(LOG_DEBUG,"Complete program output: %s", output.c_str());
+	Logger::log(LOG_DEBUG, "Complete program output: %s", output.c_str());
 	return output;
 }
 
@@ -1570,6 +1588,9 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 	}
 	if (newpid == 0) { //new process
 		close(fdmaster);
+		signal(SIGTERM, SIG_DFL);
+		signal(SIGINT, SIG_DFL);
+		signal(SIGQUIT, SIG_DFL);
 		executeInJail(pm, name, "terminal", fdslave); // Never returns
 	}
 	close(fdslave);
@@ -1602,27 +1623,27 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 				if (elapsedTime > JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()) {
 					Logger::log(LOG_INFO, "Not monitored");
 					if (stopSignal != SIGKILL)
-						redirector.addMessage("\r\nJail: process stopped\n");
+						redirector.addMessage("process stopped.");
 					redirector.stop();
 					pm.stopPrisonerProcess(stopSignal != SIGKILL);
-					kill(newpid, stopSignal);
+					kill(-newpid, stopSignal);
 					stopSignal = SIGKILL;
-				} else if (elapsedTime > executionLimits.maxtime) {
+				} else if (elapsedTime >= executionLimits.maxtime) {
 					if (stopSignal != SIGKILL)
-						redirector.addMessage("\r\nJail: execution time limit reached.\n");
+						redirector.addMessage("execution time limit reached.");
 					redirector.stop();
 					Logger::log(LOG_INFO, "Execution time limit (%d) reached",
 							executionLimits.maxtime);
 					pm.stopPrisonerProcess(stopSignal != SIGKILL);
-					kill(newpid, stopSignal);
+					kill(-newpid, stopSignal);
 					stopSignal = SIGKILL;
 				} else if (pm.isOutOfMemory()) {
 					string ml = pm.getMemoryLimit();
 					if (stopSignal != SIGKILL)
-						redirector.addMessage("\r\nJail: out of memory (" + ml + ")\n");
+						redirector.addMessage("out of memory (" + ml + ")");
 					Logger::log(LOG_INFO, "Out of memory (%s)", ml.c_str());
 					pm.stopPrisonerProcess(stopSignal != SIGKILL);
-					kill(newpid, stopSignal);
+					kill(-newpid, stopSignal);
 					stopSignal = SIGKILL;
 				}
 			}
@@ -1640,7 +1661,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 	}
 	// Reap child if still running to avoid zombie
 	if (newpid != -1) {
-		kill(newpid, SIGKILL);
+		kill(-newpid, SIGKILL);
 		waitpid(newpid, &status, 0);
 		newpid = -1;
 	}
@@ -1668,7 +1689,7 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 			int elapsedTime=now-startTime;
 			lastTime = now;
 			//TODO report to user the out of resources
-			if(elapsedTime > executionLimits.maxtime){
+			if(elapsedTime >= executionLimits.maxtime){
 				Logger::log(LOG_INFO,"Execution time limit (%d) reached"
 						,executionLimits.maxtime);
 				redirector.stop();
@@ -1680,7 +1701,7 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 				redirector.stop();
 				break;
 			}
-			if(elapsedTime>JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()){
+			if(elapsedTime >= JAIL_MONITORSTART_TIMEOUT && !pm.isMonitored()){
 				Logger::log(LOG_INFO,"Not monitored");
 				redirector.stop();
 				break;
@@ -1717,7 +1738,7 @@ void Jail::runPassthrough(processMonitor &pm, Socket *s) {
 			lastTime = now;
 			if (elapsedTime > JAIL_HARVEST_TIMEOUT) {
 				Logger::log(LOG_INFO,"Execution time limit (%d) reached", JAIL_HARVEST_TIMEOUT);
-				s->send("<b>Execution time limit reached</b>");
+				s->send("Execution time limit reached");
 				redirector.stop();
 				break;
 			}

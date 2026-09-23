@@ -553,6 +553,21 @@ bool processMonitor::isRunning() {
 }
 
 /**
+ * Wait until a control file exists or timeout is reached
+ * @param filename Control file name
+ * @param timeout Timeout in seconds
+ */
+void processMonitor::waitExistFile(string filename, int timeout) {
+	int limit = timeout * 10;
+	for (int i = 0; i < limit; i++) {
+		if (controlFileExists(filename)) {
+			break;
+		}
+		usleep(100000); // Sleep for 100ms
+	}
+}
+
+/**
  * Get current task state
  */
 processState processMonitor::getState() {
@@ -578,14 +593,14 @@ processState processMonitor::getState() {
 	}
 	time_t elapsedTime = currentTime - startTime;
 	time_t tlimit = startTime;
-	tlimit += 2 * executionLimits.maxtime;
+	tlimit += executionLimits.maxtime;
 	tlimit += JAIL_HARVEST_TIMEOUT;
 	if (tlimit < currentTime) {
 		Logger::log(LOG_INFO, "Execution last timeout reached %ld. ", tlimit);
 		cleanTask();
 		return stopped;
 	}
-	bool aliveCompiler = Util::processExists(compiler_pid);
+	bool aliveCompiler = Util::processExistsAndRunning(compiler_pid);
 	if (aliveCompiler && runner_pid == 0) return compiling;
 	if (monitor_pid == 0 && monitorticket != "NO_MONITOR" && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
 		Logger::log(LOG_INFO, "Execution without monitor timeout reached %d. ", JAIL_MONITORSTART_TIMEOUT);
@@ -599,13 +614,15 @@ processState processMonitor::getState() {
 			return stopped;
 		}
 		if (interactive) return beforeRunning;
+		waitExistFile("compilation", 2);
 		if (controlFileExists("compilation")) return retrieve;
 		Logger::log(LOG_INFO, "Execution stopped, not interactive, not runner, no compilation file");
 		return stopped;
 	}
-	bool aliveRunner = Util::processExists(runner_pid);
+	bool aliveRunner = Util::processExistsAndRunning(runner_pid);
 	if (aliveRunner) return running;
 	if (interactive) return stopped;
+	waitExistFile("execution", 2);
 	if (controlFileExists("execution")) return retrieve;
 	return stopped;
 }
@@ -617,6 +634,7 @@ void processMonitor::setRunner() {
 	if (security == monitor) return;
 	TaskLock lock(getPrisonerID());
 	readInfo();
+	startTime = time(NULL);
 	runner_pid = getpid();
 	writeInfo();
 }
@@ -773,12 +791,13 @@ void processMonitor::setCompilationOutput(const string &compilation) {
  * Save execution output if executed is true
  */
 void processMonitor::setExecutionOutput(const string &execution, bool executed) {
+	Logger::log(LOG_DEBUG, "Saving execution output %d bytes", execution.size());
 	string fileName;
 	TaskLock lock(getPrisonerID());
 	readInfo();
 	fileName = getProcessControlPath("compilation");
 	if ( ! Util::fileExists(fileName))
-		throw "Compilation not saved";
+		throw "Execution not saved because compilation is missing";
 	if (executed) {
 		fileName = getProcessControlPath("execution");
 		if (Util::fileExists(fileName))

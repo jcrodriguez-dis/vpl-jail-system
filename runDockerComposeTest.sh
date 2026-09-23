@@ -113,17 +113,33 @@ function checkDockerComposeUp() {
     showMessageIfError $result "Project '$PROJECT_NAME' $PRIVILEGED fail for correct URL: $URL"
     [[ $result -ne 0 ]] && return 4
     writeCorrect "Correct response for OK URL $URL" $CHECK_MARK
+
+    python3 ./tests/daemonExecutionTest.py "http://localhost:$PLAIN_PORT/" --iterations 1 &>> $ERRORS_LOG_FILE
+    showMessageIfError $? "Project '$PROJECT_NAME' $PRIVILEGED failed batch execution in the jail"
+    [[ $? -ne 0 ]] && return 5
+    writeCorrect "Correctly ran a program in batch mode" $CHECK_MARK
+
+    python3 ./tests/daemonExecutionTest.py "http://localhost:$PLAIN_PORT/" --interactive --iterations 1 &>> $ERRORS_LOG_FILE
+    showMessageIfError $? "Project '$PROJECT_NAME' $PRIVILEGED failed interactive terminal execution in the jail"
+    [[ $? -ne 0 ]] && return 6
+    writeCorrect "Correctly ran a program in interactive mode" $CHECK_MARK
+
+    python3 ./tests/daemonExecutionTest.py "http://localhost:$PLAIN_PORT/" --limits --timeout 15 &>> $ERRORS_LOG_FILE
+    showMessageIfError $? "Project '$PROJECT_NAME' $PRIVILEGED failed timeout or memory-limit execution diagnostics"
+    [[ $? -ne 0 ]] && return 7
+    writeCorrect "Correctly reported timeout and memory-limit diagnostics" $CHECK_MARK
+
     writeInfo "Service '$PROJECT_NAME' logs"
     docker compose logs vpl-jail
     # Stop container
     docker compose down 2> $ERRORS_LOG_FILE
     showMessageIfError $? "Error in compose down of '$PROJECT_NAME' $PRIVILEGED"
-    [[ $? -ne 0 ]] && return 5
+    [[ $? -ne 0 ]] && return 8
 
     # Remove container
     docker compose rm 2> $ERRORS_LOG_FILE
     showMessageIfError $? "Error removing container '$PROJECT_NAME' $PRIVILEGED"
-    [[ $? -ne 0 ]] && return 6
+    [[ $? -ne 0 ]] && return 9
     return 0
 }
 
