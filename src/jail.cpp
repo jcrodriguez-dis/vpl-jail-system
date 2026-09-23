@@ -1370,8 +1370,8 @@ void Jail::setLimits(processMonitor &pm){
 	limit.rlim_cur = 0;
 	limit.rlim_max = 0;
 	setrlimit(RLIMIT_CORE, &limit);
-	limit.rlim_cur = executionLimits.maxtime;
-	limit.rlim_max = executionLimits.maxtime;
+	limit.rlim_cur = executionLimits.maxtime + JAIL_VPL_EXTRA_TIME;
+	limit.rlim_max = executionLimits.maxtime + JAIL_VPL_EXTRA_TIME;
 	setrlimit(RLIMIT_CPU, &limit);
 	if(executionLimits.maxfilesize > 0){ //0 equals no limit
 		limit.rlim_cur = executionLimits.maxfilesize;
@@ -1483,7 +1483,11 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 		redirector.advance();
 		pid_t wret = waitpid(newpid, &status, WNOHANG);
 		if (wret == newpid) {
-			if(WIFSIGNALED(status)){
+			if (pm.isOutOfMemory()) {
+				string ml = pm.getMemoryLimit();
+				redirector.addMessage("out of memory (" + ml + ")");
+				Logger::log(LOG_INFO, "Out of memory (%s)", ml.c_str());
+			} else if(WIFSIGNALED(status)){
 				int signal = WTERMSIG(status);
 				char buf[1000];
 				sprintf(buf, "program terminated due to \"%s\" (%d)",

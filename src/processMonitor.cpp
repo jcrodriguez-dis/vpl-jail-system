@@ -939,6 +939,17 @@ void processMonitor::cleanTask() {
  */
 bool processMonitor::isOutOfMemory() {
 	if (executionLimits.maxmemory <= 0) return false;
+	if (configuration->getUseCGroup()) {
+		try {
+			Cgroup cgroup("p" + Util::itos(prisoner));
+			map<string, int> oomControl = cgroup.getMemoryOOMControl();
+			if (oomControl["under_oom"] || oomControl["oom_kill"] > 0) return true;
+		} catch (const std::exception &e) {
+			Logger::log(LOG_DEBUG, "Failed to read cgroup OOM state: %s", e.what());
+		} catch (...) {
+			Logger::log(LOG_DEBUG, "Failed to read cgroup OOM state");
+		}
+	}
 	long long usedMemory = max(getMemoryUsedBasedOnCgroup(), getMemoryUsedBasedOnProc());
 	return executionLimits.maxmemory < usedMemory;
 }
