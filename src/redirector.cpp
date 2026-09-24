@@ -236,6 +236,11 @@ void RedirectorTerminal::advance() {
 						break;
 					}
 					if (res == 0) break; //Nothing to do
+					if (devices[1].revents & POLLBAD) {
+						Logger::log(LOG_INFO, "Websocket client disconnected");
+						state = ending;
+						break;
+					}
 					int eventsOccurred = devices[0].revents;
 					Logger::log(LOG_INFO, "poll: program %d %s", eventsOccurred, eventsToString(eventsOccurred).c_str());
 					if((devices[0].revents & POLLREAD) && !isOutputBufferFull()){ //Read program output

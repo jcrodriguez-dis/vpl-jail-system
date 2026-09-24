@@ -406,7 +406,6 @@ void Jail::commandDirectRun(RPC &rpc, string &homepath, string &adminticket, str
 	}
 }
 
-
 void Jail::commandGetResult(string adminticket, string &compilation,
                             string &execution, bool &executed,
 							bool &interactive){
