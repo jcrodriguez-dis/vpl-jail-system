@@ -602,13 +602,13 @@ processState processMonitor::getState() {
 	}
 	bool aliveCompiler = Util::processExistsAndRunning(compiler_pid);
 	if (aliveCompiler && runner_pid == 0) return compiling;
-	if (monitor_pid == 0 && monitorticket != "NO_MONITOR" && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
+	if (monitor_pid == 0 && hasMonitorTicket() && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
 		Logger::log(LOG_INFO, "Execution without monitor timeout reached %d. ", JAIL_MONITORSTART_TIMEOUT);
 		cleanTask();
 		return stopped;
 	}
 	if (runner_pid == 0) {
-		if (monitor_pid == 0 && monitorticket == "NO_MONITOR" && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
+		if (monitor_pid == 0 && !hasMonitorTicket() && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
 			Logger::log(LOG_INFO, "Execution not started with no monitor, timeout reached %d. ", JAIL_MONITORSTART_TIMEOUT);
 			cleanTask();
 			return stopped;
@@ -659,7 +659,7 @@ bool processMonitor::isMonitored() {
 	{
 		TaskLock lock(getPrisonerID());
 		readInfo();
-		if (this->monitorticket != "NO_MONITOR") {
+		if (this->hasMonitorTicket()) {
 			if ( monitor_pid == 0 ) return false;
 			return Util::processExists(monitor_pid);
 		}
@@ -677,7 +677,7 @@ bool processMonitor::hasActiveMonitor() {
 		if (exception.getMessage() == "Task is being cleaned") return true;
 		throw;
 	}
-	return monitorticket != "NO_MONITOR" && monitor_pid != 0 && Util::processExists(monitor_pid);
+	return hasMonitorTicket() && monitor_pid != 0 && Util::processExists(monitor_pid);
 }
 
 /**
@@ -908,8 +908,8 @@ void processMonitor::cleanTask() {
 		retry++;
 		Util::sleep(sleepTime);
 	}
-	if (processes > 0) {
-		vector<pid_t> pids = getPrisonerProcesses(userid);
+	const vector<pid_t> pids = getPrisonerProcesses(userid);
+	if ( ! pids.empty()) {
 		for (size_t i = 0; i < pids.size(); i++) {
 			string processName;
 			string processPath;
@@ -917,6 +917,7 @@ void processMonitor::cleanTask() {
 			Logger::log(LOG_ERR, "Can't stop prisoner UID = %d process = %d '%s' '%s'",
 			                userid, pids[i], processName.c_str(), processPath.c_str());
 		}
+		return;
 	}
 	cleanPrisonerFiles("p" + Util::itos(userid));
 	if( configuration->getUseCGroup()) {

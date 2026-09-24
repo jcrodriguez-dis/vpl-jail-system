@@ -1668,6 +1668,9 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 		waitpid(newpid, &status, 0);
 		newpid = -1;
 	}
+	if (!pm.hasMonitorTicket()) {
+		pm.cleanTask();
+	}
 }
 
 /**

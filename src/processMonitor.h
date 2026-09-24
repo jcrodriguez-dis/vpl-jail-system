@@ -123,6 +123,7 @@ public:
 	void setRunner();
 	bool isMonitored();
 	bool hasActiveMonitor();
+	bool hasMonitorTicket() { return monitorticket != "NO_MONITOR"; }
 	void monitorize();
 	bool isOutOfMemory();
 	long long getMemoryUsedBasedOnProc();
