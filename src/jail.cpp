@@ -1653,7 +1653,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 		}
 		Logger::log(LOG_DEBUG, "End redirector loop");
 		//wait until 5s for redirector to read and send program output
-		for (int i = 0; redirector.isActive() && i < 50; i++) {
+		for (int i = 0; redirector.isActive() && !ws.isClosed() && i < 50; i++) {
 			redirector.advance();
 			Util::sleep(100000); // 1/10 sec
 		}
@@ -1665,6 +1665,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 	// Reap child if still running to avoid zombie
 	if (newpid != -1) {
 		kill(-newpid, SIGKILL);
+		kill(newpid, SIGKILL);
 		waitpid(newpid, &status, 0);
 		newpid = -1;
 	}
