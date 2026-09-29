@@ -480,7 +480,7 @@ processMonitor::processMonitor(string ticket) {
 			if (security == monitor) monitorize();
 			return;
 		} else {
-			throw "Ticket not found";
+			throw HttpException(notFoundCode, "Ticket not found");
 		}
 	} else {
 		throw "Ticket invalid format";
@@ -637,6 +637,8 @@ void processMonitor::setRunner() {
 	startTime = time(NULL);
 	runner_pid = getpid();
 	writeInfo();
+	Logger::log(LOG_INFO, "TASK uid=%d event=runner_registered pid=%d",
+				(int)getPrisonerID(), (int)runner_pid);
 }
 
 /**
@@ -649,6 +651,8 @@ void processMonitor::setCompiler() {
 	startTime = time(NULL);
 	compiler_pid = getpid();
 	writeInfo();
+	Logger::log(LOG_INFO, "TASK uid=%d event=compiler_registered pid=%d",
+				(int)getPrisonerID(), (int)compiler_pid);
 }
 
 /**
@@ -691,6 +695,8 @@ void processMonitor::monitorize() {
 		throw string("Process already monitorized");
 	monitor_pid = getpid();
 	writeInfo();
+	Logger::log(LOG_INFO, "TASK uid=%d event=monitor_registered pid=%d",
+				(int)getPrisonerID(), (int)monitor_pid);
 }
 
 /**
@@ -910,17 +916,29 @@ void processMonitor::cleanTask() {
 	}
 	const vector<pid_t> pids = getPrisonerProcesses(userid);
 	if ( ! pids.empty()) {
+		static const vplregex reg_ppid(".*^PPid:[ \\t]+([0-9]+)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
+		bool activeProcesses = false;
 		for (size_t i = 0; i < pids.size(); i++) {
+			if (getProcessUID(pids[i]) != userid) continue;
 			string processName;
 			string processPath;
+			vplregmatch match(2);
+			int parentPid = -1;
+			const string status = Util::readFile("/proc/" + Util::itos(pids[i]) + "/status", false);
+			if (status.empty()) continue;
+			if (reg_ppid.search(status, match)) {
+				parentPid = Util::atoi(match[1]);
+			}
 			Util::getProcessName(pids[i], processName, processPath);
-			Logger::log(LOG_ERR, "Can't stop prisoner UID = %d process = %d '%s' '%s'",
-			                userid, pids[i], processName.c_str(), processPath.c_str());
+			if (getProcessUID(pids[i]) != userid) continue;
+			activeProcesses = true;
+			Logger::log(LOG_ERR, "Can't stop prisoner UID = %d process = %d parent = %d '%s' '%s'",
+			                userid, pids[i], parentPid, processName.c_str(), processPath.c_str());
 		}
-		return;
+		if (activeProcesses) return;
 	}
 	cleanPrisonerFiles("p" + Util::itos(userid));
-	if( configuration->getUseCGroup()) {
+	if (isCGroupAvailable()) {
 		try {
 			string cgroupName = "p" + Util::itos(userid);
 			Cgroup cgroup(cgroupName);
@@ -934,13 +952,22 @@ void processMonitor::cleanTask() {
 }
 
 /**
+ * Check if cgroup is available for the prisoner
+ * @return true if cgroup is available
+ */
+bool processMonitor::isCGroupAvailable() {
+	return configuration->getUseCGroup() && Cgroup::isAvailable();
+}
+
+/**
  * Return if prisoner processes are out of memory
  * Checks both cgroup and /proc memory usage
  * @return true if out of memory
  */
 bool processMonitor::isOutOfMemory() {
 	if (executionLimits.maxmemory <= 0) return false;
-	if (configuration->getUseCGroup()) {
+	const bool useCGroup = isCGroupAvailable();
+	if (useCGroup) {
 		try {
 			Cgroup cgroup("p" + Util::itos(prisoner));
 			map<string, int> oomControl = cgroup.getMemoryOOMControl();
@@ -951,7 +978,10 @@ bool processMonitor::isOutOfMemory() {
 			Logger::log(LOG_DEBUG, "Failed to read cgroup OOM state");
 		}
 	}
-	long long usedMemory = max(getMemoryUsedBasedOnCgroup(), getMemoryUsedBasedOnProc());
+	long long usedMemory = getMemoryUsedBasedOnProc();
+	if (useCGroup) {
+		usedMemory = max(getMemoryUsedBasedOnCgroup(), usedMemory);
+	}
 	return executionLimits.maxmemory < usedMemory;
 }
 

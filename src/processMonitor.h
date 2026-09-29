@@ -125,6 +125,7 @@ public:
 	bool hasActiveMonitor();
 	bool hasMonitorTicket() { return monitorticket != "NO_MONITOR"; }
 	void monitorize();
+	bool isCGroupAvailable();
 	bool isOutOfMemory();
 	long long getMemoryUsedBasedOnProc();
 	long long getMemoryUsedBasedOnCgroup();

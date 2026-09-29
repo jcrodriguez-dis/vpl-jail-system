@@ -27,7 +27,9 @@ void ConfigurationFile::parseConfigLine(ConfigData &data,const string &line){
 				Logger::log(LOG_ERR,"Warning: Repeated config param %s=%s (Using last)", param.c_str(), value.c_str());
 			}
 			data[param] = value;
-			Logger::log(LOG_INFO, "Read config param %s=%s", param.c_str(), value.c_str());
+			if (Logger::isTraceEnabled()) {
+				Logger::log(LOG_DEBUG, "Read config param %s=%s", param.c_str(), value.c_str());
+			}
 		} else {
 			throw HttpException(internalServerErrorCode
 					,"Incorrect config file: " + line);

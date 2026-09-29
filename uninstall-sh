@@ -37,7 +37,7 @@ if [ ! -d $VPLJAIL_INSTALL_DIR ] ; then
 	echo "VPL jail installation dir '$VPLJAIL_INSTALL_DIR' not found"
 	exit 1
 fi
-LSYSTEM="Unknow"
+LSYSTEM="Unknown"
 if [ -f /sbin/chkconfig ] ; then
 	LSYSTEM="1"
 fi

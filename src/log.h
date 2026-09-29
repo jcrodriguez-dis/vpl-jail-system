@@ -23,10 +23,12 @@ using namespace std;
 class Logger {
 	static int loglevel;
 	static bool foreground;
+	static bool traceEnabled;
 	static const char * const levelName[8];
 public:
 	static void setLogLevel(int level, bool foreground) {
 		setForeground(foreground);
+		Logger::traceEnabled = level >= 8;
 		openlog("vpl-jail-system", LOG_PID, LOG_DAEMON);
 		if (level > 7 || level < 0) {
 			level = 7;
@@ -36,6 +38,9 @@ public:
 	}
 	static int getLogLevel() {
 		return Logger::loglevel;
+	}
+	static bool isTraceEnabled() {
+		return Logger::traceEnabled;
 	}
 	static void setForeground(bool foreground) {
 		Logger::foreground = foreground;

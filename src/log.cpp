@@ -7,7 +7,9 @@
 #include "log.h"
 
 bool Logger::foreground = false;
+bool Logger::traceEnabled = false;
 int Logger::loglevel = 3;
+
 const char * const Logger::levelName[8] = {
 		"EMERG",
 		"ALERT",

@@ -81,7 +81,6 @@ function showMessageIfError() {
         writeInfo "Logs:"
         if [ -f "$ERRORS_LOG_FILE" ] ; then
             cat "$ERRORS_LOG_FILE"
-            rm "$ERRORS_LOG_FILE"
         else
             echo "NO LOG FILE FOUND"
         fi
@@ -96,7 +95,8 @@ function checkDockerRunContainer() {
     local result=
 
     [ "$PRIVILEGED" = "privileged" ] && RUNOPTION="-e VPL_JAIL_JAILPATH=/jail -e VPL_JAIL_USE_NAMESPACE=true --privileged"
-    [ "$VPL_DEBUG" != "" ] && RUNOPTION="$RUNOPTION -e VPL_JAIL_LOGLEVEL=8"
+    [ "$VPL_DEBUG" != "" ] && [ -z "$VPL_JAIL_LOGLEVEL" ] && VPL_JAIL_LOGLEVEL=8
+    [ -n "$VPL_JAIL_LOGLEVEL" ] && RUNOPTION="$RUNOPTION -e VPL_JAIL_LOGLEVEL=$VPL_JAIL_LOGLEVEL"
     if docker container inspect "$CONTAINER_NAME" &> /dev/null ; then
         if [[ "$(docker container inspect --format '{{.State.Running}}' "$CONTAINER_NAME")" == "true" ]] ; then
             writeError "Container '$CONTAINER_NAME' already exists and is running"
@@ -157,8 +157,10 @@ function checkDockerRunContainer() {
     [[ $? -ne 0 ]] && return 7
     writeCorrect "Correctly reported timeout and memory-limit diagnostics" "$CHECK_MARK"
 
-    writeInfo "Container '$CONTAINER_NAME' running logs"
-    docker logs $CONTAINER_NAME
+    if [[ -n "$VPL_DEBUG" ]] ; then
+        writeInfo "Container '$CONTAINER_NAME' running logs"
+        docker logs "$CONTAINER_NAME"
+    fi
     # Stop container
     docker stop -t 3 $CONTAINER_NAME &>> $ERRORS_LOG_FILE
     showMessageIfError $? "Error stopping '$CONTAINER_NAME'"
@@ -231,6 +233,33 @@ function checkParameter() {
     local parameter
 }
 
+function showHelp() {
+    cat << EOF
+Usage: $0 OPTION...
+
+Run Docker tests for vpl-jail-system.
+
+Options:
+    all                    Run the default matrix: alpine, ubuntu, debian, and
+                           fedora at minimum, basic, standard, and full levels.
+    DISTRO                 Test only the named distribution.
+    minimum|basic|standard|full
+                           Test only the named install level.
+    keep                   Keep images and containers after the tests.
+    image                  Test existing Docker images instead of building them.
+    iterations=N           Run N batch and interactive tests per container.
+    languageservers[=LIST] Install language servers; LIST is comma-separated.
+    loglevel=N             Set the daemon log level from 0 to 8.
+    -h, --help, help       Show this help.
+
+Examples:
+    $0 all
+    $0 ubuntu basic
+    $0 all image keep iterations=20
+    $0 alpine languageservers=python,java loglevel=7
+EOF
+}
+
 function runTests() {
     # Parameters (all optional and in any order):
     #    Distro name, default [alpine ubuntu debian fedora]
@@ -240,6 +269,7 @@ function runTests() {
     #    iterations=N: Number of batch and interactive daemon tests per container (default 10).
     #    languageservers[=LIST]: Install the language servers in the image.
     #        LIST is a comma separated list of languages, default all.
+    #    loglevel=N: Set the daemon log level in test containers (0-8).
     local n=0
 	local DISTROS=( alpine ubuntu debian fedora )
     local INSTALL_LEVELS=( minimum basic standard full )
@@ -272,6 +302,14 @@ function runTests() {
                 VPL_INSTALL_LS=$(echo "${param#*=}" | tr ',' ' ')
             else
                 VPL_INSTALL_LS="all"
+            fi
+            continue
+        fi
+        if [[ $param == "loglevel="* ]] ; then
+            VPL_JAIL_LOGLEVEL=${param#*=}
+            if ! [[ $VPL_JAIL_LOGLEVEL =~ ^[0-8]$ ]] ; then
+                writeError "Invalid loglevel value '$VPL_JAIL_LOGLEVEL' (expected 0-8)"
+                exit 1
             fi
             continue
         fi
@@ -342,5 +380,18 @@ function runTests() {
     return $nfails
 }
 echo "$(date) Running tests for vpl-jail-system in Docker" > "$ERRORS_LOG_FILE"
+if [[ $# -eq 0 ]] ; then
+    showHelp
+    exit 0
+fi
+case "$1" in
+    -h|--help|help)
+        showHelp
+        exit 0
+        ;;
+    all)
+        shift
+        ;;
+esac
 writeHeading "vpl-jail-system running in Docker $*" "TESTING "
 runTests "$@"

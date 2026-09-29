@@ -166,6 +166,13 @@ void HttpJailServer::send200(const string &response, const bool headMethod, cons
  * @param text Extra text explainning the code
  */
 void HttpJailServer::sendCode(CodeNumber code, string text){
+	if (socket->isWebSocketProtocol()) {
+		Logger::log(LOG_ERR,
+				"Skipping HTTP error response on WebSocket connection: %d, path '%s', message '%s'",
+				(int)code, socket->getURLPath().c_str(), text.c_str());
+		socket->close();
+		return;
+	}
 	string codeText;
 	int cnumber = code;
 	switch(code) {

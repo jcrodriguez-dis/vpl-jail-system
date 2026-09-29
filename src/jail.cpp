@@ -37,6 +37,19 @@ static int pivot_root(const char *new_root, const char *put_old) {
 }
 
 namespace {
+	static const char *processStateName(processState state) {
+		switch (state) {
+		case prestarting: return "prestarting";
+		case starting: return "starting";
+		case compiling: return "compiling";
+		case beforeRunning: return "before_running";
+		case running: return "running";
+		case retrieve: return "retrieve";
+		case stopped: return "stopped";
+		}
+		return "unknown";
+	}
+
 	static bool isOctalDigit(char c) {
 		return c >= '0' && c <= '7';
 	}
@@ -123,7 +136,7 @@ namespace {
  * @return string "ready", "busy", "offline"
  */
 string Jail::commandAvailable(long long memRequested){
-	Logger::log(LOG_INFO,"Memory requested %lld", memRequested);
+	Logger::log(LOG_DEBUG,"Memory requested %lld", memRequested);
 	if (memRequested <= 0) {
 		return "ready";
 	}
@@ -159,13 +172,13 @@ void Jail::saveParseFiles(processMonitor &pm, RPC &rpc) {
 				string data = i->second->getString();
 				if ( fileencoding.find(name) != fileencoding.end()
 						&& fileencoding[name]->getInt() == 1 ) {
-					Logger::log(LOG_INFO, "Decoding file %s from b64", name.c_str());
+					Logger::log(LOG_DEBUG, "Decoding file %s from b64", name.c_str());
 					data = Base64::decode(data);
 					if ( name.length() > 4 && name.substr(name.length() - 4, 4) == ".b64") {
 						name = name.substr(0, name.length() - 4);
 					}
 				}
-				Logger::log(LOG_INFO, "Write file %s data size %lu", name.c_str(), (long unsigned int)data.size());
+				Logger::log(LOG_DEBUG, "Write file %s data size %lu", name.c_str(), (long unsigned int)data.size());
 				pm.writeFile(name, data);
 			}
 		}
@@ -211,10 +224,10 @@ void Jail::deleteFilesMarkedForDeletion(processMonitor &pm, RPC &rpc) {
 			for (mapstruct::iterator i = filestodelete.begin(); i != filestodelete.end(); i++) {
 				string name = i->first;
 				if (files.find(name) == files.end()) {
-					Logger::log(LOG_INFO, "File '%s' not in upload list then not deleted", name.c_str());
+					Logger::log(LOG_DEBUG, "File '%s' not in upload list then not deleted", name.c_str());
 					continue; // File not in the upload list so skip
 				}
-				Logger::log(LOG_INFO, "Delete file %s", name.c_str());
+				Logger::log(LOG_DEBUG, "Delete file %s", name.c_str());
 				pm.deleteFile(name);
 			}
 		}
@@ -253,7 +266,7 @@ void Jail::deleteFilesMarkedForDeletion(processMonitor &pm, RPC &rpc) {
 ExecutionLimits Jail::getParseExecutionLimits(RPC &rpc) {
 	mapstruct parsedata = rpc.getData();
 	ExecutionLimits executionLimits = Configuration::getConfiguration()->getLimits();
-	Logger::log(LOG_INFO,"Reading parameters");
+	Logger::log(LOG_DEBUG,"Reading parameters");
 	executionLimits.log("Config");
 	const TreeNode* maxtime = parsedata["maxtime"];
 	const TreeNode* maxfilesize = parsedata["maxfilesize"];
@@ -287,9 +300,9 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 	pid_t pid=fork();
 	if(pid==0){ //new process
 		try {
-			Logger::log(LOG_INFO,"Parse data %lu", (long unsigned int)parsedata.size());
+			Logger::log(LOG_DEBUG,"Parse data %lu", (long unsigned int)parsedata.size());
 			saveParseFiles(pm, rpc);
-			Logger::log(LOG_INFO,"Reading parameters");
+			Logger::log(LOG_DEBUG,"Reading parameters");
 			ExecutionLimits executionLimits = configuration->getLimits();
 			string vpl_lang = parsedata["lang"]->getString();
 			Logger::log(LOG_DEBUG, "VPL_LANG %s", vpl_lang.c_str());
@@ -316,7 +329,7 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 						program = VPL_EXECUTION;
 					}
 					string executionOutput = run(pm, program);
-					Logger::log(LOG_INFO, "Write execution result");
+					Logger::log(LOG_DEBUG, "Write execution result");
 					pm.setExecutionOutput(executionOutput, true);
 				}
 			} else {
@@ -335,7 +348,11 @@ void Jail::commandRequest(RPC &rpc, string &adminticket,string &monitorticket,st
 			_exit(EXIT_FAILURE);
 		}
 		catch(HttpException &e){
-			Logger::log(LOG_ERR, "unexpected exception: %s %s:%d", e.getLog().c_str(), __FILE__, __LINE__);
+			if (e.getMessage() == "Task is being cleaned") {
+				Logger::log(LOG_INFO, "Task cancelled during cleanup");
+			} else {
+				Logger::log(LOG_ERR, "unexpected exception: %s %s:%d", e.getLog().c_str(), __FILE__, __LINE__);
+			}
 			_exit(EXIT_FAILURE);
 		}
 		catch(const char *e){
@@ -360,9 +377,9 @@ void Jail::commandDirectRun(RPC &rpc, string &homepath, string &adminticket, str
 	pid_t pid = fork();
 	if (pid == 0) { //new process
 		try {
-			Logger::log(LOG_INFO,"Parse data %lu", (long unsigned int)parsedata.size());
+			Logger::log(LOG_DEBUG,"Parse data %lu", (long unsigned int)parsedata.size());
 			saveParseFiles(pm, rpc);
-			Logger::log(LOG_INFO,"Reading parameters");
+			Logger::log(LOG_DEBUG,"Reading parameters");
 			ExecutionLimits executionLimits = configuration->getLimits();
 			string vpl_lang = parsedata["lang"]->getString();
 			Logger::log(LOG_DEBUG, "VPL_LANG %s", vpl_lang.c_str());
@@ -465,13 +482,13 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 		processState newstate = pm.getState();
 		time_t now = time(NULL);
 		if (newstate != state) {
-			Logger::log(LOG_DEBUG, "Monitor state changed from %d to %d", state, newstate);
+			Logger::log(LOG_INFO, "TASK uid=%d event=state_changed from=%s to=%s",
+					(int)pm.getPrisonerID(), processStateName(state), processStateName(newstate));
 			state = newstate;
 			switch(state) {
 			case prestarting:
 				break;
 			case starting:
-				Logger::log(LOG_DEBUG, "Monitor state starting");
 				startTime = now;
 				timeout = now + pm.getMaxTime();
 				lastMessageTime = now;
@@ -479,7 +496,6 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 				ws.send(lastMessage);
 				break;
 			case compiling:
-				Logger::log(LOG_DEBUG, "Monitor state compiling");
 				timeout = now + pm.getMaxTime();
 				startTime = now;
 				lastMessageTime = now;
@@ -487,7 +503,6 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 				ws.send(lastMessage);
 				break;
 			case beforeRunning:
-				Logger::log(LOG_DEBUG, "Monitor state beforeRunning");
 				timeout = now + JAIL_SOCKET_TIMEOUT;
 				if (pm.FileExists(VPL_EXECUTION)) {
 					Logger::log(LOG_DEBUG, "run:terminal");
@@ -516,7 +531,6 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 				ws.send("compilation:" + pm.getCompilation());
 				break;
 			case running:
-				Logger::log(LOG_DEBUG, "Monitor state running");
 				startTime = now;
 				timeout = now + pm.getMaxTime();
 				if (!pm.isInteractive()) {
@@ -533,13 +547,11 @@ void Jail::commandMonitor(string monitorticket, Socket *s) {
 				}
 				break;
 			case retrieve:
-				Logger::log(LOG_DEBUG, "Monitor state retrieve");
 				startTime = now;
 				timeout = now + JAIL_HARVEST_TIMEOUT;
 				ws.send("retrieve:");
 				break;
 			case stopped:
-				Logger::log(LOG_DEBUG, "Monitor state stopped");
 				ws.send("close:");
 				ws.closeAndWait();
 				break;
@@ -597,7 +609,7 @@ void Jail::commandExecute(string executeticket, Socket *s){
 		Logger::log(LOG_ERR,"%s: Security. Try to execute request with no monitor ticket",IP.c_str());
 		throw "Internal server error";
 	}
-	Logger::log(LOG_INFO,"Start executing");
+		Logger::log(LOG_DEBUG,"Start executing");
 	// The client may request the execution before the preparation/compilation ends.
 	processState state = pm.getState();
 	time_t waitLimit = time(NULL) + pm.getMaxTime() + JAIL_HARVEST_TIMEOUT;
@@ -669,11 +681,11 @@ bool Jail::httpPassthrough(string passthroughticket, Socket *socket){
 	try {
 		processMonitor pm(passthroughticket);
 		if ( pm.getState() != processState::running ) {
-			Logger::log(LOG_INFO,"httpPassthrough fail: ! processState::running");
+			Logger::log(LOG_DEBUG,"httpPassthrough fail: ! processState::running");
 			return false;
 		}
 		if ( pm.getSecurityLevel() != httppassthrough ) {
-			Logger::log(LOG_INFO,"httpPassthrough fail: pm.getSecurityLevel() != httppassthrough");
+			Logger::log(LOG_DEBUG,"httpPassthrough fail: pm.getSecurityLevel() != httppassthrough");
 			return false;
 		}
 		runPassthrough(pm, socket);
@@ -691,7 +703,7 @@ bool Jail::httpPassthrough(string passthroughticket, Socket *socket){
 	catch(const char *s){
 		Logger::log(LOG_ERR,"%s:%s",IP.c_str(),s);
 	}catch(...) {
-		Logger::log(LOG_INFO,"httpPassthrough fail: unexpected exception");
+		Logger::log(LOG_DEBUG,"httpPassthrough fail: unexpected exception");
 	}
 	return false;
 }
@@ -852,7 +864,7 @@ void Jail::process(Socket *socket){
 				// Next line fixes XML-RPC int limits (-1).
 				memRequested = memRequested > 0 ? memRequested : configuration->getLimits().maxmemory;
 				string status = commandAvailable(memRequested);
-				Logger::log(LOG_INFO, "Status: '%s'", status.c_str());
+				Logger::log(LOG_DEBUG, "Status: '%s'", status.c_str());
 				server.send200(rpc.availableResponse(status,
 				        processMonitor::requestsInProgress(),
 						jailLimits.maxtime,
@@ -995,7 +1007,7 @@ void Jail::setupNamespaces() {
 		waitpid(pid, NULL, 0);
 		_exit(EXIT_SUCCESS);
 	}
-	Logger::log(LOG_INFO, "Namespaces created: PID, NS, IPC, USER");
+		Logger::log(LOG_DEBUG, "Namespaces created: PID, NS, IPC, USER");
 }
 
 /**
@@ -1057,7 +1069,7 @@ void Jail::setupNamespaceUser(processMonitor &mp) {
 	} catch(...) {
 		Logger::log(LOG_WARNING, "Failed to set up UID/GID mappings for user namespace. Continuing without user namespace isolation.");
 	}
-	Logger::log(LOG_INFO, "Namespaces created: USER");
+	Logger::log(LOG_DEBUG, "Namespaces created: USER");
 }
 
 /**
@@ -1066,7 +1078,7 @@ void Jail::setupNamespaceUser(processMonitor &mp) {
  */
 void Jail::pivotRoot(string jailPath, int prisonerID){
 	if (jailPath == "") {
-		Logger::log(LOG_INFO,"No pivot_root, running in container");
+		Logger::log(LOG_DEBUG,"No pivot_root, running in container");
 		return;
 	}
 	// Ensure mount propagation doesn't leak to the host (best-effort).
@@ -1081,7 +1093,7 @@ void Jail::pivotRoot(string jailPath, int prisonerID){
 			throw HttpException(internalServerErrorCode, "I can't chdir to jail", jailPath);
 		if(chroot(jailPath.c_str()) != 0)
 			throw HttpException(internalServerErrorCode, "I can't chroot to jail", jailPath);
-		Logger::log(LOG_INFO,"chrooted (fallback) \"%s\"",jailPath.c_str());
+		Logger::log(LOG_DEBUG,"chrooted (fallback) \"%s\"",jailPath.c_str());
 		return;
 	}
 	// Make it private so mounts don't propagate (required for reliable cleanup).
@@ -1106,7 +1118,7 @@ void Jail::pivotRoot(string jailPath, int prisonerID){
 		// Fallback to chroot
 		if(chroot(jailPath.c_str()) != 0)
 			throw HttpException(internalServerErrorCode, "I can't chroot to jail", jailPath);
-		Logger::log(LOG_INFO,"chrooted (fallback) \"%s\"",jailPath.c_str());
+		Logger::log(LOG_DEBUG,"chrooted (fallback) \"%s\"",jailPath.c_str());
 		return;
 	}
 	
@@ -1125,7 +1137,7 @@ void Jail::pivotRoot(string jailPath, int prisonerID){
 	
 	// Remove the old root directory
 	rmdir(oldrootAbsolute.c_str());
-	Logger::log(LOG_INFO,"pivot_root completed to \"%s\"",jailPath.c_str());
+	Logger::log(LOG_DEBUG,"pivot_root completed to \"%s\"",jailPath.c_str());
 }
 
 /**
@@ -1277,7 +1289,7 @@ void Jail::setupFilesystemIsolation(processMonitor &pm){
 	string jailPath=configuration->getJailPath();
 	
 	if (jailPath == "") {
-		Logger::log(LOG_INFO,"No pivot_root, running in container");
+		Logger::log(LOG_DEBUG,"No pivot_root, running in container");
 		return;
 	}
 	if (!configuration->getUseNamespace()) {
@@ -1286,7 +1298,7 @@ void Jail::setupFilesystemIsolation(processMonitor &pm){
 			throw HttpException(internalServerErrorCode, "I can't chdir to jail", jailPath);
 		if(chroot(jailPath.c_str()) != 0)
 			throw HttpException(internalServerErrorCode, "I can't chroot to jail", jailPath);
-		Logger::log(LOG_INFO,"chrooted \"%s\"",jailPath.c_str());
+		Logger::log(LOG_DEBUG,"chrooted \"%s\"",jailPath.c_str());
 		return;
 	}
 	
@@ -1441,7 +1453,7 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 	pm.getLimits().log("run");
 	if (othermaxtime) {
 		maxtime = othermaxtime;
-		Logger::log(LOG_INFO, "Other maxtime set: %d", othermaxtime);
+		Logger::log(LOG_DEBUG, "Other maxtime set: %d", othermaxtime);
 	}
 	else
 		maxtime = pm.getMaxTime();
@@ -1454,14 +1466,14 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 			close(fdmaster);
 		if (fdslave != -1)
 			close(fdslave);
-		Logger::log(LOG_INFO, "Jail: openpty error %m");
+		Logger::log(LOG_WARNING, "Jail: openpty error %m");
 		return "- Jail: openpty error";
 	}
 	newpid = fork();
 	if (newpid == -1) {
 		close(fdmaster);
 		close(fdslave);
-		Logger::log(LOG_INFO, "Jail: fork error %m");
+		Logger::log(LOG_WARNING, "Jail: fork error %m");
 		return "- Jail: fork error";
 	}
 	if (newpid == 0) { //new process
@@ -1472,7 +1484,7 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 		executeInJail(pm, name, (VNCLaunch ? "VNCLaunch" : "run"), fdslave); // Never returns
 	}
 	close(fdslave);
-	Logger::log(LOG_INFO, "child pid %d", newpid);
+	Logger::log(LOG_DEBUG, "child pid %d", newpid);
 	RedirectorTerminalBatch redirector(fdmaster);
 	time_t startTime = time(NULL);
 	time_t lastTime = startTime;
@@ -1505,10 +1517,10 @@ string Jail::run(processMonitor &pm, string name, int othermaxtime, bool VNCLaun
 			newpid = -1;
 			break;
 		} else if(wret > 0) { //waitpid error wret != newpid
-			Logger::log(LOG_INFO, "Jail waitpid error: ret>0 %m");
+				Logger::log(LOG_WARNING, "Jail waitpid error: ret>0 %m");
 			break;
 		} else if(wret == -1) { //waitpid error
-			Logger::log(LOG_INFO, "Jail waitpid error: ret==-1 %m");
+			Logger::log(LOG_WARNING, "Jail waitpid error: ret==-1 %m");
 			break;
 		}
 		if (wret == 0) { //Process running
@@ -1579,14 +1591,14 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 			close(fdmaster);
 		if (fdslave != -1)
 			close(fdslave);
-		Logger::log(LOG_INFO, "Jail: openpty error %m");
+		Logger::log(LOG_WARNING, "Jail: openpty error %m");
 		return;
 	}
 	newpid = fork();
 	if (newpid == -1) {
 		close(fdmaster);
 		close(fdslave);
-		Logger::log(LOG_INFO, "Jail: fork error %m");
+		Logger::log(LOG_WARNING, "Jail: fork error %m");
 		return;
 	}
 	if (newpid == 0) { //new process
@@ -1597,14 +1609,14 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 		executeInJail(pm, name, "terminal", fdslave); // Never returns
 	}
 	close(fdslave);
-	Logger::log(LOG_INFO, "child pid %d", newpid);
+	Logger::log(LOG_DEBUG, "child pid %d", newpid);
 	RedirectorTerminal redirector(fdmaster, &ws);
-	Logger::log(LOG_INFO, "Redirector start terminal control");
+	Logger::log(LOG_DEBUG, "Redirector start terminal control");
 	time_t startTime = time(NULL);
 	time_t lastTime = startTime;
 	int stopSignal = SIGTERM;
 	int status;
-	Logger::log(LOG_INFO, "run: start redirector loop");
+	Logger::log(LOG_DEBUG, "run: start redirector loop");
 	try {
 		while(redirector.isActive() && !ws.isClosed()){
 			redirector.advance();
@@ -1614,7 +1626,7 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 				newpid = -1;
 				break;
 			} else if (wret == -1) { // waitpid error
-				Logger::log(LOG_INFO, "Jail waitpid error: %m");
+				Logger::log(LOG_WARNING, "Jail waitpid error: %m");
 				newpid = -1;
 				break;
 			}
@@ -1657,8 +1669,17 @@ void Jail::runTerminal(processMonitor &pm, webSocket &ws, string name){
 			redirector.advance();
 			Util::sleep(100000); // 1/10 sec
 		}
+	} catch (HttpException &e) {
+		Logger::log(LOG_ERR, "HTTP exception in redirector loop: code=%d message='%s' log='%s'",
+				(int)e.getCode(), e.getMessage().c_str(), e.getLog().c_str());
 	} catch (const std::exception &e) {
 		Logger::log(LOG_ERR, "Exception in redirector loop: %s", e.what());
+	} catch (const std::string &e) {
+		Logger::log(LOG_ERR, "String exception in redirector loop: %s", e.c_str());
+	} catch (const char *e) {
+		Logger::log(LOG_ERR, "C-string exception in redirector loop: %s", e);
+	} catch (CodeNumber e) {
+		Logger::log(LOG_ERR, "HTTP code exception in redirector loop: code=%d", (int)e);
 	} catch (...) {
 		Logger::log(LOG_ERR, "Unknown exception in redirector loop");
 	}
@@ -1685,10 +1706,10 @@ void Jail::runVNC(processMonitor &pm, webSocket &ws, string name){
 	Logger::log(LOG_DEBUG,"VNC launch %s", output.c_str());
 	int VNCServerPort = Util::atoi(output);
 	RedirectorVNC redirector(&ws, VNCServerPort);
-	Logger::log(LOG_INFO, "Redirector start vncserver control");
+	Logger::log(LOG_DEBUG, "Redirector start vncserver control");
 	time_t startTime=time(NULL);
 	time_t lastTime=startTime;
-	Logger::log(LOG_INFO,"run: start redirector loop");
+	Logger::log(LOG_DEBUG,"run: start redirector loop");
 	while(redirector.isActive() && !ws.isClosed()){
 		redirector.advance();
 		time_t now=time(NULL);
@@ -1734,7 +1755,7 @@ void Jail::runPassthrough(processMonitor &pm, Socket *s) {
 	// TODO change to config data
 	string localServerAdress = pm.getLocalWebServer();
 	RedirectorWebServer redirector(s, localServerAdress);
-	Logger::log(LOG_INFO, "Redirector web server request start");
+	Logger::log(LOG_DEBUG, "Redirector web server request start");
 	time_t startTime = time(NULL);
 	time_t lastTime = startTime;
 	while (redirector.isActive() && ! s->isClosed()) {
