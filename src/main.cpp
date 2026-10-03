@@ -342,6 +342,10 @@ int main(int const argc, const char ** const argv) {
 		}
 	}
 	Logger::log(LOG_NOTICE, "%s", startupMessage.c_str());
+	if (conf->getLogLevel() >= LOG_DEBUG) {
+		Logger::log(LOG_WARNING, "SECURITY CONCERN: LOGLEVEL %d records request details such as the URLPATH and cookies "
+				"(tickets, passthrough credentials) in the logs. Use it only for debugging.", conf->getLogLevel());
+	}
 	if (conf->getJailPath() == "" && ! runningInContainer) {
 		Logger::log(LOG_EMERG, "Jail directory root \"/\" but not running in container");
 		exit(1);

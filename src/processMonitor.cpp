@@ -329,16 +329,16 @@ ConfigData processMonitor::readInfo() {
 	runner_pid = atoi(data["RUNNER_PID"].c_str());
 	monitor_pid = atoi(data["MONITOR_PID"].c_str());
 	if (cleaning) {
-		throw HttpException(internalServerErrorCode, "Task is being cleaned");
+		throw TaskCleaningException();
 	}
 	return data;
 }
 
 /**
  * Create a new task monitor given the generated admin, monitor and execution tickets
- * @param adminticket output admin ticket string
- * @param monitorticket output monitor ticket string
- * @param executionticket output execution ticket string
+ * @param adminticket output admin ticket string. Used for administrative tasks (get state, stop, get result).
+ * @param monitorticket output monitor ticket string. One-time use. Used for monitoring tasks
+ * @param executionticket output execution ticket string. One-time use. Used for executing tasks.
  */
 processMonitor::processMonitor(string & adminticket, string & monitorticket, string & executionticket) {
 	prisoner = -1; // Not selected
@@ -394,6 +394,9 @@ processMonitor::processMonitor(string & adminticket, string & monitorticket, str
 
 /**
  * Create a new task monitor given the generated admin and execution tickets
+ * No monitor ticket is generated for this constructor.
+ * It is used in direct execution scenarios where no monitoring is required.
+ *
  * @param adminticket output admin ticket string
  * @param executionticket output execution ticket string
  */
@@ -443,8 +446,9 @@ processMonitor::processMonitor(string & adminticket, string & executionticket) {
 }
 
 /**
- * Create task monitor from ticket
- * @param ticket Ticket string
+ * Create task monitor for a task already created and located using a ticket of that task.
+ *
+ * @param ticket Ticket string. Used to locate and access the existing task.
  */
 processMonitor::processMonitor(string ticket) {
 	prisoner = -1; // Not selected
@@ -578,11 +582,8 @@ processState processMonitor::getState() {
 		if ( ! Util::fileExists(fileName))	return stopped;
 		try {
 			readInfo();
-		} catch (HttpException &exception) {
-			if (exception.getMessage() == "Task is being cleaned") {
-				return stopped;
-			}
-			throw;
+		} catch (TaskCleaningException &) {
+			return stopped;
 		}
 	}
 	if (compiler_pid == 0) return starting;
@@ -677,9 +678,8 @@ bool processMonitor::hasActiveMonitor() {
 	TaskLock lock(getPrisonerID());
 	try {
 		readInfo();
-	} catch (HttpException &exception) {
-		if (exception.getMessage() == "Task is being cleaned") return true;
-		throw;
+	} catch (TaskCleaningException &) {
+		return true;
 	}
 	return hasMonitorTicket() && monitor_pid != 0 && Util::processExists(monitor_pid);
 }
@@ -919,7 +919,8 @@ void processMonitor::cleanTask() {
 		static const vplregex reg_ppid(".*^PPid:[ \\t]+([0-9]+)", REG_EXTENDED|REG_ICASE|REG_NEWLINE);
 		bool activeProcesses = false;
 		for (size_t i = 0; i < pids.size(); i++) {
-			if (getProcessUID(pids[i]) != userid) continue;
+			if (pids[i] == getpid()) continue; // Skip the current process
+			if (getProcessUID(pids[i]) != userid) continue; // Skip processes not belonging to the prisoner
 			string processName;
 			string processPath;
 			vplregmatch match(2);
@@ -937,16 +938,15 @@ void processMonitor::cleanTask() {
 		}
 		if (activeProcesses) return;
 	}
-	cleanPrisonerFiles("p" + Util::itos(userid));
+	cleanPrisonerFiles(getPrisonerName());
 	if (isCGroupAvailable()) {
 		try {
-			string cgroupName = "p" + Util::itos(userid);
-			Cgroup cgroup(cgroupName);
+			Cgroup cgroup(getPrisonerName());
 			cgroup.removeCgroup();
 		} catch (const std::exception &e) {
-			Logger::log(LOG_DEBUG, "Failed to remove cgroup for prisoner %d: %s", userid, e.what());
+			Logger::log(LOG_DEBUG, "Failed to remove cgroup for prisoner %s: %s", getPrisonerName().c_str(), e.what());
 		} catch (...) {
-			Logger::log(LOG_DEBUG, "Failed to remove cgroup for prisoner %d", userid);
+			Logger::log(LOG_DEBUG, "Failed to remove cgroup for prisoner %s", getPrisonerName().c_str());
 		}
 	}
 }
@@ -969,7 +969,7 @@ bool processMonitor::isOutOfMemory() {
 	const bool useCGroup = isCGroupAvailable();
 	if (useCGroup) {
 		try {
-			Cgroup cgroup("p" + Util::itos(prisoner));
+			Cgroup cgroup(getPrisonerName());
 			map<string, int> oomControl = cgroup.getMemoryOOMControl();
 			if (oomControl["under_oom"] || oomControl["oom_kill"] > 0) return true;
 		} catch (const std::exception &e) {
@@ -1045,8 +1045,7 @@ long long processMonitor::getMemoryUsedBasedOnProc() {
 
 long long processMonitor::getMemoryUsedBasedOnCgroup() {
 	try {
-		string cgroupName = "p" + Util::itos(prisoner);
-		Cgroup cgroup(cgroupName);
+		Cgroup cgroup(getPrisonerName());
 		long long usage = cgroup.getMemoryUsageInBytes();
 		Logger::log(LOG_DEBUG, "Cgroup memory usage: %ld bytes", usage);
 		return usage;
@@ -1159,13 +1158,13 @@ bool processMonitor::cleanZombiePrisonerFiles(string pdir, time_t maxAge,
 			return false;
 		}
 	}
-
+	Logger::log(LOG_INFO, "Cleaning zombie prisoner files for %s", pdir.c_str());
 	cleanPrisonerFilesLocked(pdir);
 	return true;
 }
 
 void processMonitor::cleanZombieTasks() {
-	Logger::log(LOG_INFO, "Cleaning zombie tasks");
+	Logger::log(LOG_INFO, "Finding/cleaning zombie tasks");
 	const Configuration* configuration = Configuration::getConfiguration();
 	const string controlDir = configuration->getControlPath();
 	const string homeDir = configuration->getJailPath() + "/home";
@@ -1173,10 +1172,12 @@ void processMonitor::cleanZombieTasks() {
 	// Search home dir, if log level < 8.
 	const bool checkHomes = configuration->getLogLevel() <= LOG_DEBUG;
 	const vector<string> homes = checkHomes ? getPrisonersFromDir(homeDir) : vector<string>();
+	int cleanedControlDirs = 0;
+	int cleanedHomes = 0;
 	// First loop: Check all prisoner control directories (tasks) for zombies
 	for (size_t i = 0; i < tasks.size(); i++) {
 		ConfigData data;
-		Logger::log(LOG_INFO, "Cleaning zombie tasks: checking(1) %s", tasks[i].c_str());
+		Logger::log(LOG_INFO, "Finding/cleaning zombie tasks: task %s (checking control directory)", tasks[i].c_str());
 		string configDir = controlDir + "/" + tasks[i];
 		string configFile = configDir + "/" + "config";
 		struct stat statbuf;
@@ -1185,8 +1186,10 @@ void processMonitor::cleanZombieTasks() {
 			continue;
 		}
 		if ( ! Util::dirExists(homeDir + "/" + tasks[i]) ) {
-			cleanZombiePrisonerFiles(tasks[i], JAIL_MONITORSTART_TIMEOUT,
-					true, true);
+			if (cleanZombiePrisonerFiles(tasks[i], JAIL_MONITORSTART_TIMEOUT, true, true)) {
+				Logger::log(LOG_INFO, "Finding/cleaning zombie tasks: No home directory for task %s, cleaned control directory", tasks[i].c_str());
+				cleanedControlDirs++;
+			}
 		} else {
 			try {
 				data = ConfigurationFile::readConfiguration(configFile, data);
@@ -1195,18 +1198,26 @@ void processMonitor::cleanZombieTasks() {
 			} catch(...) {
 				time_t maxAge = Configuration::getConfiguration()->getLimits().maxtime;
 				maxAge += JAIL_HARVEST_TIMEOUT;
-				cleanZombiePrisonerFiles(tasks[i], maxAge, true, false);
+				if (cleanZombiePrisonerFiles(tasks[i], maxAge, true, false)) {
+					Logger::log(LOG_INFO, "Finding/cleaning zombie tasks: Task %s is time-stale control directory, cleaned zombie prisoner files", tasks[i].c_str());
+					cleanedControlDirs++;
+				}
 			}
 		}
 	}
 	// Second loop: Check all prisoner home directories (homes) for orphaned directories
 	for (size_t i = 0; i < homes.size(); i++) {
-		Logger::log(LOG_INFO, "Cleaning zombie tasks: checking(2) %s", homes[i].c_str());
+		Logger::log(LOG_INFO, "Finding/cleaning zombie tasks: task %s (checking home directory)", homes[i].c_str());
 		string configFile = controlDir + "/" + homes[i] + "/" + "config";
 		string phome = homeDir + "/" + homes[i];
 		if ( Util::dirExists(phome) && ! Util::fileExists(configFile)) {
-			cleanZombiePrisonerFiles(homes[i], JAIL_MONITORSTART_TIMEOUT * 2,
-					false, false);
+			if (cleanZombiePrisonerFiles(homes[i], JAIL_MONITORSTART_TIMEOUT * 2,
+					false, false)) {
+				Logger::log(LOG_INFO, "Finding/cleaning zombie tasks: Home directory for task %s is orphaned, cleaned home directory", homes[i].c_str());
+				cleanedHomes++;
+			}
 		}
 	}
+	Logger::log(LOG_INFO, "Finding/cleaning zombie tasks: Finished checking of %lu tasks with cleaned %d control directories and %d home directories",
+			(long unsigned int) tasks.size(), cleanedControlDirs, cleanedHomes);
 }

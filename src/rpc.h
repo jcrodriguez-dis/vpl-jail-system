@@ -16,13 +16,21 @@
 class RPC {
 protected:
 	TreeNode *root;
+	string taskid;
 public:
 	RPC() {
 		this->root = NULL;
+		this->taskid = "";
 	}
 
 	virtual ~RPC() {}
 
+	string getTaskId() {
+		return this->taskid;
+	}
+	void setTaskId(const string &task) {
+		this->taskid = task;
+	}
 	/**
 	 * return a ready response
 	 */

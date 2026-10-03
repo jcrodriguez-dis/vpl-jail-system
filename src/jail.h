@@ -55,12 +55,12 @@ protected:
 	string commandAvailable(long long memRequested);
 	void commandRequest(RPC &rpc, string &adminticket,string &monitorticket,string &executionticket);
 	void commandDirectRun(RPC &rpc, string &homepath, string &adminticket, string &executionticket);
-	void commandGetResult(string adminticket,string &compilation,string &execution,bool &executed,bool &interactive);
-	bool commandUpdate(string adminticket, RPC &rpc);
-	bool commandRunning(string adminticket);
-	void commandStop(string adminticket);
-	void commandMonitor(string userticket,Socket *s);
-	void commandExecute(string userticket,Socket *s);
+	void commandGetResult(RPC &rpc, const string adminticket,string &compilation,string &execution,bool &executed,bool &interactive);
+	bool commandUpdate(RPC &rpc, const string adminticket);
+	bool commandRunning(RPC &rpc, const string adminticket);
+	void commandStop(RPC &rpc, string adminticket);
+	void commandMonitor(const string monitorticket, Socket *s);
+	void commandExecute(const string executeticket, Socket *s);
 	bool commandSetPassthroughCookie(string passthroughticket, HttpJailServer & server);
 public:
 	static const vplregex regPassthroughTicket;

@@ -147,6 +147,7 @@ void Configuration::readConfigFile() {
 	jailLimits.maxprocesses = atoi(data["MAXPROCESSES"].c_str());
 	istringstream iss(data["TASK_ONLY_FROM"]);
 	for (string ipnet; iss >> ipnet; ) {
+		// TODO: Validate IP/net format before adding to the list
 		taskOnlyFrom.push_back(ipnet);
 		Logger::log(LOG_INFO, "TASK_ONLY_FROM found IP/net %s", ipnet.c_str());
 	}

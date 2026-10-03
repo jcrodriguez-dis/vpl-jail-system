@@ -192,6 +192,7 @@ public:
 	void readHeaders();
 	size_t headerSize() { return header.size(); }
 	uint32_t getClientIP() { return clientip; }
+	string getClientIPString() { return Util::ipToString(clientip); }
 	string getHeaders() { return header; }
 	string getProtocol() { return protocol; }
 	string getMethod() { return method; }
@@ -218,14 +219,19 @@ class SSLRetry{
 	time_t currentTime, timeLimit;
 	string message;
 	const SSL *ssl;
+	bool peerClosed;
+	bool webSocketConnection;
 public:
-	SSLRetry(int socket, const SSL *s, string action){
+	SSLRetry(int socket, const SSL *s, string action, bool webSocketConnection = false){
 		devices[0].fd = socket;
 		ssl = s;
 		message = "Error in SSL " + action + " ";
+		peerClosed = false;
+		this->webSocketConnection = webSocketConnection;
 		currentTime = time(NULL);
 		timeLimit = currentTime + JAIL_SOCKET_TIMEOUT;
 	}
+	bool isPeerClosed() const { return peerClosed; }
 	bool end(ssize_t ret){
 		if (ret > 0) return true;
 		int code = SSL_get_error(ssl, ret);
@@ -248,7 +254,9 @@ public:
 		}
 		switch (code) {
 			case SSL_ERROR_NONE: return true;
-			case SSL_ERROR_ZERO_RETURN: return true;
+			case SSL_ERROR_ZERO_RETURN:
+				peerClosed = true;
+				return true;
 			case SSL_ERROR_WANT_READ:
 				devices[0].events = POLLIN;
 				break;
@@ -262,13 +270,37 @@ public:
 				devices[0].events = POLLIN;
 				break;
 			case SSL_ERROR_SYSCALL:
-				if (errno == 0 || ret == 0) {
-					Logger::log(LOG_INFO, "SSL socket closed unexpectedly: %s", message.c_str());
+				if (ret == 0 || errno == 0 || errno == EPIPE ||
+					errno == ECONNRESET || errno == ENOTCONN) {
+					peerClosed = true;
+					Logger::log(LOG_DEBUG, "SSL peer disconnected: %s", message.c_str());
 					return true;
 				}
 				throw HttpException(internalServerErrorCode,
 					message + "SSL_ERROR_SYSCALL: " + strerror(errno));
 			case SSL_ERROR_SSL:
+				{
+				#if defined(SSL_R_UNEXPECTED_EOF_WHILE_READING) || defined(SSL_R_RECORD_LAYER_FAILURE)
+					const unsigned long error = ERR_peek_last_error();
+				#endif
+				#ifdef SSL_R_UNEXPECTED_EOF_WHILE_READING
+				if (ERR_GET_REASON(error) == SSL_R_UNEXPECTED_EOF_WHILE_READING) {
+					peerClosed = true;
+					ERR_clear_error();
+					Logger::log(LOG_DEBUG, "SSL peer disconnected without close notification: %s", message.c_str());
+					return true;
+				}
+				#endif
+				#ifdef SSL_R_RECORD_LAYER_FAILURE
+				if (webSocketConnection && ERR_GET_REASON(error) == SSL_R_RECORD_LAYER_FAILURE) {
+					peerClosed = true;
+					ERR_clear_error();
+					Logger::log(LOG_DEBUG, "WebSocket SSL peer disconnected: %s", message.c_str());
+					return true;
+				}
+				#endif
+				}
+				/* fall through */
 			default:
 				throw HttpException(internalServerErrorCode,
 				      	message + scode + SSLBase::getError()); //Error
@@ -290,18 +322,18 @@ public:
 class SSLSocket: public Socket{
 	SSL *ssl;
 	virtual ssize_t netWrite(const void *b, size_t s){
-		SSLRetry retry(getSocket(), ssl, "write");
+		SSLRetry retry(getSocket(), ssl, "write", isWebSocketProtocol());
 		while(true){
 			ssize_t ret= SSL_write(ssl, b, s);
-			if(retry.end(ret)) return ret;
+			if(retry.end(ret)) return retry.isPeerClosed() ? 0 : ret;
 		}
 		return 0; //Not reachable
 	}
 	virtual ssize_t netRead(void *b, size_t s){
-		SSLRetry retry(getSocket(), ssl, "read");
+		SSLRetry retry(getSocket(), ssl, "read", isWebSocketProtocol());
 		while(true){
 			ssize_t ret= SSL_read(ssl, b, s);
-			if(retry.end(ret)) return ret;
+			if(retry.end(ret)) return retry.isPeerClosed() ? 0 : ret;
 		}
 		return 0; //Not reachable
 	}

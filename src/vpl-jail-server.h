@@ -280,11 +280,7 @@ class Daemon {
 			Logger::log(LOG_ERR,"accept() Error:%d  %m", this->actualSocket);
 			return;
 		}
-		string IP;
-		char dst[INET_ADDRSTRLEN];
-		const char *d = inet_ntop(client.sin_family, &client.sin_addr, dst, INET_ADDRSTRLEN);
-		if(d != NULL)
-			IP=d;
+		string IP = Util::ipToString(client.sin_addr.s_addr);
 		if (isBanned(IP)) {
 			close(this->actualSocket);
 			statistics.rejected++;

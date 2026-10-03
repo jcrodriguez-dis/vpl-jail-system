@@ -217,8 +217,14 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 			if(sizeToReceive == 0){
 				Logger::log(LOG_DEBUG,"Socket read timeout, closed connection?");
 				return "";
-			}else {
-				throw HttpException(requestTimeoutCode, "Socket read timeout");
+			} else {
+				if (websocketProtocol) {
+					Logger::log(LOG_DEBUG, "WebSocket read timeout");
+					closed = true;
+					break;
+				}else {
+					throw HttpException(requestTimeoutCode, "Socket read timeout");
+				}
 			}
 		}
 		if (res == 0 && sizeToReceive == 0) break; //Nothing to read
@@ -236,9 +242,9 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 					size_t pos;
 					if ((pos = readBuffer.find("\r\n\r\n")) != string::npos) {
 						header = readBuffer.substr(0, pos + 4);
-						Logger::log(LOG_INFO, "Received header %lu",(long unsigned int)pos+4);
+						Logger::log(LOG_INFO, "Received header %lu", (long unsigned int)pos+4);
 						processHeaders(header);
-						readBuffer.erase(0,pos+4);
+						readBuffer.erase(0, pos+4);
 						return ""; //End of process
 					} else if (readBuffer.size() > JAIL_HEADERS_SIZE_LIMIT) {
 						throw HttpException(requestEntityTooLargeCode, "Http headers too large");
@@ -247,8 +253,16 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 					break;
 				}
 				timeLimit = currentTime + JAIL_SOCKET_TIMEOUT; //Reset timeout
-			} else if (sizeRead < 0) {
-				throw HttpException(badRequestCode, "Error reading data");
+			} else if (sizeRead < 0) { // Error reading from socket
+				if (websocketProtocol &&
+					(errno == EPIPE || errno == ECONNRESET || errno == ECONNABORTED ||
+					 errno == ENOTCONN)) {
+					Logger::log(LOG_DEBUG, "WebSocket peer disconnected while reading: %m");
+					closed = true;
+					break;
+				} else {
+					throw HttpException(badRequestCode, "Error reading data");
+				}
 			} else {
 				Logger::log(LOG_INFO, "sizeRead==0");
 				closed = true;
@@ -261,6 +275,11 @@ string Socket::receive(int sizeToReceive){ //=0 async read
 			break;
 		}
 		if (devices[0].revents & bad) {
+			if (websocketProtocol) {
+				Logger::log(LOG_DEBUG, "WebSocket peer disconnected while reading");
+				closed = true;
+				break;
+			}
 			throw HttpException(internalServerErrorCode, "Error reading data");
 		}
 	}
@@ -283,53 +302,66 @@ void Socket::send(const string &data, bool async){
 	devices[0].fd=socket;
 	devices[0].events=POLLOUT;
 	const int wait=10; // 10 milisec
-	const int bad=POLLERR|POLLHUP|POLLNVAL;
+	const int bad = POLLERR | POLLHUP | POLLNVAL;
 	time_t timeLimit=time(NULL)+JAIL_SOCKET_TIMEOUT;
 	time_t fullTimeLimit=time(NULL)+JAIL_SOCKET_REQUESTTIMEOUT;
-	while(true){
-		int res=poll(devices,1,wait);
-		if(res==-1) {
-			throw HttpException(internalServerErrorCode
-					,"Error poll writing data"); //Error
+	while (true) {
+		int res = poll(devices, 1, wait);
+		if (res == -1) {
+			throw HttpException(internalServerErrorCode, "Error poll writing data"); //Error
 		}
-		if(res==0 && async) break; //async write Nothing to do
-		if(res==0) continue; //Nothing to do
-		time_t currentTime=time(NULL);
-		if(currentTime>timeLimit || currentTime>fullTimeLimit){
+		if (res == 0 && async) break; //async write Nothing to do
+		if (res == 0) continue; //Nothing to do
+		time_t currentTime = time(NULL);
+		if (currentTime > timeLimit || currentTime > fullTimeLimit) {
 			Logger::log(LOG_ERR,"Socket write timeout");
+			if (websocketProtocol) {
+				closed = true;
+				break;
+			}
 			throw requestTimeoutCode;
 		}
 		if(devices[0].revents & POLLOUT){ //Write to net
-			size_t toWrite=JAIL_NET_BUFFER_SIZE;
-			if(toWrite>size-offset)
-				toWrite=size-offset;
-			int sizeWritten=netWrite(s+offset,toWrite);
-			if(sizeWritten <0) {
-				throw HttpException(internalServerErrorCode
-						,"Socket write data error");
-			}if(sizeWritten == 0){
-				closed=true;
-				break;
+			size_t toWrite = JAIL_NET_BUFFER_SIZE;
+			if(toWrite > size - offset)
+				toWrite = size - offset;
+			int sizeWritten = netWrite(s + offset, toWrite);
+			if (sizeWritten < 0) {
+				if (websocketProtocol &&
+					(errno == EPIPE || errno == ECONNRESET || errno == ECONNABORTED ||
+					 errno == ENOTCONN)) {
+					Logger::log(LOG_DEBUG, "WebSocket peer disconnected while writing: %m");
+					closed = true;
+					break;
+			    }
+				throw HttpException(internalServerErrorCode, "Socket write data error");
 			}
-			else{
+			if (sizeWritten == 0) {
+				closed = true;
+				break;
+			} else {
 				offset += sizeWritten;
-				timeLimit=currentTime+JAIL_SOCKET_TIMEOUT; //Reset timeout
+				timeLimit = currentTime + JAIL_SOCKET_TIMEOUT; //Reset timeout
 			}
 		}
-		if(devices[0].revents & POLLHUP){ //socket close
-			closed=true;
-			Logger::log(LOG_INFO,"POLLHUP");
+		if (devices[0].revents & POLLHUP){ //socket close
+			closed = true;
+			Logger::log(LOG_INFO, "POLLHUP");
 			break;
 		}
-		if(devices[0].revents & bad) {
-			Logger::log(LOG_ERR,"Error writing http data %m");
-			throw HttpException(internalServerErrorCode
-					,"Socket write data error");
+		if (devices[0].revents & bad) {
+			if (websocketProtocol) {
+				Logger::log(LOG_DEBUG, "WebSocket peer disconnected while writing");
+				closed = true;
+				break;
+			}
+			Logger::log(LOG_ERR, "Error writing http data %m");
+			throw HttpException(internalServerErrorCode, "Socket write data error");
 		}
-		if(offset>=size) break;
+		if (offset >= size) break;
 	}
-	writeBuffer.erase(0,offset);
-	Logger::log(LOG_INFO,"Send %lu",(long unsigned int)offset);
+	writeBuffer.erase(0, offset);
+	Logger::log(LOG_INFO, "Send %lu", (long unsigned int)offset);
 }
 
 bool Socket::wait(const int msec){

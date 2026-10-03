@@ -47,6 +47,8 @@ public:
 	bool isSilent() {return noOutput;}
 	bool isOutputBufferFull();
 	void addOutput(const string &);
+	bool addInput(const string &);
+	bool addVNCInput(const string &);
 	void addMessage(const string &);
 	string getOutput();
 	size_t getOutputSize();

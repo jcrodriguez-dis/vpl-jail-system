@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <syslog.h>
@@ -1023,6 +1024,13 @@ public:
 		}
 		return clean;
     }
+	static string ipToString(uint32_t clientip) {
+		struct in_addr ip_addr;
+		ip_addr.s_addr = clientip;
+		char buf[INET_ADDRSTRLEN];
+		inet_ntop(AF_INET, &ip_addr, buf, INET_ADDRSTRLEN);
+		return string(buf);
+	}
 };
 
 #endif

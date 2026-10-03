@@ -59,7 +59,7 @@ class processMonitor{
 		setProcessControlPath();
 	}
 	void setProcessControlPath(){
-		processControlPath = configuration->getControlPath() + "/p" + Util::itos(getPrisonerID());
+		processControlPath = configuration->getControlPath() + "/" + getPrisonerName();
 	}
 	string getProcessControlPath(){
 		return processControlPath;
@@ -103,10 +103,16 @@ public:
 	uid_t getPrisonerID() { return prisoner; }
 	securityLevel getSecurityLevel() { return security; }
 	string getHomePath() {
-		return configuration->getJailPath() + "/home/p" + Util::itos(prisoner);
+		return configuration->getJailPath() + getRelativeHomePath();
 	}
 	string getRelativeHomePath() {
-		return "/home/p" + Util::itos(prisoner);
+		return "/home/" + getPrisonerName();
+	}
+	string getPrisonerName() {
+		return "p" + Util::itos(getPrisonerID());
+	}
+	string getTaskId() {
+		return getPrisonerName() + "_" + executionticket.substr(0,3);
 	}
 	string getHttpPassthroughTicket();
 	string getLocalWebServer();

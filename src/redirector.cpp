@@ -62,6 +62,25 @@ void Redirector::addOutput(const string &toAdd){
 	}
 }
 
+bool Redirector::addInput(const string &toAdd){
+	if (toAdd.size() + programbuf.size() > JAIL_WEBSOCKET_FRAME_SIZE_LIMIT) {
+		Logger::log(LOG_INFO, "WebSocket input buffer limit reached");
+		addMessage("input buffer limit reached; terminal session closed.");
+		return false;
+	}
+	programbuf += toAdd;
+	return true;
+}
+
+bool Redirector::addVNCInput(const string &toAdd){
+	if (toAdd.size() + netbuf.size() > JAIL_WEBSOCKET_FRAME_SIZE_LIMIT) {
+		Logger::log(LOG_INFO, "VNC input buffer limit reached");
+		return false;
+	}
+	netbuf += toAdd;
+	return true;
+}
+
 /**
  * Add string to Message buffer
  * The string is jail information
@@ -177,8 +196,7 @@ void RedirectorTerminalBatch::advance() {
 							break;
 						}
 						if (readsize >0) {
-							noOutput = false;
-							netbuf += string(buf, readsize);
+							addOutput(string(buf, readsize));
 							break;
 						}
 					}
@@ -219,8 +237,12 @@ void RedirectorTerminal::advance() {
 			case connected:
 				{
 					//Poll to write and read from program and net
-					if(ws->isReadBuffered())
-						programbuf += ws->receive();
+					if(ws->isReadBuffered()) {
+						if (!addInput(ws->receive())) {
+							state = ending;
+							break;
+						}
+					}
 					struct pollfd devices[2];
 					devices[0].fd = fdps;
 					devices[1].fd = ws->getSocket();
@@ -255,8 +277,12 @@ void RedirectorTerminal::advance() {
 							ws->send(string(buf, readsize));
 						}
 					}
-					if(devices[1].revents & POLLREAD)
-						programbuf += ws->receive();
+					if(devices[1].revents & POLLREAD) {
+						if (!addInput(ws->receive())) {
+							state = ending;
+							break;
+						}
+					}
 					if (programbuf.size() > 0 && (devices[0].revents & POLLOUT)) { //Write to program
 						int written = write(fdps, programbuf.data(), programbuf.size());
 						if (written <= 0) {
@@ -358,8 +384,12 @@ void RedirectorVNC::advance() {
 						state = end;
 						break;
 					}
-					if (ws->isReadBuffered())
-						netbuf += ws->receive(); //Read client data
+					if (ws->isReadBuffered()) {
+						if (!addVNCInput(ws->receive())) {
+							state = ending;
+							break;
+						}
+					}
 					struct pollfd devices[2];
 					devices[0].fd = sock;
 					devices[1].fd = ws->getSocket();
@@ -391,7 +421,10 @@ void RedirectorVNC::advance() {
 						ws->send(string(buf, readsize), BINARY_FRAME);
 					}
 					if (devices[1].revents & POLLREAD) { //Read vnc client data.
-						netbuf += ws->receive();
+						if (!addVNCInput(ws->receive())) {
+							state = ending;
+							break;
+						}
 					}
 					if (netbuf.size()>0 && (devices[0].revents & POLLOUT)) { //Write to vncserver
 						int written = write(sock, netbuf.data(), netbuf.size());

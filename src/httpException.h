@@ -9,14 +9,17 @@
 #include <string>
 using namespace std;
 
-enum CodeNumber {continueCode = 100,
+enum CodeNumber {
+	continueCode = 100,
 	badRequestCode = 400,
 	notFoundCode = 404,
 	methodNotAllowedCode = 405,
 	requestTimeoutCode = 408,
 	requestEntityTooLargeCode = 413,
 	internalServerErrorCode = 500,
-	notImplementedCode = 501};
+	notImplementedCode = 501
+};
+
 class HttpException {
 	CodeNumber code;
 	string message;
@@ -30,6 +33,11 @@ public:
 	CodeNumber getCode() {return code;}
 	string getMessage() {return message;}
 	string getLog() {return message+(log.size()?" ("+log+")":"");}
+};
+
+class TaskCleaningException : public HttpException {
+public:
+	TaskCleaningException() : HttpException(internalServerErrorCode, "Task is being cleaned") {}
 };
 
 #endif
