@@ -35,9 +35,15 @@
 #          |     |___ lock #Real dir by mount --bind
 
 umask 077
-LOGFILE=/var/log/vpl-jail-service.log
-touch $LOGFILE &> /dev/null
-chmod 600 $LOGFILE
+
+LOGFILE=/var/log/vpl/vpl-jail-system.log
+{
+	mkdir -p /var/log/vpl
+	chmod 700 /var/log/vpl
+	touch "$LOGFILE"
+	chmod 600 "$LOGFILE"
+} &> /dev/null
+
 VPL_PROGRAMS_DIR=/usr/sbin/vpl
 VPL_CONFIG_DIR=/etc/vpl
 DAEMON=$VPL_PROGRAMS_DIR/vpl-jail-server

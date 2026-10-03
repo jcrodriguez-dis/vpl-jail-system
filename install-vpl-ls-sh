@@ -44,9 +44,15 @@ JDTLS_VERSION=latest
 JDTLS_URL="https://www.eclipse.org/downloads/download.php?file=/jdtls/snapshots/jdt-language-server-latest.tar.gz&r=1"
 KOTLIN_LS_URL="https://github.com/fwcd/kotlin-language-server/releases/latest/download/server.zip"
 JUNIT_VERSION=4.13.2
-LOGFILE=/var/log/vpl_ls_installation.log
+LOGFILE=/var/log/vpl/vpl_ls_installation.log
 DO_UPGRADE=yes
 SELECTED=()
+{
+	mkdir -p /var/log/vpl
+	chmod 700 /var/log/vpl
+	touch "$LOGFILE"
+	chmod 600 "$LOGFILE"
+} &> /dev/null
 
 # ---------------------------------------------------------------- utilities --
 log() { echo "[vpl-ls] $*"; }
