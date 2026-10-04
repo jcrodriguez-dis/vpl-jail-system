@@ -884,6 +884,7 @@ void processMonitor::cleanTask() {
 		return; //No prisoner to clean
 	}
 	Logger::log(LOG_INFO, "Cleaning task");
+	Logger::logRequest("local", false,"Clean task", getTaskId());
 	{
 		GlobalLock globalLock;
 		TaskLock taskLock(userid);
@@ -1159,6 +1160,7 @@ bool processMonitor::cleanZombiePrisonerFiles(string pdir, time_t maxAge,
 		}
 	}
 	Logger::log(LOG_INFO, "Cleaning zombie prisoner files for %s", pdir.c_str());
+	Logger::logRequest("local", false,"Clean zombie task", pdir);
 	cleanPrisonerFilesLocked(pdir);
 	return true;
 }
