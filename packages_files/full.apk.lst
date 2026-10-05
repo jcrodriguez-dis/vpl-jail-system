@@ -1,6 +1,6 @@
 # Full addintional packages for VPL jail system on Linux using APK (Alpine)
 "Clisp" clisp
-"Clojure" clojure clojure1.6 clojure1.4
+"Clojure" clojure
 "D compiler (GNU)" gcc-gdc
 "Erlang" erlang
 "Go programming language compiler" go
