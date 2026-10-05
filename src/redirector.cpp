@@ -172,8 +172,8 @@ void RedirectorTerminalBatch::advance() {
 						break;
 					}
 
-					if (devices[0].revents & POLLHUP) {
-						// PTY slave closed; normally means the child ended
+					if ((devices[0].revents & POLLHUP) && !(devices[0].revents & POLLREAD)) {
+						// PTY slave closed and no pending data; normally means the child ended
 						state = end;
 						break;
 					}
