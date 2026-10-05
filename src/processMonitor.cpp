@@ -616,7 +616,11 @@ processState processMonitor::getState() {
 		}
 		if (interactive) return beforeRunning;
 		waitExistFile("compilation", 2);
-		if (controlFileExists("compilation")) return retrieve;
+		if (controlFileExists("compilation")) {
+			// The compiled program will be run: the runner is not registered yet.
+			if (FileExists(VPL_EXECUTION)) return compiling;
+			return retrieve;
+		}
 		Logger::log(LOG_INFO, "Execution stopped, not interactive, not runner, no compilation file");
 		return stopped;
 	}
