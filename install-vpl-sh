@@ -1,6 +1,6 @@
 #!/bin/bash
 # package:		Part of VPL-Jail-System
-# copyright:    Copyright (C) 2014 Juan Carlos Rodriguez-del-Pino
+# copyright:    Copyright (C) 2014 onwards Juan Carlos Rodriguez-del-Pino
 # license:      GNU/GPL, see LICENSE.txt or http://www.gnu.org/licenses/gpl.txt
 # Description:  Script to install VPL-Jail-System
 
@@ -33,91 +33,12 @@ VPL_CONFIG_DIR=/etc/vpl
 	exec &> >(tee "$LOGFILE")
 } &> /dev/null
 
-function vpl_detect_package_manager() {
-	# Detect package manager (DNF/APT/APK)
-	if [ "$(command -v dnf)" != "" ] ; then
-		echo "Using DNF package manager" 
-		echo "Upgrading installed software"
-		dnf -y -q makecache >> "$LOGFILE"
-		dnf -y -q check-update >> "$LOGFILE"
-		dnf -y -q upgrade >> "$LOGFILE"
-		function vpl_install_base {
-			dnf -y -q install $1 >> "$LOGFILE"
-			return $?
-		}
-		function vpl_uninstall_base {
-			dnf -y -q remove $1 >> "$LOGFILE"
-			return $?
-		}
-		function vpl_install_check {
-			dnf install -y --downloadonly $1 &>/dev/null
-			return $?
-		}
-		PMTYPE="dnf"
-	elif [ "$(command -v yum)" != "" ] ; then
-		echo "Using YUM deprecated package manager" 
-		echo "Upgrading installed software"
-		yum -y -q check-update >> "$LOGFILE"
-		yum -y -q upgrade >> "$LOGFILE"
-		function vpl_install_base {
-			yum -y -q install $1 >> "$LOGFILE"
-			return $?
-		}
-		function vpl_uninstall_base {
-			yum -y -q remove $1 >> "$LOGFILE"
-			return $?
-		}
-		function vpl_install_check {
-			yum -y -q list $1 &> /dev/null
-			return $?
-		}
-		PMTYPE="dnf"
-	elif [ "$(command -v apt-get)" != "" ] ; then
-		echo "Using APT package manager"
-		echo "Upgrading installed software"
-		apt-get -q update >> "$LOGFILE"
-		apt-get -q -y upgrade >> "$LOGFILE"
-		function vpl_install_base {
-			apt-get -q -y --allow-unauthenticated install $1 >> "$LOGFILE"
-			return $?
-		}
-		function vpl_uninstall_base {
-			apt-get -q -y remove $1 >> "$LOGFILE"
-			return $?
-		}
-		function vpl_install_check {
-			apt-cache pkgnames $1 | grep -q -x -F $1 &> /dev/null
-			return $?
-		}
-		PMTYPE="apt"
-		if [ "$(command -v add-apt-repository)" != "" ] ; then
-			add-apt-repository -y universe &> /dev/null
-		fi
-
-	elif [ "$(command -v apk)" != "" ] ; then
-		echo "Using APK package manager"
-		echo "Updagrading installed software"
-		apk --no-interactive update >> "$LOGFILE"
-		apk --no-interactive upgrade >> "$LOGFILE"
-		function vpl_install_base {
-			apk --no-interactive add $1 >> "$LOGFILE"
-			return $?
-		}
-		function vpl_uninstall_base {
-			apk --no-interactive del $1 >> "$LOGFILE"
-			return $?
-		}
-		function vpl_install_check {
-			apk --no-interactive add $1 &> /dev/null
-			return $?
-		}
-		PMTYPE="apk"
-	else
-	    echo "Unable to detect the package manager."
-		echo "Please ensure your system uses one of the supported package managers: APT, DNF, or APK."
-		exit 1
-	fi
-}
+VPL_INSTALLER_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PACKAGE_INSTALLER="$VPL_INSTALLER_DIR/install-vpl-packages-sh"
+if [ ! -x "$PACKAGE_INSTALLER" ] ; then
+	echo "Executable package installer not found: $PACKAGE_INSTALLER"
+	exit 1
+fi
 
 function vpl_detect_service_manager(){
 	# Detect service manager
@@ -307,109 +228,13 @@ function vpl_check_selinux {
 	fi
 }
 
-function vpl_install_package {
-	if [ "$LISTPACKAGES" != "" ] ; then
-		echo -n "  $1 -> "
-		shift
-		while [ "$#" != "0" ] ; do
-			echo -n $1
-			shift
-			if [ "$#" != "0" ] ; then
-				echo -n " or "
-			fi
-		done
-		echo ""
-		return
-	fi
-	local found=0
-	local checked=""
-	local name="$1"
-	echo -n "Installing $1: "
-	shift
-	while [ "$#" != "0" ] ; do
-		checked="$checked $1"
-   		vpl_install_check $1
-		if [ $? -eq 0 ] ; then
-	   	   echo -n $1
-	       vpl_install_base $1
-	   	   if [ $? -eq 0 ] ; then
-	   	   		found=1
-	   	   		echo " [OK]"
-	   	   else
-	   	   		echo " [ERROR]"
-	   	   fi
-	       break
-   	   fi
-       shift
-   done
-   if [ $found -eq 0 ] ; then
-   	   echo "[Package not found. Checked:$checked]"
-	   echo "Package not found for $name. Checked:$checked" >> "$LOGFILE"
-   fi
-}
-
-function vpl_install_npm_check {
-    vpl_install_check npm
-	if [ $? -eq 0 ] ; then
-		vpl_install_base npm
-	fi
-}
-
-function vpl_install_npm {
-	if [ "$LISTPACKAGES" != "" ] ; then
-		echo -n "  $1 -> npm "
-		shift
-		while [ "$#" != "0" ] ; do
-			echo -n $1
-			shift
-			if [ "$#" != "0" ] ; then
-				echo -n " or "
-			fi
-		done
-		echo ""
-		return
-	fi
-    vpl_install_check npm
-	if [ $? -eq 0 ] ; then
-		vpl_install_base npm
-	fi
-	local found=1
-	local checked=""
-	local name="$1"
-	echo -n "Installing $1 (using npm): "
-	shift
-	while [ "$#" != "0" ] ; do
-	    checked="$checked $1"
-   	    npm install -g $1 &> /dev/null
-   	    if [ $? -eq 0 ] ; then
-   	   	    echo " [OK]"
-	        found=0
-   	   	    break
-   	    fi
-        shift
-   done
-   if [ $found -eq 1 ] ; then
-   	   echo "[Package npm not found. Checked:$checked]"
-	   echo "Package npm not found for $name. Checked:$checked" >> "$LOGFILE"
-   fi
-}
-
-
-function vpl_installq {
-   echo -n "Do you want to install $1 (y/n) "
-   A="y"
-   read A
-   if [ "$A" == "y" ] ; then
-        vpl_install_package $@
-   fi
-}
-
 function vpl_install_letsencrypt {
-	vpl_install_package "Let's Encrypt" certbot
-	if [ "$(command -v certbot)" = "" ] ; then
+	if VPL_LOG_REDIRECTED=yes VPL_DO_PACKAGE_UPDATE=no "$PACKAGE_INSTALLER" certbot ; then
+		:
+	else
 		echo "Error: certbot not installed."
 		echo "Please install certbot manually"
-		exit 0
+		exit 1
 	fi
 	local DETECTEDFQDN=""
 	local HNAME=""
@@ -432,82 +257,6 @@ function vpl_install_letsencrypt {
 	ln -s /etc/letsencrypt/live/$HNAME/privkey.pem /etc/vpl/key.pem 2> /dev/null
 	echo "Note: commonly the renewal of the certificate is checked twince a day,"
 	echo "      this action require stop and start the vpl-jail-service."
-}
-
-function vpl_install_jgrasp {
-	local URLBASE="https://www.jgrasp.org/dl4g/jgrasp/"
-	local VERSION="205_04"
-	local FILENAME="jgrasp205_04.zip"
-	local CDIR=""
-	vpl_install_package "wget" wget &> /dev/null
-	while true ; do
-		echo -n "Version number of JGrasp to install e.g. 2.0.5_04 (0 to exit)"
-		read VERSION
-		if [ "$VERSION" == "0" ] ; then
-			break
-		fi 
-		VERSION=$(echo $VERSION | sed 's/\.//g')
-		FILENAME="jgrasp$VERSION.zip"
-		wget -q $URLBASE$FILENAME
-		if [ "$?" == "0" -a -f "$FILENAME" ] ; then
-			unzip $FILENAME > /dev/null
-			if [ -d "jgrasp" ] ; then
-				rm -R /usr/local/jgrasp 2> /dev/null
-				rm /usr/bin/jgrasp 2> /dev/null
-				mv jgrasp /usr/local/jgrasp
-				ln -s /usr/local/jgrasp/bin/jgrasp /usr/bin/jgrasp
-				CDIR=$(pwd)
-				cd /usr/local/jgrasp/src
-				./configure > /dev/null
-				./Make.sh
-				if [ "$?" == "0" ] ; then
-					cd $CDIR
-					break
-				else
-					cd $CDIR
-					echo "Error compiling code. Try again"
-				fi
-			else
-				echo "Error uncompressing package, jgrasp dir not found. Try again"
-			fi
-		else
-			echo "Version not found. Try gain."
-		fi
-	done
-}
-
-function vpl_install_kotlin {
-	local URLBASE="https://github.com/JetBrains/kotlin/releases/download/"
-	local VERSION="1.4.21"
-	local FILENAME=""
-	local CDIR=""
-	vpl_install_package "wget" wget &> /dev/null
-	while true ; do
-		echo -n "Version number of Kotlin to install e.g. 1.4.21 (0 to exit)"
-		read VERSION
-		if [ "$VERSION" == "0" ] ; then
-			break
-		fi
-		SUBDIR="v$VERSION/"
-		FILENAME="kotlin-compiler-$VERSION.zip"
-		wget -q $URLBASE$SUBDIR$FILENAME
-		if [ "$?" == "0" -a -f "$FILENAME" ] ; then
-			unzip $FILENAME > /dev/null
-			if [ -d "kotlinc" ] ; then
-				DESTINATION=/opt/kotlin
-				rm -R $DESTINATION 2> /dev/null
-				mv kotlinc $DESTINATION
-				ln -s $DESTINATION/bin/kotlinc /usr/bin/kotlinc
-				break
-			else
-				echo ""
-				echo "Error uncompressing package, jgrasp dir not found. Try again"
-				echo ""
-			fi
-		else
-			echo "Version not found. Try gain."
-		fi
-	done
 }
 
 function vpl_generate_selfsigned_certificate {
@@ -559,9 +308,11 @@ function vpl_show_help() {
     echo "  update         Update the VPL-Jail-System server software."
     echo "  start          Start the VPL-Jail-System service after installation."
     echo "  noninteractive Install without user interaction."
+    echo "  nogui          Skip VNC/X11/GUI packages (graphical tasks unavailable)."
     echo "  uninstall      Uninstall all development packages leaving the minimum required."
     echo "  [inst_level]   Install programming languages development packages:"
 	echo "                 values [minimum | basic | standard | full]"
+	echo "                 append -nogui to skip GUI packages (e.g. full-nogui)"
 	echo "  list           Show the packages to install by [inst_level]"
     echo ""
     echo "EXAMPLES:"
@@ -571,6 +322,39 @@ function vpl_show_help() {
 	echo "         Install in non-interactive mode standard packages and start server."
     echo "  ./install-vpl.sh full"
 	echo "         Install all known dev packages in interactive mode."
+    echo "  ./install-vpl-sh full-nogui"
+	echo "         Install full packages without VNC/X11 or GUI tools."
+}
+
+function vpl_run_package_installer() {
+	local action="$1"
+	local level="${INSTALL_PACKAGE_LEVEL:-}"
+	VPL_LOG_REDIRECTED=yes "$PACKAGE_INSTALLER" "$NONINTERACTIVE" "$level" "$NOGUI" "$action"
+}
+
+function vpl_commandline_config_arg() {
+	local arg="$1"
+	case "$arg" in
+		start)
+			export START=yes
+			;;
+		noninteractive)
+			export NONINTERACTIVE=noninteractive
+			;;
+		nogui|no-gui)
+			export NOGUI=nogui
+			;;
+		minimum|basic|standard|full)
+			export INSTALL_PACKAGE_LEVEL="$arg"
+			;;
+		minimum-nogui|basic-nogui|standard-nogui|full-nogui)
+			export NOGUI=nogui
+			export INSTALL_PACKAGE_LEVEL="${arg%-nogui}"
+			;;
+		*)
+			[ -z "$ACTION_ARG" ] && ACTION_ARG=$1
+			;;
+	esac
 }
 
 function vpl_install_update_daemon() {
@@ -625,7 +409,7 @@ function vpl_install_update_extra_files() {
 	else
 		cp vpl-jail-system.conf $VPL_CONFIGFILE
 		echo "Default configuration file installed"
-		if [ "$PMTYPE" = "dnf"  ] ; then
+		if [ "$(command -v dnf)" != "" ] || [ "$(command -v yum)" != "" ] ; then
 			echo "" >> $VPL_CONFIGFILE
 			echo "ENVPATH=/usr/bin:/bin" >> $VPL_CONFIGFILE
 			echo "Configuration file changed. Added ENVPATH"
@@ -644,170 +428,6 @@ function vpl_install_update_extra_files() {
 	# Create default control dir
 	mkdir -p /var/vpl-jail-system
 	chmod 0700 /var/vpl-jail-system
-}
-
-function vpl_process_packages_file() {
-	[ ! -s "$1" ] && (echo "Package file '$1' not found" ; return)
-	local npm_command=$3
-	local package_command=$4
-	echo "$2 from $1"
-	local line
-	local name
-	local packages
-	while read -r line
-	do
-		echo "$line" | grep -q "^ *#"
-		[ $? = 0 ] && continue
-		echo "$line" | grep -q "^ *npm "
-		if [ $? = 0 ] ; then
-			name=$(echo $line | sed -e "s/^ *npm \+\"\([^\"]\+\)\".*/\1/")
-			packages=$(echo $line | sed -e "s/.*\"[^\"]\+\"\(.*\)/\1/")
-			[ -n "$packages" ] && $npm_command "$name" $packages
-		else
-			name=$(echo $line | sed -e "s/.*\"\([^\"]\+\)\".*/\1/")
-			packages=$(echo $line | sed -e "s/.*\"[^\"]\+\"\(.*\)/\1/")
-			[ -n "$packages" ] && $package_command "$name" $packages
-		fi
-	done < "$1"
-}
-
-function vpl_install_packages_file() {
-	vpl_process_packages_file "$1" "Installing" vpl_install_npm vpl_install_package
-}
-
-function vpl_install_minimum() {
-	echo ""
-	echo "Minimum required packages"
-	local PACKAGE_LIST_FILE="packages_files/minimum.$PMTYPE.lst"
-	[ -s $PACKAGE_LIST_FILE ] && vpl_install_packages_file $PACKAGE_LIST_FILE
-	if [ "$(command -v gconftool-2)" != "" ] ; then
-		gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults -t string --set /apps/metacity/general/theme Redmond
-	fi
-	echo
-}
-
-function vpl_install_basic() {
-	echo ""
-	echo "Basic additional packages"
-	local PACKAGE_LIST_FILE="packages_files/basic.$PMTYPE.lst"
-	[ -s $PACKAGE_LIST_FILE ] && vpl_install_packages_file $PACKAGE_LIST_FILE
-	if [ "$PMTYPE" = "apt" ] ; then
-		if [ "$(command -v update-alternatives)" != "" -a "$LISTPACKAGES" == "" ] ; then
-			update-alternatives --auto java
-			update-alternatives --auto javac
-		fi
-	fi
-	echo
-}
-
-function vpl_install_standard() {
-	echo ""
-	echo "Standard additional packages"
-	local PACKAGE_LIST_FILE="packages_files/standard.$PMTYPE.lst"
-	[ -s $PACKAGE_LIST_FILE ] && vpl_install_packages_file $PACKAGE_LIST_FILE
-	echo
-}
-
-function vpl_install_full() {
-	echo ""
-	echo "Full additional packages"
-	local PACKAGE_LIST_FILE="packages_files/full.$PMTYPE.lst"
-	[ -s $PACKAGE_LIST_FILE ] && vpl_install_packages_file $PACKAGE_LIST_FILE
-	if [ "$LISTPACKAGES" != "" ] ; then
-		echo "  JGrasp (requires user intervention) "
-		echo "  Kotlin (requires user intervention) "
-		echo
-		return
-	fi
-
-	if [ "$NONINTERACTIVE" == "" ] ; then
-		echo "Do you want to try to install Kotlin?"
-		echo -n "(y/n)"
-		read A3
-		if [ "$A3" != "n" ] ; then
-			vpl_install_kotlin
-		fi
-		echo "Do you want to try to install JGrasp?"
-		echo -n "(y/n)"
-		read A4
-		if [ "$A4" != "n" ] ; then
-			vpl_install_jgrasp
-		fi
-	fi
-}
-
-function vpl_uninstall_package {
-	local checked=""
-	echo -n "Uninstalling $1: "
-	shift
-	while [ "$#" != "0" ] ; do
-		checked="$checked $1"
-	    vpl_uninstall_base $1
-   	    if [ $? -eq 0 ] ; then
-   	   		echo " [OK]"
-   	    else
-   	   		echo " [FAILED/NOT FOUND]"
-   	    fi
-        shift
-   done
-}
-
-function vpl_uninstall_npm {
-    if [ "$(command -v npm)" == "" ] ; then
-       return
-    fi
-	echo -n "Uninstalling $1 (using npm): "
-	shift
-	while [ "$#" != "0" ] ; do
-   	    npm uninstall -g $1 &> /dev/null
-   	    if [ $? -eq 0 ] ; then
-   	   	    echo " [OK]"
-   	    fi
-        shift
-   done
-}
-
-function vpl_uninstall_packages_file() {
-	vpl_process_packages_file "$1" "Uninstalling" vpl_uninstall_npm vpl_uninstall_package
-}
-
-function vpl_uninstall_full_leaving_minimum() {
-	if [ "$NONINTERACTIVE" == "" ] ; then
-		echo ""
-		echo "WARNING:"
-		echo "This action will uninstall all development packages in the full set"
-		echo "except for those in the minimum set."
-		echo "This script cannot determine if a package was installed by this script or manually."
-		echo "Therefore, packages installed manually or by other means may be removed."
-		echo "Custom configurations or packages depending on the removed packages might be affected."
-		echo -n "Are you sure you want to proceed? (y/n) "
-		read A
-		if [ "$A" != "y" ] ; then
-			echo "Uninstall aborted."
-			return
-		fi
-	fi
-	echo ""
-	echo "Uninstalling Full, Standard and Basic packages"
-	local PACKAGE_LIST_FILE="packages_files/full.$PMTYPE.lst"
-	[ -s $PACKAGE_LIST_FILE ] && vpl_uninstall_packages_file $PACKAGE_LIST_FILE
-	PACKAGE_LIST_FILE="packages_files/standard.$PMTYPE.lst"
-	[ -s $PACKAGE_LIST_FILE ] && vpl_uninstall_packages_file $PACKAGE_LIST_FILE
-	PACKAGE_LIST_FILE="packages_files/basic.$PMTYPE.lst"
-	[ -s $PACKAGE_LIST_FILE ] && vpl_uninstall_packages_file $PACKAGE_LIST_FILE
-
-	if [ -d "/opt/kotlin" ]; then
-        echo "Removing Kotlin"
-        rm -R /opt/kotlin
-        rm /usr/bin/kotlinc
-    fi
-    
-    if [ -d "/usr/local/jgrasp" ]; then
-         echo "Removing JGrasp"
-         rm -R /usr/local/jgrasp
-         rm /usr/bin/jgrasp
-    fi
-    echo "Done."
 }
 
 function vpl_check_SSL_certificate() {
@@ -842,38 +462,6 @@ function vpl_check_SSL_certificate() {
 	fi
 }
 
-function vpl_commandline_config_arg() {
-	case "$1" in
-		start)
-			export START=yes
-			;;
- 		noninteractive)
-			export NONINTERACTIVE=yes
-			export DEBIAN_FRONTEND=noninteractive
-			;;
-		minimum)		
-			export MINIMUM=yes
-			;;
-		basic)
-			export MINIMUM=yes
-			export BASIC=yes
-			;;
-		standard)
-			export MINIMUM=yes
-			export BASIC=yes
-			export STANDARD=yes
-			;;
-		full)
-			export MINIMUM=yes
-			export BASIC=yes
-			export STANDARD=yes
-			export FULL=yes
-			;;
-		*)
-			[ -z "$ACTION_ARG" ] && ACTION_ARG=$1
-			;;
-	esac
-}
 
 function vpl_commandline_action_arg() {
 	case "$1" in
@@ -881,20 +469,17 @@ function vpl_commandline_action_arg() {
 			vpl_show_help
 			;;
 		update)
+			vpl_run_package_installer update || exit $?
 			vpl_install_update_daemon
 			vpl_install_update_extra_files
 			vpl_install_service
 			[ -z "$NONINTERACTIVE" ] && vpl_info_using_service
 			;;
 		uninstall)
-			vpl_uninstall_full_leaving_minimum
+			vpl_run_package_installer uninstall || exit $?
 			;;
 		list)
-			export LISTPACKAGES=yes
-			vpl_install_minimum
-			[ "$BASIC" != "" ] && vpl_install_basic
-			[ "$STANDARD" != "" ] && vpl_install_standard
-			[ "$FULL" != "" ] && vpl_install_full
+			vpl_run_package_installer list || exit $?
 			;;
 		*)
 			echo ""
@@ -906,7 +491,6 @@ function vpl_commandline_action_arg() {
 	exit 0
 }
 
-vpl_detect_package_manager
 vpl_detect_service_manager
 
 echo "Installation log file => $LOGFILE"
@@ -917,19 +501,18 @@ done
 
 [ -n "$ACTION_ARG" ] && vpl_commandline_action_arg $ACTION_ARG
 
-if [ "$MINIMUM" == "" ] ; then
+if [ "$INSTALL_PACKAGE_LEVEL" = "" ] ; then
 	vpl_show_help
 	exit 1
 fi
-vpl_install_minimum
+vpl_run_package_installer || {
+	echo "Package installation failed."
+	exit 1
+}
 vpl_install_update_daemon
 vpl_install_update_extra_files
 vpl_install_service
 vpl_check_SSL_certificate
-
-[ "$BASIC" != "" ] && vpl_install_basic
-[ "$STANDARD" != "" ] && vpl_install_standard
-[ "$FULL" != "" ] && vpl_install_full
 
 echo "-----------------------------------------------------------------"
 echo "If you are planning to use apache2, nginx or other service,"
