@@ -1,1 +1,10 @@
-Run ./install-vpl-sh as root
+Run ./install-vpl-sh as root.
+
+To install without graphical/VNC support, append `-nogui` to an installation
+level, for example: `./install-vpl-sh full-nogui`. This is equivalent to
+`./install-vpl-sh full nogui`. Graphical and interactive VNC tasks will not be
+available in a nogui installation.
+
+To manage development packages separately from the VPL installer,
+run `./install-vpl-packages-sh [minimum|basic|standard|full][-nogui]`.
+To install Certbot separately, run `./install-vpl-packages-sh certbot`.
