@@ -29,8 +29,11 @@ WORKDIR /vpl-jail-system
 # Install bash on distros with no bash
 RUN /vpl-jail-system/install-bash-sh
 
+# Install packages first to make an optimized Docker layer cache
+RUN /vpl-jail-system/install-vpl-packages-sh noninteractive ${VPL_INSTALL_LEVEL}
+
 # Run VPL installer
-RUN /vpl-jail-system/install-vpl-sh noninteractive ${VPL_INSTALL_LEVEL}
+RUN VPL_DO_PACKAGE_UPDATE=no /vpl-jail-system/install-vpl-sh noninteractive update
 
 # Install the language servers and their launchers
 RUN if [ -n "${VPL_INSTALL_LS}" ] ; then \
