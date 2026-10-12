@@ -234,13 +234,9 @@ vpl_log "vncconfig running if available"
 function vpl_start_window_manager {
     local WINDOW_MANAGER
     local WINDOW_MANAGER_PID
-    for WINDOW_MANAGER in icewm openbox fluxbox metacity ; do
+    for WINDOW_MANAGER in openbox fluxbox icewm ; do
         if [ ! -x "$(command -v "$WINDOW_MANAGER")" ] ; then
             continue
-        fi
-        if [ "$WINDOW_MANAGER" = "icewm" ] ; then
-            mkdir -p .icewm
-            echo "Theme=SilverXP/default.theme" > .icewm/theme
         fi
         "$WINDOW_MANAGER" &
         WINDOW_MANAGER_PID=$!
