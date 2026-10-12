@@ -243,8 +243,8 @@ Options:
     all                    Run the default matrix: alpine, ubuntu, debian, and
                            fedora at minimum, basic, standard, and full levels.
     DISTRO                 Test only the named distribution.
-    minimum|basic|standard|full
-                           Test only the named install level.
+    minimum[-nogui]|basic[-nogui]|standard[-nogui]|full[-nogui]
+                           Test only the named install level; -nogui skips GUI packages.
     keep                   Keep images and containers after the tests.
     image                  Test existing Docker images instead of building them.
     iterations=N           Run N batch and interactive tests per container.
@@ -254,7 +254,7 @@ Options:
 
 Examples:
     $0 all
-    $0 ubuntu basic
+    $0 ubuntu basic-nogui
     $0 all image keep iterations=20
     $0 alpine languageservers=python,java loglevel=7
 EOF
@@ -263,7 +263,7 @@ EOF
 function runTests() {
     # Parameters (all optional and in any order):
     #    Distro name, default [alpine ubuntu debian fedora]
-    #    Install level [minimum basic standard full]
+    #    Install level [minimum basic standard full], optionally suffixed with -nogui.
     #    keep: Indicate do not delete the image and container after the test.
     #    image: Test existing Docker images instead of building images.
     #    iterations=N: Number of batch and interactive daemon tests per container (default 10).
@@ -277,8 +277,8 @@ function runTests() {
     local USE_EXISTING_IMAGES=
     local keep=
     for param in "$@"; do
-        if printf '%s\n' "${INSTALL_LEVELS[@]}" | grep -q -x "$param" ; then
-            INSTALL_LEVELS=( $param )
+        if [[ "$param" =~ ^(minimum|basic|standard|full)(-nogui)?$ ]] ; then
+            INSTALL_LEVELS=( "$param" )
             continue
         fi
         if [[ $param == "keep" ]] ; then

@@ -18,4 +18,4 @@
 "VHDL compiler" ghdl
 "libtool required for VHDL" libtool-bin
 "Groovy programming language" groovy
-"Web browser" firefox firefox-esr
+GUI "Web browser" firefox firefox-esr

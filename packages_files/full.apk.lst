@@ -7,4 +7,4 @@
 "Lua compiler" lua lua5.4 lua5.3 lua5.2 lua5.1
 "R statistical computation and graphics system (GNU)" R
 "Verilog compiler" iverilog
-"Web browser" firefox
+GUI "Web browser" firefox

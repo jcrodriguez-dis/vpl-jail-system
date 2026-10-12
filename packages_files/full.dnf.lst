@@ -14,4 +14,4 @@
 "MIPS R2000/R3000 emulator" spim
 "Verilog compiler" iverilog
 "VHDL compiler" ghdl
-"Web browser" firefox
+GUI "Web browser" firefox

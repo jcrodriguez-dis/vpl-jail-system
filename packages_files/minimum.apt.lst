@@ -8,13 +8,9 @@
 "SSL library" openssl
 "SSL library" libssl-dev
 "Firewall" iptables
-"X system" xorg
-"dbus-x11" dbus-x11
-"VNC server" tigervnc-standalone-server tightvncserver
-"Fonts" xfonts-75dpi
-"Fonts" xfonts-100dpi
-"Window manager" openbox fluxbox metacity
-"Configuration DB system" gconf2
-"xterm" xterm
+GUI "dbus-x11" dbus-x11
+GUI "VNC server" tigervnc-standalone-server tightvncserver
+GUI "Window manager" openbox fluxbox icewm
+GUI "xterm" xterm
 "net-tools" net-tools
 "bc" bc

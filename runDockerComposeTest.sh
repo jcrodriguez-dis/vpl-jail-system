@@ -173,7 +173,7 @@ function checkDockerCompose() {
 function runTests() {
     # Parameters:
     #    $1 Ditro name [Optional]
-    #    $2 Install level [Optional]
+    #    $2 Install level [Optional], optionally suffixed with -nogui
     local n=0
 	local DISTROS=( alpine ubuntu debian fedora )
     local INSTALL_LEVELS=( minimum basic standard full )
@@ -189,8 +189,8 @@ function runTests() {
     fi
     if [ "$1" != "" ] ; then
         for AUX in "${INSTALL_LEVELS[@]}"; do
-            if [[ "$AUX" == "$1" ]]; then
-                INSTALL_LEVELS=( $AUX )
+            if [[ "$AUX" == "$1" || "${AUX}-nogui" == "$1" ]]; then
+                INSTALL_LEVELS=( "$1" )
                 shift
                 break
             fi

@@ -8,12 +8,11 @@
 "SSL library" openssl
 "SSL library" openssl-dev
 "Firewall" iptables
-"X system" xorg-server
-"dbus-x11" dbus-x11
-"VNC server" tigervnc
-"Python XDG" py3-xdg
-"Window manager" openbox fluxbox metacity
-"X resource manager" xrdb
-"xterm" xterm
+GUI "dbus-x11" dbus-x11
+GUI "VNC server" tigervnc
+GUI "Python XDG" py3-xdg
+GUI "Window manager" openbox fluxbox icewm
+GUI "X resource manager" xrdb
+GUI "xterm" xterm
 "net-tools" net-tools
 "bc" bc

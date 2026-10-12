@@ -1,17 +1,17 @@
 # Basic packages for VPL jail system on Linux using APT (Debian, Ubuntu, etc.)
 "C compiler (GNU)" gcc
 "General purpose debugger (GNU)" gdb
-"DDD graphical front end debugger (GNU)" ddd
+GUI "DDD graphical front end debugger (GNU)" ddd
 "Java runtime" openjdk-26-jre openjdk-25-jre openjdk-21-jre openjdk-17-jre default-jre openjdk-11-jre openjdk-8-jre
 "Java jdk" openjdk-26-jdk openjdk-25-jdk openjdk-21-jdk openjdk-17-jdk default-jdk openjdk-11-jdk openjdk-8-jdk
-"JavaFX" openjfx
+GUI "JavaFX" openjfx
 "Java Checkstyle" checkstyle
 "Junit framework" junit4 junit
 "PHP interpreter" php-cli
 "PHP readline" php-readline
 "Sqlite for PHP" php-sqlite3
 "Python3" python3
-"Python3 Tk" python3-tk
+GUI "Python3 Tk" python3-tk
 "Python3 NumPy" python3-numpy
 "Python3 pandas" python3-pandas
 "Python3 Matplotlib" python3-matplotlib
@@ -21,5 +21,5 @@
 "Python mypy" mypy
 "Python pycodestyle" pycodestyle
 "Python pydocstyle" pydocstyle
-"Pythom Thonny" thonny
+GUI "Pythom Thonny" thonny
 "SQL interpreter" sqlite3
