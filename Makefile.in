@@ -324,7 +324,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = src
-EXTRA_DIST = tests/daemonExecutionTest.py
+EXTRA_DIST = tests/daemonExecutionTest.py \
+	tests/daemonResultRetentionTest.py
 dist_pkgdata_DATA = launchers/vncaccel.sh \
 	launchers/vpl_terminal_launcher.sh \
 	launchers/vpl_vnc_launcher.sh launchers/vpl_batch_launcher.sh \
