@@ -593,6 +593,35 @@ processState processMonitor::getState() {
 		return starting;
 	}
 	time_t elapsedTime = currentTime - startTime;
+	// Completed batch output has its own harvest window, even without a monitor.
+	if (!interactive) {
+		string resultFile;
+		if (runner_pid != 0 && !Util::processExistsAndRunning(runner_pid)) {
+			resultFile = getProcessControlPath("execution");
+		} else if (runner_pid == 0 && !Util::processExistsAndRunning(compiler_pid)
+				&& !FileExists(VPL_EXECUTION)) {
+			resultFile = getProcessControlPath("compilation");
+		}
+		time_t completedTime = Util::timeOfFileModification(resultFile);
+		if (completedTime != 0) {
+			if (completedTime + JAIL_HARVEST_TIMEOUT >= currentTime) {
+				if (monitor_pid == 0 && hasMonitorTicket() && elapsedTime > JAIL_MONITORSTART_TIMEOUT) {
+					// Keep the output but stop processes left after the no-monitor timeout.
+					vector<pid_t> pids = getPrisonerProcesses(getPrisonerID());
+					for (size_t i = 0; i < pids.size(); i++) {
+						if (Util::processExistsAndRunning(pids[i])) {
+							stopPrisonerProcess(false);
+							break;
+						}
+					}
+				}
+				return retrieve;
+			}
+			Logger::log(LOG_INFO, "Execution result harvest timeout reached");
+			cleanTask();
+			return stopped;
+		}
+	}
 	time_t tlimit = startTime;
 	tlimit += executionLimits.maxtime;
 	tlimit += JAIL_HARVEST_TIMEOUT;

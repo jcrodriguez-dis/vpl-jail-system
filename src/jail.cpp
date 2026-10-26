@@ -579,14 +579,14 @@ void Jail::commandMonitor(const string monitorticket, Socket *s) {
 			if (!ws.wait(200)) {
 				rec = ws.receive();
 			}
-			if (ws.isClosed()) {
-				if (state == retrieve && timeout >= time(NULL)) {
-					continue;
-				}
-				break;
-			}
 			if (rec.size() > 0) { //Receive client close ws
 				ws.close();
+			}
+			if (ws.isClosed()) {
+				if (state == retrieve && timeout >= time(NULL)) {
+					usleep(100000);
+					continue;
+				}
 				break;
 			}
 			//Check running timeout
